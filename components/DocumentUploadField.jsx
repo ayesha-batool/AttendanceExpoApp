@@ -1,7 +1,7 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as DocumentPicker from 'expo-document-picker';
+import React from 'react';
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+// Removed DocumentPicker import to fix the error
 
 const DocumentUploadField = ({ 
   label, 
@@ -12,24 +12,28 @@ const DocumentUploadField = ({
   required = false 
 }) => {
   const handleUpload = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: [
-          'application/pdf',
-          'image/*',
-          'application/msword',
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        ],
-        copyToCacheDirectory: true,
-      });
+    // Temporarily disabled due to DocumentPicker issues
+    Alert.alert('Upload Disabled', 'Document upload is temporarily disabled. Please contact support.');
+    
+    // Original code commented out:
+    // try {
+    //   const result = await DocumentPicker.getDocumentAsync({
+    //     type: [
+    //       'application/pdf',
+    //       'image/*',
+    //       'application/msword',
+    //       'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    //     ],
+    //     copyToCacheDirectory: true,
+    //   });
 
-      if (!result.canceled && result.assets && result.assets[0]) {
-        const file = result.assets[0];
-        onUpload(file);
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to pick document');
-    }
+    //   if (!result.canceled && result.assets && result.assets[0]) {
+    //     const file = result.assets[0];
+    //     onUpload(file);
+    //   }
+    // } catch (error) {
+    //   Alert.alert('Error', 'Failed to pick document');
+    // }
   };
 
   const handleRemove = () => {

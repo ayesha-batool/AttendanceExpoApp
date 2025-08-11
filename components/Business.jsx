@@ -2,12 +2,12 @@
 import { useRouter } from "expo-router";
 import React from "react";
 import {
-    Dimensions,
-    Image,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Dimensions,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
 
@@ -23,7 +23,7 @@ const Card = ({ title, image, onPress, iconColor, gradientColors }) => (
       <View style={styles.textContainer}>
         <Text style={styles.title}>{title}</Text>
           <Text style={styles.subtitle}>
-            {title === "Police Officers" ? "Manage police officers and duty assignments" : "Manage your team members"}
+            {title === "Business" ? "Manage your business operations" : "Manage your team members"}
           </Text>
         </View>
         <View style={styles.arrowContainer}>
@@ -52,8 +52,15 @@ const BusinessAndEmployee = () => {
      
       
     <View style={styles.row}>
+      {/* <Card
+        title="Business"
+        image={require("../assets/images/Business.png")}
+        onPress={() => handleNavigate("business")}
+          iconColor="#E3F2FD"
+          gradientColors={["#667eea", "#764ba2"]}
+      /> */}
       <Card
-        title="Police Officers"
+        title="Employee"
         image={require("../assets/images/Employee.png")}
         onPress={() => handleNavigate("employee")}
           iconColor="#F3E5F5"

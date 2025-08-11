@@ -13,7 +13,7 @@ const EmployeeLayoutContent = () => {
         title="Team Management"
         subtitle="Manage officers & track attendance"
         icon="people"
-        gradientColors={['#3b82f6', '#2563eb', '#1d4ed8']}
+        gradientColors={['#1e40af', '#1e3a8a']}
         showBackButton={true}
         actionButton={headerAction}
       />

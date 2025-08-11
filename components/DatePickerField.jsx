@@ -3,7 +3,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import React, { useState } from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-const DatePickerField = ({ label, mode = 'date', value, onChange, optional = false }) => {
+const DatePickerField = ({ label, mode = 'date', value, onChange, optional = false, error = null }) => {
   const [showPicker, setShowPicker] = useState(false);
 
   const handleChange = (event, selectedDate) => {
@@ -14,13 +14,20 @@ const DatePickerField = ({ label, mode = 'date', value, onChange, optional = fal
   };
 
   const formatDate = (date) => {
-    if (!(date instanceof Date)) return 'Select Date';
+    if (!date || !(date instanceof Date) || isNaN(date.getTime())) return 'Select Date';
 
     return mode === 'time'
       ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       : date.toLocaleDateString();
   };
 
+  // Ensure we have a valid date for the DateTimePicker
+  const getPickerValue = () => {
+    if (value instanceof Date && !isNaN(value.getTime())) {
+      return value;
+    }
+    return new Date();
+  };
 
   return (
     <View style={styles.container}>
@@ -29,12 +36,13 @@ const DatePickerField = ({ label, mode = 'date', value, onChange, optional = fal
           {label} {optional && <Text style={styles.optionalText}>(optional)</Text>}
         </Text>
       )}
-      <TouchableOpacity onPress={() => setShowPicker(true)} style={styles.button}>
+      <TouchableOpacity onPress={() => setShowPicker(true)} style={[styles.button, error && styles.buttonError]}>
         <Text style={styles.buttonText}>{formatDate(value)}</Text>
       </TouchableOpacity>
+      {error && <Text style={styles.errorText}>{error}</Text>}
       {showPicker && (
         <DateTimePicker
-          value={value}
+          value={getPickerValue()}
           mode={mode}
           display="default"
           onChange={handleChange}
@@ -58,6 +66,15 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 16,
     color: '#333',
+  },
+  buttonError: {
+    borderColor: '#ff4d4f',
+    backgroundColor: '#fff2f0',
+  },
+  errorText: {
+    color: '#ff4d4f',
+    fontSize: 12,
+    marginTop: 4,
   },
 });
 

@@ -1,9 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as DocumentPicker from 'expo-document-picker';
 import React, { useEffect, useState } from 'react';
 import {
     Modal,
-    Image as RNImage,
     ScrollView,
     StyleSheet,
     Text,
@@ -14,8 +12,8 @@ import {
 import Toast from 'react-native-toast-message';
 
 import CustomOptionsService from '../services/customOptionsService';
-import { CUSTOM_VALIDATORS, formatErrorMessage, formatSuccessMessage, validateForm, VALIDATION_SCHEMAS } from '../utils/validation';
-import DatePicker from './DatePicker';
+import { CUSTOM_VALIDATORS, formatErrorMessage, validateForm, VALIDATION_SCHEMAS } from '../utils/validation';
+import DatePickerField from './DatePickerField';
 import SelectDropdown from './SelectDropdown';
 
 const ExpenseForm = ({ visible, onClose, onSave, expense, isEditMode }) => {
@@ -26,12 +24,10 @@ const ExpenseForm = ({ visible, onClose, onSave, expense, isEditMode }) => {
     department: '',
     date: new Date().toISOString().split('T')[0],
     description: '',
-    notes: '',
-    receipt: null
+    notes: ''
   });
 
   const [errors, setErrors] = useState({});
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [departmentOptions, setDepartmentOptions] = useState([
     { label: 'Patrol', value: 'patrol' },
@@ -109,8 +105,7 @@ const ExpenseForm = ({ visible, onClose, onSave, expense, isEditMode }) => {
         department: expense.department || '',
         date: expense.date || new Date().toISOString().split('T')[0],
         description: expense.description || '',
-        notes: expense.notes || '',
-        receipt: expense.receipt || null
+        notes: expense.notes || ''
       });
     } else {
       setFormData({
@@ -120,8 +115,7 @@ const ExpenseForm = ({ visible, onClose, onSave, expense, isEditMode }) => {
         department: '',
         date: new Date().toISOString().split('T')[0],
         description: '',
-        notes: '',
-        receipt: null
+        notes: ''
       });
     }
     setErrors({});
@@ -133,7 +127,7 @@ const ExpenseForm = ({ visible, onClose, onSave, expense, isEditMode }) => {
     
     // Add custom validations
     if (formData.amount) {
-      const amountError = CUSTOM_VALIDATORS.expenseAmountRange(formData.amount, 0, 100000);
+      const amountError = CUSTOM_VALIDATORS.expenseAmountRange(formData.amount, 0, 10000000);
       if (amountError) {
         validation.errors.amount = amountError;
         validation.isValid = false;
@@ -159,18 +153,15 @@ const ExpenseForm = ({ visible, onClose, onSave, expense, isEditMode }) => {
       const expenseData = {
         ...formData,
         amount: parseFloat(formData.amount),
-        id: expense?.id || Date.now().toString(),
+        id: expense?.id || expense?.$id || `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        $id: expense?.$id || expense?.id || `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         createdAt: expense?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
       await onSave(expenseData);
       
-      Toast.show({
-        type: 'success',
-        text1: 'Success',
-        text2: formatSuccessMessage(isEditMode ? 'updated' : 'added', 'Expense'),
-      });
+      // Removed success toast
       
       onClose();
     } catch (error) {
@@ -183,57 +174,13 @@ const ExpenseForm = ({ visible, onClose, onSave, expense, isEditMode }) => {
     }
   };
 
-  const handleDocumentPick = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: 'image/*',
-        copyToCacheDirectory: true,
-      });
 
-      if (!result.canceled && result.assets[0]) {
-        const asset = result.assets[0];
-        
-        // Validate the URI to prevent data URL navigation issues
-        if (asset.uri && !asset.uri.startsWith('data:')) {
-          setFormData(prev => ({
-            ...prev,
-            receipt: asset.uri
-          }));
-          Toast.show({
-            type: 'success',
-            text1: 'Image Selected',
-            text2: 'Receipt image has been attached successfully',
-          });
-        } else {
-          Toast.show({
-            type: 'error',
-            text1: 'Error',
-            text2: 'Invalid image format. Please select a valid image file.',
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Failed to select image',
-      });
-    }
-  };
-
-  const removeReceipt = () => {
-    setFormData(prev => ({
-      ...prev,
-      receipt: null
-    }));
-  };
 
   return (
     <Modal
       visible={visible}
-      animationType="slide"
-      transparent={true}
+      animationType="fade"
+      transparent={false}
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
@@ -244,7 +191,7 @@ const ExpenseForm = ({ visible, onClose, onSave, expense, isEditMode }) => {
               {isEditMode ? 'Edit Expense' : 'Add New Expense'}
             </Text>
             <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <Ionicons name="close" size={24} color="#666" />
+              <Ionicons name="close" size={24} color="#fff" />
             </TouchableOpacity>
           </View>
 
@@ -306,19 +253,12 @@ const ExpenseForm = ({ visible, onClose, onSave, expense, isEditMode }) => {
             </View>
 
             {/* Date */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Date *</Text>
-              <TouchableOpacity
-                style={[styles.dateInput, errors.date && styles.inputError]}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <Text style={[styles.dateText, !formData.date && styles.placeholderText]}>
-                  {formData.date ? new Date(formData.date).toLocaleDateString() : 'Select date'}
-                </Text>
-                <Ionicons name="calendar" size={20} color="#6b7280" />
-              </TouchableOpacity>
-              {errors.date && <Text style={styles.errorText}>{errors.date}</Text>}
-            </View>
+            <DatePickerField
+              label="Date *"
+              value={formData.date ? new Date(formData.date) : new Date()}
+              onChange={(date) => setFormData(prev => ({ ...prev, date: date.toISOString().split('T')[0] }))}
+              error={errors.date}
+            />
 
             {/* Description */}
             <View style={styles.inputGroup}>
@@ -350,36 +290,7 @@ const ExpenseForm = ({ visible, onClose, onSave, expense, isEditMode }) => {
               />
             </View>
 
-            {/* Receipt */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Receipt</Text>
-              <View style={styles.photoContainer}>
-                {formData.receipt && !formData.receipt.startsWith('data:') ? (
-                  <View style={styles.photoPreview}>
-                    <RNImage
-                      source={{ uri: formData.receipt }}
-                      style={styles.photoImage}
-                      resizeMode="cover"
-                    />
-                    <TouchableOpacity
-                      style={styles.removePhotoButton}
-                      onPress={removeReceipt}
-                    >
-                      <Ionicons name="close-circle" size={24} color="#FF3B30" />
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <View style={styles.photoPlaceholder}>
-                    <Ionicons name="receipt" size={48} color="#8E8E93" />
-                    <Text style={styles.photoPlaceholderText}>No receipt selected</Text>
-                  </View>
-                )}
-                <TouchableOpacity style={styles.uploadPhotoButton} onPress={handleDocumentPick}>
-                  <Ionicons name="cloud-upload" size={24} color="#007AFF" />
-                  <Text style={styles.uploadPhotoButtonText}>Upload Receipt</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+
           </ScrollView>
 
           {/* Footer */}
@@ -396,18 +307,6 @@ const ExpenseForm = ({ visible, onClose, onSave, expense, isEditMode }) => {
         </View>
       </View>
 
-      {/* Date Picker Modal */}
-      <DatePicker
-        visible={showDatePicker}
-        onClose={() => setShowDatePicker(false)}
-        onDateSelect={(date) => {
-          setFormData(prev => ({ ...prev, date: date.toISOString().split('T')[0] }));
-          setShowDatePicker(false);
-        }}
-        selectedDate={formData.date ? new Date(formData.date) : new Date()}
-      />
-
-
     </Modal>
   );
 };
@@ -415,21 +314,11 @@ const ExpenseForm = ({ visible, onClose, onSave, expense, isEditMode }) => {
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
   },
   modalContent: {
+    flex: 1,
     backgroundColor: '#fff',
-    borderRadius: 20,
-    width: '90%',
-    maxHeight: '90%',
-    padding: 0,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 10,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -437,24 +326,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: '#8b5cf6',
+    backgroundColor: '#8b5cf6',
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1e293b',
+    color: '#fff',
   },
   closeButton: {
     padding: 8,
     borderRadius: 8,
-    backgroundColor: '#f8fafc',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   modalBody: {
     flex: 1,
-    padding: 20,
+    padding: 24,
+    paddingBottom: 32,
   },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
   row: {
     flexDirection: 'row',
@@ -464,10 +355,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   label: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
     color: '#374151',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   input: {
     borderWidth: 1,
@@ -491,24 +382,7 @@ const styles = StyleSheet.create({
     color: '#ef4444',
     marginTop: 4,
   },
-  dateInput: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-  },
-  dateText: {
-    fontSize: 16,
-    color: '#1e293b',
-  },
-  placeholderText: {
-    color: '#9ca3af',
-  },
+
   uploadButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -528,10 +402,10 @@ const styles = StyleSheet.create({
   modalFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: 20,
+    padding: 24,
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
-    gap: 12,
+    gap: 16,
   },
   cancelButton: {
     flex: 1,
@@ -560,65 +434,14 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   // Photo upload styles (for receipt)
-  photoContainer: {
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  photoPreview: {
-    position: 'relative',
-    marginBottom: 16,
-  },
-  photoImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    borderWidth: 3,
-    borderColor: '#007AFF',
-  },
-  removePhotoButton: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 2,
-  },
-  photoPlaceholder: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#F2F2F7',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#E5E5EA',
-    borderStyle: 'dashed',
-    marginBottom: 16,
-  },
-  photoPlaceholderText: {
-    fontSize: 12,
-    color: '#8E8E93',
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  uploadPhotoButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F2F2F7',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#007AFF',
-    borderStyle: 'dashed',
-  },
-  uploadPhotoButtonText: {
-    marginLeft: 8,
-    fontSize: 16,
-    color: '#007AFF',
-    fontWeight: '500',
-  },
+
+
+
+
+
+
+
+
 });
 
 export default ExpenseForm; 

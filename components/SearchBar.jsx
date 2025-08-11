@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
-const SearchBar = ({ value, onChangeText, placeholder = "Search...", onFilterPress }) => {
+const SearchBar = ({ value, onChangeText, placeholder = "Search...", onFilterPress, onClear }) => {
   return (
     <View style={styles.searchContainer}>
       <View style={styles.searchInputContainer}>
@@ -14,6 +14,11 @@ const SearchBar = ({ value, onChangeText, placeholder = "Search...", onFilterPre
           placeholder={placeholder}
           placeholderTextColor="#9ca3af"
         />
+        {value && onClear && (
+          <TouchableOpacity onPress={onClear} style={styles.clearButton}>
+            <Ionicons name="close-circle" size={18} color="#9ca3af" />
+          </TouchableOpacity>
+        )}
       </View>
       {onFilterPress && (
         <TouchableOpacity style={styles.filterButton} onPress={onFilterPress}>
@@ -56,6 +61,9 @@ const styles = StyleSheet.create({
   },
   searchIcon: {
     marginRight: 8,
+  },
+  clearButton: {
+    padding: 4,
   },
   filterButton: {
     padding: 12,

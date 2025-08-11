@@ -143,11 +143,7 @@ const RemarksScreen = () => {
       });
       setErrors({});
 
-      Toast.show({
-        type: 'success',
-        text1: 'Success',
-        text2: 'Remark added successfully'
-      });
+      // Removed success toast
     } catch (error) {
       console.error('Error saving remark:', error);
       Toast.show({
@@ -181,11 +177,7 @@ const RemarksScreen = () => {
               // For now, just log the action
               console.log('📦 Deleted remark:', recordId);
               
-              Toast.show({
-                type: 'success',
-                text1: 'Success',
-                text2: 'Remark deleted successfully'
-              });
+              // Removed success toast
             } catch (error) {
               console.error('Error deleting remark:', error);
               Toast.show({

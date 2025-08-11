@@ -67,6 +67,53 @@ export const clearCorruptedData = async (collectionId) => {
     console.error('❌ Failed to clear corrupted data:', e);
   }
 };
+
+// Remove duplicate entries for a specific collection
+export const removeDuplicateEntries = async (collectionId) => {
+  try {
+    const data = await getFromLocal(collectionId);
+    const seen = new Set();
+    const unique = [];
+    const duplicateKeys = [];
+    
+    for (const item of data) {
+      const id = item.id || item.$id;
+      if (!seen.has(id)) {
+        seen.add(id);
+        unique.push(item);
+      } else {
+        // Find the key for this duplicate item
+        const keys = await AsyncStorage.getAllKeys();
+        const itemKeys = keys.filter(key => key.startsWith(`${collectionId}_`));
+        
+        for (const key of itemKeys) {
+          try {
+            const value = await AsyncStorage.getItem(key);
+            const parsed = JSON.parse(value);
+            if ((parsed.id === id || parsed.$id === id) && !unique.find(u => (u.id === parsed.id || u.$id === parsed.$id))) {
+              duplicateKeys.push(key);
+              break;
+            }
+          } catch (e) {
+            console.error('Error parsing item:', e);
+          }
+        }
+      }
+    }
+    
+    if (duplicateKeys.length > 0) {
+      await AsyncStorage.multiRemove(duplicateKeys);
+      console.log(`🧹 Removed ${duplicateKeys.length} duplicate entries for ${collectionId}`);
+    } else {
+      console.log(`🧹 No duplicates found for ${collectionId}`);
+    }
+    
+    return unique;
+  } catch (e) {
+    console.error('❌ Failed to remove duplicate entries:', e);
+    return [];
+  }
+};
 // Optional: Sync all local records with synced: false
 export const syncPendingLocalData = async () => {
   const allItems = await getAllLocal();
@@ -95,6 +142,7 @@ export const saveToLocal = async (key, data) => {
     
     await AsyncStorage.setItem(key, jsonString);
     console.log('✅ Saved locally:', key);
+    console.log('✅ Data size:', jsonString.length, 'characters');
   } catch (e) {
     console.error('❌ Local save error:', e);
     throw e; // Re-throw to handle in calling function
@@ -152,13 +200,28 @@ export const getFromLocal = async (collectionId) => {
   console.log('🔍 getFromLocal called for collectionId:', collectionId);
   const keys = await AsyncStorage.getAllKeys();
   console.log('🔍 getFromLocal - all keys in AsyncStorage:', keys);
+  console.log('🔍 getFromLocal - total keys count:', keys.length);
+  
   const filteredKeys = keys.filter((key) => key.startsWith(`${collectionId}_`));
   console.log('🔍 getFromLocal - filtered keys for', collectionId, ':', filteredKeys);
   console.log('🔍 getFromLocal - number of filtered keys:', filteredKeys.length);
   
+  // Debug: Check for any keys that might be incorrectly filtered
+  if (collectionId === 'employees') {
+    const potentialEmployeeKeys = keys.filter(key => key.includes('employee') || key.includes('officer'));
+    console.log('🔍 getFromLocal - potential employee-related keys:', potentialEmployeeKeys);
+  }
+  
   const items = await AsyncStorage.multiGet(filteredKeys);
   console.log('🔍 getFromLocal - raw items for', collectionId, ':', items);
   console.log('🔍 getFromLocal - number of raw items:', items.length);
+  
+  // Log each item's data size
+  items.forEach(([key, value], index) => {
+    if (value) {
+      console.log(`🔍 getFromLocal - item ${index} (${key}) size:`, value.length, 'characters');
+    }
+  });
   const parsedItems = items.map(([k, v]) => {
     try {
       const parsed = JSON.parse(v);
@@ -175,9 +238,23 @@ export const getFromLocal = async (collectionId) => {
       if (collectionId === 'employees') {
         normalized.fullName = parsed.fullName || 'Unknown';
         normalized.status = parsed.status || 'active';
+        normalized.employmentStatus = parsed.employmentStatus || parsed.status || 'active';
         normalized.phone = parsed.phone || '';
         normalized.department = parsed.department || '';
         normalized.rank = parsed.rank || '';
+        
+        console.log(`🔍 getFromLocal - normalization for ${k}:`, {
+          originalStatus: parsed.status,
+          normalizedStatus: normalized.status,
+          originalEmploymentStatus: parsed.employmentStatus,
+          normalizedEmploymentStatus: normalized.employmentStatus
+        });
+        
+        // Ensure photoUrl is preserved during normalization
+        if (parsed.photoUrl) {
+          normalized.photoUrl = parsed.photoUrl;
+          console.log(`🔍 getFromLocal - preserved photoUrl for ${k}:`, normalized.photoUrl.length, 'characters');
+        }
       } else if (collectionId === 'expenses') {
         normalized.title = parsed.title || 'Untitled Expense';
         normalized.amount = parsed.amount || 0;
@@ -192,10 +269,19 @@ export const getFromLocal = async (collectionId) => {
       }
       
       console.log(`🔍 getFromLocal - normalized item ${k}:`, normalized);
+      if (collectionId === 'employees') {
+        console.log(`🔍 getFromLocal - employee ${k} final status:`, normalized.status);
+        console.log(`🔍 getFromLocal - employee ${k} final employmentStatus:`, normalized.employmentStatus);
+      }
+      if (normalized.photoUrl) {
+        console.log(`🔍 getFromLocal - photoUrl for ${k}:`, normalized.photoUrl);
+        console.log(`🔍 getFromLocal - photoUrl type for ${k}:`, typeof normalized.photoUrl);
+      }
       
       return normalized;
     } catch (e) {
       console.error(`❌ getFromLocal - failed to parse ${k}:`, e);
+      console.error(`❌ getFromLocal - raw value for ${k}:`, v);
       return null;
     }
   }).filter(item => item !== null);
@@ -290,14 +376,23 @@ export const handleDataSubmit = async (data, collectionId) => {
   const collectionIdStr = typeof collectionId === 'string' ? collectionId : 'employees';
   console.log('🔍 handleDataSubmit called with:', { collectionId, collectionIdStr, data });
   
+  // Debug: Log when employee data is being submitted
+  if (collectionIdStr === 'employees') {
+    console.log('🔍 EMPLOYEE DATA SUBMISSION - Employee name:', data.fullName || data.name);
+    console.log('🔍 EMPLOYEE DATA SUBMISSION - Employee ID:', data.employeeId || data.id);
+  }
+  
   // Validate that data is a proper object
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
     console.error('❌ Invalid data structure:', data);
     throw new Error('Data must be a valid object');
   }
   
-  const key = `${collectionIdStr}_${Date.now()}`;
+  // Generate a unique ID for the item
+  const uniqueId = data.id || data.$id || `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const key = `${collectionIdStr}_${uniqueId}`;
   console.log('🔍 Generated key:', key);
+  console.log('🔍 Generated uniqueId:', uniqueId);
   
   // Ensure data is a proper object and clean it
   const cleanData = { ...data };
@@ -309,32 +404,71 @@ export const handleDataSubmit = async (data, collectionId) => {
     }
   });
   
+  // Handle photoUrl field - ensure it's properly formatted but don't truncate
+  if (cleanData.photoUrl && typeof cleanData.photoUrl === 'string') {
+    // Clean the photoUrl but don't truncate it
+    cleanData.photoUrl = cleanData.photoUrl.trim();
+    console.log('🔍 PhotoUrl length:', cleanData.photoUrl.length, 'characters');
+  }
+  
   console.log('🔍 Clean data to save:', cleanData);
+  console.log('🔍 Status in cleanData:', cleanData.status);
+  console.log('🔍 EmploymentStatus in cleanData:', cleanData.employmentStatus);
+  console.log('🔍 PhotoUrl in cleanData:', cleanData.photoUrl);
+  console.log('🔍 PhotoUrl type:', typeof cleanData.photoUrl);
   
   // Validate the cleaned data structure
   try {
-    JSON.stringify(cleanData);
+    const jsonString = JSON.stringify(cleanData);
+    console.log('🔍 JSON serialization successful, length:', jsonString.length);
   } catch (error) {
     console.error('❌ Data cannot be serialized:', error);
+    console.error('❌ Error details:', error.message);
+    console.error('❌ Problematic data:', cleanData);
     throw new Error('Data contains invalid values that cannot be saved');
   }
   
   await saveToLocal(key, { ...cleanData, synced: false });
   await syncIfOnline(key, cleanData, collectionIdStr);
   
-  // Return the saved data with the key for immediate use
-  return { ...cleanData, $id: key.split('_')[1], synced: false };
+  // Return the saved data with consistent ID structure
+  return { ...cleanData, $id: uniqueId, id: uniqueId, synced: false };
 };
 
 // Master handler for updating data
 export const handleDataUpdate = async (key, docId, updatedData, collectionId) => {
   console.log('🔍 handleDataUpdate called with:', { key, docId, updatedData, collectionId });
   const online = await isOnline();
-  const cleaned = sanitizeForAppwrite(updatedData);
+  
+  // Clean the data before processing
+  const cleanData = { ...updatedData };
+  
+  // Handle photoUrl field - ensure it's properly formatted but don't truncate
+  if (cleanData.photoUrl && typeof cleanData.photoUrl === 'string') {
+    // Clean the photoUrl but don't truncate it
+    cleanData.photoUrl = cleanData.photoUrl.trim();
+    console.log('🔍 handleDataUpdate - PhotoUrl length:', cleanData.photoUrl.length, 'characters');
+  }
+  
+  const cleaned = sanitizeForAppwrite(cleanData);
   console.log('🔍 handleDataUpdate - cleaned data:', cleaned);
   console.log('🔍 handleDataUpdate - online status:', online);
   
-  await updateLocal(key, { ...cleaned, $id: docId, synced: online });
+  // Find the actual key if the provided key doesn't exist
+  let actualKey = key;
+  try {
+    await AsyncStorage.getItem(key);
+  } catch (e) {
+    console.log('🔍 Provided key not found, searching for actual key...');
+    actualKey = await findItemKey(collectionId, docId);
+    if (!actualKey) {
+      console.error('❌ Could not find key for item:', docId);
+      throw new Error('Item not found');
+    }
+  }
+
+  console.log('🔍 Updating with actual key:', actualKey);
+  await updateLocal(actualKey, { ...cleaned, $id: docId, synced: online });
   console.log('🔍 handleDataUpdate - all local data after update:', await getAllLocal());
 
   if (online) {
@@ -364,17 +498,60 @@ const sanitizeForAppwrite = (data) => {
 };
 
 
+// Find the actual key for an item in AsyncStorage
+export const findItemKey = async (collectionId, itemId) => {
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const collectionKeys = keys.filter(key => key.startsWith(`${collectionId}_`));
+    
+    for (const key of collectionKeys) {
+      try {
+        const value = await AsyncStorage.getItem(key);
+        const parsed = JSON.parse(value);
+        if (parsed.id === itemId || parsed.$id === itemId) {
+          console.log(`🔍 Found key for item ${itemId}: ${key}`);
+          return key;
+        }
+      } catch (e) {
+        console.error('Error parsing item:', e);
+      }
+    }
+    
+    console.log(`🔍 No key found for item ${itemId} in collection ${collectionId}`);
+    return null;
+  } catch (e) {
+    console.error('Error finding item key:', e);
+    return null;
+  }
+};
+
 // Master handler for deleting data
 export const handleDataDelete = async (key, docId, collectionId) => {
+  console.log('🔍 handleDataDelete called with:', { key, docId, collectionId });
   const online = await isOnline();
 
-  await deleteLocal(key);
+  // Find the actual key if the provided key doesn't exist
+  let actualKey = key;
+  try {
+    await AsyncStorage.getItem(key);
+  } catch (e) {
+    console.log('🔍 Provided key not found, searching for actual key...');
+    actualKey = await findItemKey(collectionId, docId);
+    if (!actualKey) {
+      console.error('❌ Could not find key for item:', docId);
+      throw new Error('Item not found');
+    }
+  }
+
+  console.log('🔍 Deleting with actual key:', actualKey);
+  await deleteLocal(actualKey);
 
   if (online) {
     try {
       await deleteAppwrite(docId, collectionId);
+      console.log('✅ Appwrite delete successful');
     } catch (e) {
-      console.error('Appwrite delete failed, local was deleted.');
+      console.error('❌ Appwrite delete failed, local was deleted:', e);
     }
   }
 };

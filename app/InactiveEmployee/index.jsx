@@ -93,11 +93,7 @@ const InactiveEmployeeScreen = () => {
                 inactiveDate: null
               }, 'employees');
 
-              Toast.show({
-                type: 'success',
-                text1: 'Success',
-                text2: 'Employee restored successfully'
-              });
+              // Removed success toast
 
               fetchInactiveEmployees();
             } catch (error) {
@@ -128,11 +124,7 @@ const InactiveEmployeeScreen = () => {
               const key = `employees_${employee.$id}`;
               await handleDataDelete(key, employee.$id, 'employees');
 
-              Toast.show({
-                type: 'success',
-                text1: 'Success',
-                text2: 'Employee permanently deleted'
-              });
+              // Removed success toast
 
               fetchInactiveEmployees();
             } catch (error) {

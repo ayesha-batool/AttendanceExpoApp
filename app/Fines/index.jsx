@@ -148,11 +148,7 @@ const FinesScreen = () => {
         setFinesRecords(prev => prev.map(record => 
           record.$id === editingRecord.$id ? { ...record, ...fineData } : record
         ));
-        Toast.show({
-          type: 'success',
-          text1: 'Success',
-          text2: 'Fine updated successfully'
-        });
+        // Removed success toast
       } else {
         // Create new record
         const newFineRecord = {
@@ -160,11 +156,7 @@ const FinesScreen = () => {
           ...fineData
         };
         setFinesRecords(prev => [newFineRecord, ...prev]);
-        Toast.show({
-          type: 'success',
-          text1: 'Success',
-          text2: 'Fine added successfully'
-        });
+        // Removed success toast
       }
 
       setShowAddModal(false);
@@ -221,11 +213,7 @@ const FinesScreen = () => {
       
       setFinesRecords(prev => prev.filter(record => record.$id !== recordToDelete.$id));
       
-      Toast.show({
-        type: 'success',
-        text1: 'Success',
-        text2: 'Fine deleted successfully'
-      });
+      // Removed success toast
     } catch (error) {
       console.error('Error deleting fine:', error);
       Toast.show({

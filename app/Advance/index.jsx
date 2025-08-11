@@ -337,21 +337,13 @@ const AdvanceScreen = () => {
         await handleDataDelete(editingRecord.$id, 'advances');
         await handleDataSubmit(advanceData, 'advances');
         
-        Toast.show({
-          type: 'success',
-          text1: 'Success',
-          text2: 'Advance record updated successfully'
-        });
+        // Removed success toast
       } else {
         // Create new record
         console.log('🔍 Creating new record');
         await handleDataSubmit(advanceData, 'advances');
 
-      Toast.show({
-        type: 'success',
-        text1: 'Success',
-        text2: 'Advance record saved successfully'
-      });
+      // Removed success toast
       }
 
       setShowAddModal(false);
@@ -404,11 +396,7 @@ const AdvanceScreen = () => {
       const key = `advances_${recordId}`;
       await handleDataDelete(key, recordId, 'advances');
               
-              Toast.show({
-                type: 'success',
-                text1: 'Success',
-                text2: 'Advance record deleted successfully'
-              });
+              // Removed success toast
       
       setShowDeleteModal(false);
       setRecordToDelete(null);

@@ -151,18 +151,10 @@ const PoliceFleetManagementScreen = () => {
 
       if (selectedVehicle) {
         await handleDataUpdate('vehicles', selectedVehicle.$id, vehicleData, 'vehicles');
-        Toast.show({
-          type: 'success',
-          text1: 'Success',
-          text2: 'Vehicle updated successfully'
-        });
+        // Removed success toast
       } else {
         await handleDataSubmit('vehicles', vehicleData);
-        Toast.show({
-          type: 'success',
-          text1: 'Success',
-          text2: 'Vehicle added successfully'
-        });
+        // Removed success toast
       }
 
       setShowAddModal(false);
@@ -252,11 +244,7 @@ const PoliceFleetManagementScreen = () => {
           onPress: async () => {
             try {
               await handleDataDelete('vehicles', vehicleId);
-              Toast.show({
-                type: 'success',
-                text1: 'Success',
-                text2: 'Vehicle deleted successfully'
-              });
+              // Removed success toast
               fetchData();
             } catch (error) {
               console.error('Error deleting vehicle:', error);

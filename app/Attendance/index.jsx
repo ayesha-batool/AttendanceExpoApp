@@ -222,28 +222,49 @@ export default function AttendanceScreen() {
       const employee = employees.find(emp => emp.id === employeeId);
       if (!employee) return;
 
-      const attendanceRecord = {
-        id: Date.now().toString(),
-        employeeId,
-        employeeName: employee.fullName,
-        date: selectedDate.toISOString().split('T')[0],
-        status,
-        checkIn: status === ATTENDANCE_STATUS.PRESENT ? new Date().toISOString() : null,
-        checkOut: null,
-        workingHours: 0,
-        remarks: '',
-        createdAt: new Date().toISOString()
-      };
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Check if attendance already exists for today
+      const existingRecordIndex = attendanceRecords.findIndex(record => 
+        record.employeeId === employeeId && record.date === today
+      );
 
-      const updatedRecords = [...attendanceRecords, attendanceRecord];
+      let updatedRecords;
+      if (existingRecordIndex >= 0) {
+        // Update existing record
+        const existingRecord = attendanceRecords[existingRecordIndex];
+        const updatedRecord = {
+          ...existingRecord,
+          status,
+          checkIn: status === ATTENDANCE_STATUS.PRESENT ? new Date().toISOString() : existingRecord.checkIn,
+          checkOut: status !== ATTENDANCE_STATUS.PRESENT ? new Date().toISOString() : existingRecord.checkOut,
+          updatedAt: new Date().toISOString()
+        };
+        
+        updatedRecords = [...attendanceRecords];
+        updatedRecords[existingRecordIndex] = updatedRecord;
+      } else {
+        // Create new record
+        const attendanceRecord = {
+          id: Date.now().toString(),
+          employeeId,
+          employeeName: employee.fullName,
+          date: today,
+          status,
+          checkIn: status === ATTENDANCE_STATUS.PRESENT ? new Date().toISOString() : null,
+          checkOut: null,
+          workingHours: 0,
+          remarks: '',
+          createdAt: new Date().toISOString()
+        };
+
+        updatedRecords = [...attendanceRecords, attendanceRecord];
+      }
+
       await AsyncStorage.setItem('attendance', JSON.stringify(updatedRecords));
       setAttendanceRecords(updatedRecords);
 
-      Toast.show({
-        type: 'success',
-        text1: 'Attendance Marked',
-        text2: `${employee.fullName} marked as ${status}`
-      });
+      // Removed success toast
     } catch (error) {
       console.error('Error marking attendance:', error);
       Toast.show({
@@ -290,11 +311,7 @@ export default function AttendanceScreen() {
         remarks: ''
       });
 
-      Toast.show({
-        type: 'success',
-        text1: 'Leave Added',
-        text2: 'Leave request submitted successfully'
-      });
+      // Removed success toast
     } catch (error) {
       console.error('Error adding leave:', error);
       Toast.show({
@@ -313,11 +330,7 @@ export default function AttendanceScreen() {
       await AsyncStorage.setItem('leaves', JSON.stringify(updatedLeaves));
       setLeaves(updatedLeaves);
 
-      Toast.show({
-        type: 'success',
-        text1: 'Status Updated',
-        text2: `Leave status updated to ${status}`
-      });
+      // Removed success toast
     } catch (error) {
       console.error('Error updating leave status:', error);
       Toast.show({
@@ -353,11 +366,7 @@ export default function AttendanceScreen() {
         type: 'public'
       });
 
-      Toast.show({
-        type: 'success',
-        text1: 'Holiday Added',
-        text2: 'Holiday added successfully'
-      });
+      // Removed success toast
     } catch (error) {
       console.error('Error adding holiday:', error);
       Toast.show({
@@ -374,11 +383,7 @@ export default function AttendanceScreen() {
       await AsyncStorage.setItem('holidays', JSON.stringify(updatedHolidays));
       setHolidays(updatedHolidays);
 
-      Toast.show({
-        type: 'success',
-        text1: 'Holiday Deleted',
-        text2: 'Holiday removed successfully'
-      });
+      // Removed success toast
     } catch (error) {
       console.error('Error deleting holiday:', error);
       Toast.show({

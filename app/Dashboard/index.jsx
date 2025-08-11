@@ -85,8 +85,7 @@ const DashboardScreen = () => {
     // Count employees who are active and currently on duty
     const activeEmployees = employees.filter(emp => 
       emp.status === 'active' || 
-      emp.employmentStatus === 'Active' ||
-      emp.status === 'active'
+      emp.employmentStatus === 'active'
     );
     
     // For now, return active employees count
@@ -98,27 +97,16 @@ const DashboardScreen = () => {
   const getCurrentlyOnDutyCount = async () => {
     try {
       // Get attendance data to see who is actually clocked in today
-      const attendanceData = await AsyncStorage.getItem('attendanceData');
+      const attendanceData = await AsyncStorage.getItem('attendance');
       if (attendanceData) {
         const attendance = JSON.parse(attendanceData);
         const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
         
         // Count employees who are checked in today and haven't checked out
         let onDutyCount = 0;
-        Object.keys(attendance).forEach(dateKey => {
-          if (dateKey === today) {
-            const todayAttendance = attendance[dateKey];
-            Object.keys(todayAttendance).forEach(employeeId => {
-              const employeeAttendance = todayAttendance[employeeId];
-              // Check if employee has checked in but not checked out
-              const checkInTimes = employeeAttendance.checkInTimes || [];
-              const checkOutTimes = employeeAttendance.checkOutTimes || [];
-              
-              // If employee has more check-ins than check-outs, they're currently on duty
-              if (checkInTimes.length > checkOutTimes.length) {
-                onDutyCount++;
-              }
-            });
+        attendance.forEach(record => {
+          if (record.date === today && record.status === 'Present' && !record.checkOut) {
+            onDutyCount++;
           }
         });
         
@@ -217,7 +205,7 @@ const DashboardScreen = () => {
         <View style={styles.kpiGrid}>
           <View style={styles.kpiCard}>
             <View style={styles.kpiIconContainer}>
-              <Ionicons name="people" size={24} color="#1e40af" />
+              <Ionicons name="people" size={20} color="#1e40af" />
             </View>
             <View style={styles.kpiContent}>
               <Text style={styles.kpiValue}>{employees.length}</Text>
@@ -227,7 +215,7 @@ const DashboardScreen = () => {
           </View>
           <View style={styles.kpiCard}>
             <View style={styles.kpiIconContainer}>
-              <Ionicons name="checkmark-circle" size={24} color="#10b981" />
+              <Ionicons name="checkmark-circle" size={20} color="#10b981" />
             </View>
             <View style={styles.kpiContent}>
               <Text style={styles.kpiValue}>{onDutyCount}</Text>
@@ -237,7 +225,7 @@ const DashboardScreen = () => {
           </View>
           <View style={styles.kpiCard}>
             <View style={styles.kpiIconContainer}>
-              <Ionicons name="folder" size={24} color="#dc2626" />
+              <Ionicons name="folder" size={20} color="#dc2626" />
             </View>
             <View style={styles.kpiContent}>
               <Text style={styles.kpiValue}>{getActiveCasesCount()}</Text>
@@ -247,7 +235,7 @@ const DashboardScreen = () => {
           </View>
                      <View style={styles.kpiCard}>
              <View style={styles.kpiIconContainer}>
-               <Ionicons name="card" size={24} color="#8b5cf6" />
+               <Ionicons name="card" size={20} color="#8b5cf6" />
              </View>
              <View style={styles.kpiContent}>
                <Text style={styles.kpiValue}>${getTotalExpenses().toLocaleString()}</Text>
@@ -309,8 +297,8 @@ const styles = StyleSheet.create({
     fontWeight: '600' 
   },
   header: { 
-    paddingTop: 50, 
-    paddingBottom: 20, 
+    paddingTop: 30, 
+    paddingBottom: 12, 
     paddingHorizontal: 16 
   },
   headerContent: { 
@@ -352,7 +340,7 @@ const styles = StyleSheet.create({
     opacity: 0.9 
   },
   kpiSection: { 
-    padding: 16 
+    padding: 12 
   },
   kpiGrid: { 
     flexDirection: 'row', 
@@ -362,41 +350,41 @@ const styles = StyleSheet.create({
   kpiCard: { 
     width: screenWidth > 768 ? '48%' : '47%', 
     backgroundColor: '#fff', 
-    borderRadius: 16, 
-    padding: 16, 
+    borderRadius: 12, 
+    padding: 12, 
     shadowColor: '#000', 
-    shadowOffset: { width: 0, height: 4 }, 
-    shadowOpacity: 0.1, 
-    shadowRadius: 12, 
-    elevation: 4,
-    marginBottom: 12
+    shadowOffset: { width: 0, height: 2 }, 
+    shadowOpacity: 0.08, 
+    shadowRadius: 8, 
+    elevation: 3,
+    marginBottom: 8
   },
   kpiIconContainer: { 
-    width: 48, 
-    height: 48, 
-    borderRadius: 24, 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20, 
     backgroundColor: '#f8fafc', 
     justifyContent: 'center', 
     alignItems: 'center', 
-    marginBottom: 12 
+    marginBottom: 8 
   },
   kpiContent: { 
     flex: 1 
   },
   kpiValue: { 
-    fontSize: 24, 
+    fontSize: 20, 
     fontWeight: 'bold', 
     color: '#1e293b', 
-    marginBottom: 4 
+    marginBottom: 3 
   },
   kpiLabel: { 
-    fontSize: 14, 
+    fontSize: 13, 
     fontWeight: '600', 
     color: '#374151', 
     marginBottom: 2 
   },
   kpiSubtext: { 
-    fontSize: 12, 
+    fontSize: 11, 
     color: '#64748b' 
   },
   actionsSection: { 

@@ -1,7 +1,7 @@
 import { useNoteOperations } from "@/hooks/useNoteOperations";
 import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import Toast from "react-native-toast-message";
-import { formatErrorMessage, formatSuccessMessage, validateForm, VALIDATION_SCHEMAS } from "../utils/validation";
+import { formatErrorMessage, validateForm, VALIDATION_SCHEMAS } from "../utils/validation";
 
 const AddNoteModal = ({ modalVisible, setModalVisible, newNote, setNewNote }) => {
   const { addNote, isLoading } = useNoteOperations();
@@ -23,11 +23,7 @@ const AddNoteModal = ({ modalVisible, setModalVisible, newNote, setNewNote }) =>
 
       const result = await addNote(newNote);
       if (result.success) {
-        Toast.show({
-          type: 'success',
-          text1: 'Success',
-          text2: formatSuccessMessage('added', 'Note'),
-        });
+        // Removed success toast
         setNewNote("");
         setModalVisible(false);
       } else {
@@ -49,8 +45,8 @@ const AddNoteModal = ({ modalVisible, setModalVisible, newNote, setNewNote }) =>
 
   return (
     <Modal
-      animationType="slide"
-      transparent
+      animationType="fade"
+      transparent={false}
       visible={modalVisible}
       onRequestClose={() => setModalVisible(false)}
     >
@@ -81,16 +77,17 @@ const AddNoteModal = ({ modalVisible, setModalVisible, newNote, setNewNote }) =>
 }
 const styles = StyleSheet.create({
     modalContainer: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'center',
-        alignItems: 'center',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: '#fff',
+        zIndex: 1000,
     },
     modalContent: {
+        flex: 1,
         backgroundColor: '#fff',
-        borderRadius: 12,
-        width: '90%',
-        maxHeight: '80%',
     },
     modalHeader: {
         flexDirection: 'row',

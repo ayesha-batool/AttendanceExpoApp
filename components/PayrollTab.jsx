@@ -2,12 +2,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from 'react';
 import {
-  FlatList,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    FlatList,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { getItems } from '../services/dataHandler';
@@ -140,11 +140,7 @@ const PayrollTab = ({ employees }) => {
         await handleDataUpdate(`employees_${employee.id || employee.$id}`, employee.id || employee.$id, employee, 'employees');
       }
 
-      Toast.show({
-        type: 'success',
-        text1: 'Success',
-        text2: 'Sample payroll data added to employees',
-      });
+      // Removed success toast
 
       setShowSampleDataButton(false);
       calculatePayrollData(); // Refresh the data

@@ -2,14 +2,15 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
 import {
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
+import DatePickerField from './DatePickerField';
 import StatCard from './StatCard';
 
 const AttendanceTab = ({ employees = [] }) => {
@@ -397,6 +398,7 @@ const AttendanceTab = ({ employees = [] }) => {
           ...existingAttendance,
           checkInTimes: newCheckInTimes,
           status: 'present',
+          dutyStatus: 'On Duty', // Update duty status to "On Duty"
           timestamp: new Date().toISOString()
         }
       }
@@ -507,6 +509,7 @@ const AttendanceTab = ({ employees = [] }) => {
           checkOutTimes: newCheckOutTimes,
           workingHours: totalWorkingHours.formatted,
           totalWorkingHours: totalWorkingHours.minutes,
+          dutyStatus: 'Off Duty', // Update duty status to "Off Duty"
           timestamp: new Date().toISOString()
         }
       }
@@ -749,7 +752,7 @@ const AttendanceTab = ({ employees = [] }) => {
 
   const getAttendanceStats = () => {
     const dayData = attendanceData[formatDate(selectedDate)] || {};
-    const activeEmployees = employees.filter(emp => emp.status === 'active' || emp.status === 'Active');
+    const activeEmployees = employees.filter(emp => emp.status === 'active');
     const totalEmployees = activeEmployees.length;
     
     // Check if the selected date is a holiday
@@ -936,7 +939,20 @@ const AttendanceTab = ({ employees = [] }) => {
               day: 'numeric' 
             })}
           </Text>
-          {!isHoliday(selectedDate) && (
+          {isHoliday(selectedDate) ? (
+            <TouchableOpacity
+              style={[styles.markHolidayButton, styles.unmarkHolidayButton]}
+              onPress={() => {
+                const holidayId = getHolidayId(selectedDate);
+                if (holidayId) {
+                  deleteHoliday(holidayId);
+                }
+              }}
+            >
+              <Ionicons name="close-circle" size={16} color="#ef4444" />
+              <Text style={[styles.markHolidayButtonText, styles.unmarkHolidayButtonText]}>Unmark as Holiday</Text>
+            </TouchableOpacity>
+          ) : (
             <TouchableOpacity
               style={styles.markHolidayButton}
               onPress={() => {
@@ -956,7 +972,7 @@ const AttendanceTab = ({ employees = [] }) => {
       {/* Employee List */}
       <ScrollView style={styles.employeeList}>
         {employees
-          .filter(employee => employee.status === 'active' || employee.status === 'Active')
+          .filter(employee => employee.status === 'active')
           .map((employee, index) => {
           const attendance = getAttendanceStatus(employee.id);
           const isHolidayDate = isHoliday(selectedDate);
@@ -1463,16 +1479,12 @@ const AttendanceTab = ({ employees = [] }) => {
             </View>
             
             <View style={styles.modalBody}>
-              <View style={styles.timeInputContainer}>
-                <Text style={styles.timeInputLabel}>Date (YYYY-MM-DD)</Text>
-                <TextInput
-                  style={styles.timeInput}
-                  value={tempHolidayDate}
-                  onChangeText={setTempHolidayDate}
-                  placeholder="2024-12-25"
-                  placeholderTextColor="#9ca3af"
-                />
-              </View>
+              <DatePickerField
+                label="Holiday Date"
+                value={tempHolidayDate ? new Date(tempHolidayDate) : null}
+                onChange={(date) => setTempHolidayDate(date ? date.toISOString().split('T')[0] : '')}
+                placeholder="Select holiday date"
+              />
             </View>
             
             <View style={styles.modalFooter}>

@@ -3,9 +3,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Toast from 'react-native-toast-message';
-
-import DatePicker from '../../components/DatePicker';
+import DatePickerField from '../../components/DatePickerField';
 import DeleteConfirmationModal from '../../components/DeleteConfirmationModal';
 import InputField from '../../components/InputField';
 import LoadingState from '../../components/LoadingState';
@@ -16,8 +14,6 @@ import { getItems, handleDataDelete, handleDataSubmit, handleDataUpdate } from '
 
 const CasesScreen = () => {
   const { setHeaderActionButton, clearHeaderAction } = useCasesContext();
-  
-  // State management - compressed
   const [cases, setCases] = useState([]);
   const [filteredCases, setFilteredCases] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -27,31 +23,33 @@ const CasesScreen = () => {
   const [selected, setSelected] = useState({ case: null, deleteCase: null, isEdit: false, editCase: null });
   const [formData, setFormData] = useState({
     title: '', description: '', status: 'active', priority: 'medium', 
-    assignedOfficer: '', location: '', category: '', evidence: '', notes: '',
-    startDate: '', endDate: ''
+    assignedOfficer: '', location: '', category: '', evidence: '', notes: '', startDate: '', endDate: ''
   });
-  const [datePickers, setDatePickers] = useState({ start: false, end: false });
 
-  // Constants - compressed
+
   const statusOptions = [
     { label: 'Active', value: 'active' }, { label: 'Under Investigation', value: 'investigation' },
     { label: 'Pending Review', value: 'pending' }, { label: 'Closed', value: 'closed' },
     { label: 'Archived', value: 'archived' }
   ];
-
   const priorityOptions = [
     { label: 'Low', value: 'low' }, { label: 'Medium', value: 'medium' },
     { label: 'High', value: 'high' }, { label: 'Critical', value: 'critical' }
   ];
-
   const categoryOptions = ['Theft', 'Assault', 'Fraud', 'Drug Related', 'Traffic Violation', 'Domestic Violence', 'Property Crime', 'White Collar Crime', 'Organized Crime', 'Cyber Crime', 'Other'];
 
-  // Utility functions
-  const showToast = (type, text1, text2) => Toast.show({ type, text1, text2 });
-  const updateModal = (key, value) => setModals(prev => ({ ...prev, [key]: value }));
+  const updateModal = (key, value) => {
+    console.log('🔍 updateModal called:', { key, value });
+    setModals(prev => {
+      const newState = { ...prev, [key]: value };
+      console.log('🔍 New modal state:', newState);
+      return newState;
+    });
+  };
   const updateSelected = (key, value) => setSelected(prev => ({ ...prev, [key]: value }));
   const updateFormData = (key, value) => setFormData(prev => ({ ...prev, [key]: value }));
-  const updateDatePicker = (key, value) => setDatePickers(prev => ({ ...prev, [key]: value }));
+
+  const handleDeleteCancel = () => { updateModal('delete', false); updateSelected('deleteCase', null); };
 
   const getStatusColor = (status) => ({
     active: '#10b981', investigation: '#f59e0b', pending: '#3b82f6',
@@ -62,7 +60,6 @@ const CasesScreen = () => {
     low: '#10b981', medium: '#f59e0b', high: '#ef4444', critical: '#dc2626'
   }[priority] || '#6b7280');
 
-  // Data fetching
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -73,13 +70,12 @@ const CasesScreen = () => {
       setFilteredCases(validCases);
       setEmployees(validEmployees);
     } catch (error) {
-      showToast('error', 'Error', 'Failed to load cases data');
+      console.error('Failed to load cases data:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Search functionality
   const applySearch = () => {
     if (!searchQuery.trim()) {
       setFilteredCases(cases);
@@ -92,18 +88,19 @@ const CasesScreen = () => {
     setFilteredCases(filtered);
   };
 
-  // CRUD operations
   const handleAdd = () => {
+    console.log('🔍 handleAdd called - opening case modal');
     updateSelected('isEdit', false);
     updateSelected('editCase', null);
+    const today = new Date().toISOString().split('T')[0];
+    console.log('🔍 Setting start date to:', today);
     setFormData({
-      title: '', description: '',
-      status: '', priority: '', assignedOfficer: '',
-      startDate: new Date().toISOString().split('T')[0], endDate: '',
-      location: '', category: '', evidence: '',
-      notes: ''
+      title: '', description: '', status: '', priority: '', assignedOfficer: '',
+      startDate: today, endDate: '',
+      location: '', category: '', evidence: '', notes: ''
     });
     updateModal('case', true);
+    console.log('🔍 Modal state after update:', { case: true });
   };
 
   const handleEdit = (caseItem) => {
@@ -124,41 +121,35 @@ const CasesScreen = () => {
   };
 
   const saveCase = async () => {
-    if (!formData.title.trim()) {
-      Alert.alert('Error', 'Please enter a case title');
-      return;
-    }
-    if (!formData.startDate) {
-      Alert.alert('Error', 'Please select a start date');
-      return;
-    }
+    if (!formData.title.trim()) { Alert.alert('Error', 'Please enter a case title'); return; }
+    if (!formData.status) { Alert.alert('Error', 'Please select a case status'); return; }
+    if (!formData.priority) { Alert.alert('Error', 'Please select a priority level'); return; }
+    if (!formData.category) { Alert.alert('Error', 'Please select a case category'); return; }
+    if (!formData.startDate) { Alert.alert('Error', 'Please select a start date'); return; }
     if (formData.endDate && new Date(formData.endDate) < new Date(formData.startDate)) {
-      Alert.alert('Error', 'End date cannot be before start date');
-      return;
+      Alert.alert('Error', 'End date cannot be before start date'); return;
     }
 
     try {
       const caseData = { ...formData, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-
       if (selected.isEdit && selected.editCase) {
         const key = `cases_${selected.editCase.id || selected.editCase.$id}`;
         await handleDataUpdate(key, selected.editCase.id || selected.editCase.$id, caseData, 'cases');
         setCases(prev => prev.map(c => (c.id || c.$id) === (selected.editCase.id || selected.editCase.$id) ? { ...caseData, id: selected.editCase.id || selected.editCase.$id } : c));
         setFilteredCases(prev => prev.map(c => (c.id || c.$id) === (selected.editCase.id || selected.editCase.$id) ? { ...caseData, id: selected.editCase.id || selected.editCase.$id } : c));
-        showToast('success', 'Success', 'Case updated successfully');
+        // Case updated successfully
       } else {
         const newCase = await handleDataSubmit(caseData, 'cases');
         setCases(prev => [...prev, newCase]);
         setFilteredCases(prev => [...prev, newCase]);
-        showToast('success', 'Success', 'Case added successfully');
+        // Case added successfully
       }
-
       updateModal('case', false);
       updateSelected('isEdit', false);
       updateSelected('editCase', null);
       setFormData({ title: '', description: '', status: 'active', priority: 'medium', assignedOfficer: '', location: '', category: '', evidence: '', notes: '', startDate: '', endDate: '' });
     } catch (error) {
-      showToast('error', 'Error', 'Failed to save case');
+      console.error('Failed to save case:', error);
     }
   };
 
@@ -169,32 +160,17 @@ const CasesScreen = () => {
       await handleDataDelete(key, selected.deleteCase.id || selected.deleteCase.$id, 'cases');
       setCases(prev => prev.filter(c => (c.id || c.$id) !== (selected.deleteCase.id || selected.deleteCase.$id)));
       setFilteredCases(prev => prev.filter(c => (c.id || c.$id) !== (selected.deleteCase.id || selected.deleteCase.$id)));
-      showToast('success', 'Success', 'Case deleted successfully');
+      // Case deleted successfully
     } catch (error) {
-      showToast('error', 'Error', 'Failed to delete case');
+      console.error('Failed to delete case:', error);
     } finally {
       updateModal('delete', false);
       updateSelected('deleteCase', null);
     }
   };
 
-  // Date handlers
-  const handleDateConfirm = (type, date) => {
-    if (type === 'start') {
-      updateFormData('startDate', date.toISOString().split('T')[0]);
-      updateDatePicker('start', false);
-    } else {
-      const startDate = new Date(formData.startDate);
-      if (date < startDate) {
-        Alert.alert('Invalid Date', 'End date cannot be before start date');
-        return;
-      }
-      updateFormData('endDate', date.toISOString().split('T')[0]);
-      updateDatePicker('end', false);
-    }
-  };
 
-  // Stats
+
   const stats = {
     total: cases.length,
     active: cases.filter(c => c.status === 'active').length,
@@ -202,10 +178,10 @@ const CasesScreen = () => {
     high: cases.filter(c => ['high', 'critical'].includes(c.priority)).length
   };
 
-  // Effects
   useEffect(() => { fetchData(); }, []);
   useFocusEffect(useCallback(() => { fetchData(); }, []));
-  useEffect(() => { setHeaderActionButton({ icon: 'add', onPress: handleAdd }); return () => clearHeaderAction(); }, []);
+  // Remove header action button since we're using floating action button
+  // useEffect(() => { setHeaderActionButton({ icon: 'add', onPress: handleAdd }); return () => clearHeaderAction(); }, []);
   useEffect(() => { applySearch(); }, [searchQuery, cases]);
 
   if (loading) return <LoadingState />;
@@ -214,7 +190,6 @@ const CasesScreen = () => {
 
   return (
     <View style={styles.container}>
-      {/* Stats Section - compressed */}
       <View style={styles.stats}>
         <View style={styles.statRow}>
           <StatCard icon="folder" color="#dc2626" value={stats.total} label="Total Cases" />
@@ -226,12 +201,10 @@ const CasesScreen = () => {
         </View>
       </View>
 
-      {/* Search */}
       <View style={styles.searchContainer}>
         <SearchBar value={searchQuery} onChangeText={setSearchQuery} placeholder="Search cases..." onClear={() => setSearchQuery('')} />
       </View>
 
-      {/* Cases List */}
       {filteredCases.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="folder-open-outline" size={64} color="#9ca3af" />
@@ -291,14 +264,14 @@ const CasesScreen = () => {
         />
       )}
 
-      {/* Case Form Modal */}
-      <Modal visible={modals.case} animationType="slide" transparent onRequestClose={() => updateModal('case', false)}>
+      <Modal visible={modals.case} animationType="fade" transparent={false} onRequestClose={() => updateModal('case', false)}>
+        {console.log('🔍 Rendering case modal, visible:', modals.case)}
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{selected.isEdit ? 'Edit Case' : 'Add New Case'}</Text>
               <TouchableOpacity style={styles.closeButton} onPress={() => updateModal('case', false)}>
-                <Ionicons name="close" size={24} color="#666" />
+                <Ionicons name="close" size={24} color="#fff" />
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.modalBody}>
@@ -310,15 +283,21 @@ const CasesScreen = () => {
               <SelectDropdown label="Assigned Officer" selectedValue={formData.assignedOfficer} onValueChange={(value) => updateFormData('assignedOfficer', value)} options={[{ label: 'Unassigned', value: '' }, ...employeeOptions]} />
               <InputField label="Location" value={formData.location} onChangeText={(text) => updateFormData('location', text)} placeholder="Enter case location" />
               
-              <TouchableOpacity style={styles.dateButton} onPress={() => updateDatePicker('start', true)}>
-                <Text style={styles.dateButtonLabel}>Start Date</Text>
-                <Text style={styles.dateButtonValue}>{formData.startDate ? new Date(formData.startDate).toLocaleDateString() : 'Select date'}</Text>
-              </TouchableOpacity>
+              <DatePickerField
+                label="Start Date *"
+                value={formData.startDate ? new Date(formData.startDate) : new Date()}
+                onChange={(date) => {
+                  console.log('🔍 Start date changed to:', date);
+                  updateFormData('startDate', date.toISOString().split('T')[0]);
+                }}
+              />
               
-              <TouchableOpacity style={styles.dateButton} onPress={() => updateDatePicker('end', true)}>
-                <Text style={styles.dateButtonLabel}>End Date (Optional)</Text>
-                <Text style={styles.dateButtonValue}>{formData.endDate ? new Date(formData.endDate).toLocaleDateString() : 'Select date'}</Text>
-              </TouchableOpacity>
+              <DatePickerField
+                label="End Date (Optional)"
+                value={formData.endDate ? new Date(formData.endDate) : new Date()}
+                onChange={(date) => updateFormData('endDate', date.toISOString().split('T')[0])}
+                optional={true}
+              />
               
               <InputField label="Evidence" value={formData.evidence} onChangeText={(text) => updateFormData('evidence', text)} placeholder="Enter evidence details" multiline numberOfLines={3} />
               <InputField label="Notes" value={formData.notes} onChangeText={(text) => updateFormData('notes', text)} placeholder="Enter additional notes" multiline numberOfLines={3} />
@@ -337,8 +316,7 @@ const CasesScreen = () => {
         </View>
       </Modal>
 
-      {/* Case Details Modal */}
-      <Modal visible={modals.details} animationType="slide" transparent onRequestClose={() => updateModal('details', false)}>
+      <Modal visible={modals.details} animationType="fade" transparent={false} onRequestClose={() => updateModal('details', false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -393,27 +371,28 @@ const CasesScreen = () => {
         </View>
       </Modal>
 
-      {/* Delete Modal */}
       <DeleteConfirmationModal
         visible={modals.delete}
         onConfirm={confirmDelete}
-        onCancel={() => { updateModal('delete', false); updateSelected('deleteCase', null); }}
+        onClose={handleDeleteCancel}
         title="Delete Case"
         message="Are you sure you want to delete this case? This action cannot be undone."
       />
 
-      {/* Date Pickers */}
-      <DatePicker visible={datePickers.start} onConfirm={(date) => handleDateConfirm('start', date)} onClose={() => updateDatePicker('start', false)} mode="date" />
-      <DatePicker visible={datePickers.end} onConfirm={(date) => handleDateConfirm('end', date)} onClose={() => updateDatePicker('end', false)} mode="date" />
+      {/* Floating Action Button */}
+      <TouchableOpacity style={styles.fab} onPress={handleAdd}>
+        <LinearGradient colors={['#dc2626', '#b91c1c']} style={styles.fabGradient}>
+          <Ionicons name="add" size={24} color="#fff" />
+        </LinearGradient>
+      </TouchableOpacity>
     </View>
   );
 };
 
-// Stat Card Component
 const StatCard = ({ icon, color, value, label }) => (
   <View style={styles.statCard}>
     <View style={[styles.statIconContainer, { backgroundColor: `${color}20` }]}>
-      <Ionicons name={icon} size={20} color={color} />
+      <Ionicons name={icon} size={16} color={color} />
     </View>
     <View style={styles.statContent}>
       <Text style={styles.statValue}>{value}</Text>
@@ -424,14 +403,14 @@ const StatCard = ({ icon, color, value, label }) => (
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
-  stats: { padding: 20, gap: 16 },
-  statRow: { flexDirection: 'row', gap: 16 },
-  statCard: { flex: 1, backgroundColor: '#fff', borderRadius: 12, padding: 16, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 },
-  statIconContainer: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: 10 },
+  stats: { padding: 12, gap: 8 },
+  statRow: { flexDirection: 'row', gap: 8 },
+  statCard: { flex: 1, backgroundColor: '#fff', borderRadius: 8, padding: 12, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
+  statIconContainer: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginRight: 8 },
   statContent: { flex: 1 },
-  statValue: { fontSize: 16, fontWeight: 'bold', color: '#1e293b', marginBottom: 2 },
-  statLabel: { fontSize: 10, color: '#64748b', fontWeight: '500' },
-  searchContainer: { paddingHorizontal: 20,padding:0 },
+  statValue: { fontSize: 14, fontWeight: 'bold', color: '#1e293b', marginBottom: 1 },
+  statLabel: { fontSize: 9, color: '#64748b', fontWeight: '500' },
+  searchContainer: { paddingHorizontal: 20, padding: 0 },
   casesList: { padding: 20 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
   emptyTitle: { fontSize: 20, fontWeight: '600', color: '#374151', marginTop: 16, marginBottom: 8 },
@@ -453,11 +432,11 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 12, fontWeight: '600', color: '#fff' },
   priorityBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   priorityText: { fontSize: 12, fontWeight: '600', color: '#fff' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { backgroundColor: '#fff', borderRadius: 20, width: '90%', maxHeight: '80%', padding: 0 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
-  modalTitle: { fontSize: 20, fontWeight: '700', color: '#1e293b' },
-  closeButton: { padding: 8, borderRadius: 8, backgroundColor: '#f8fafc' },
+  modalOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#f8f9fa', zIndex: 1000 },
+  modalContent: { flex: 1, backgroundColor: '#f8f9fa' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#dc2626', backgroundColor: '#dc2626' },
+  modalTitle: { fontSize: 20, fontWeight: '700', color: '#fff' },
+  closeButton: { padding: 8, borderRadius: 8, backgroundColor: 'rgba(255, 255, 255, 0.2)' },
   modalBody: { flex: 1, padding: 20 },
   modalFooter: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, borderTopWidth: 1, borderTopColor: '#f1f5f9', gap: 12 },
   cancelButton: { flex: 1, padding: 14, borderRadius: 12, backgroundColor: '#6b7280', alignItems: 'center' },
@@ -468,9 +447,6 @@ const styles = StyleSheet.create({
   editButton: { flex: 1, borderRadius: 12 },
   editGradient: { paddingVertical: 14, paddingHorizontal: 20, borderRadius: 12, alignItems: 'center' },
   editButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  dateButton: { padding: 16, backgroundColor: '#f8fafc', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16 },
-  dateButtonLabel: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 4 },
-  dateButtonValue: { fontSize: 16, color: '#64748b' },
   detailSection: { marginBottom: 20 },
   detailTitle: { fontSize: 24, fontWeight: '700', color: '#1e293b', marginBottom: 12 },
   detailBadges: { flexDirection: 'row', gap: 8, marginBottom: 16 },
@@ -479,7 +455,25 @@ const styles = StyleSheet.create({
   detailPriorityBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   detailPriorityText: { fontSize: 14, fontWeight: '600', color: '#fff' },
   detailLabel: { fontSize: 16, fontWeight: '600', color: '#374151', marginBottom: 8 },
-  detailValue: { fontSize: 16, color: '#64748b', lineHeight: 24 }
+  detailValue: { fontSize: 16, color: '#64748b', lineHeight: 24 },
+  fab: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    zIndex: 1000,
+  },
+  fabGradient: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  }
 });
 
 export default CasesScreen;

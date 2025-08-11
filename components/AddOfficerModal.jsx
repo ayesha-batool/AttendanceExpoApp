@@ -1,5 +1,6 @@
 // Components
 import DatePickerField from './DatePickerField';
+import FileUploader from './FileUploader';
 import InputField from './InputField';
 import PhoneNumberField from './PhoneNumberField';
 import SelectDropdown from './SelectDropdown';
@@ -10,25 +11,24 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from 'react';
 import {
-  Dimensions,
-  Modal,
-  Image as RNImage,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    Dimensions,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 
 // Contexts & Services
 import { useAuth } from '../context/AuthContext';
 import {
-  getItems,
-  handleDataSubmit,
-  handleDataUpdate
+    getItems,
+    handleDataSubmit,
+    handleDataUpdate
 } from '../services/dataHandler';
-import { CUSTOM_VALIDATORS, formatErrorMessage, formatSuccessMessage, validateForm, VALIDATION_SCHEMAS } from '../utils/validation';
+import { CUSTOM_VALIDATORS, formatErrorMessage, validateForm, VALIDATION_SCHEMAS } from '../utils/validation';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -72,10 +72,10 @@ const GENDER_OPTIONS = [
 ];
 
 const EMPLOYMENT_STATUS = [
-  { label: 'Active', value: 'Active' },
-  { label: 'Suspended', value: 'Suspended' },
-  { label: 'Retired', value: 'Retired' },
-  { label: 'Transferred', value: 'Transferred' }
+  { label: 'Active', value: 'active' },
+  { label: 'Suspended', value: 'suspended' },
+  { label: 'Retired', value: 'retired' },
+  { label: 'Transferred', value: 'transferred' }
 ];
 
 const SHIFT_OPTIONS = [
@@ -149,7 +149,7 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
     fullName: '',
     fatherName: '',
     cnic: '',
-    dateOfBirth: new Date(),
+    dateOfBirth: new Date('2000-01-01'),
     gender: '',
     
     // Contact Information
@@ -163,10 +163,11 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
     department: '',
     postingStation: '',
     shift: '',
-    employmentStatus: 'Active',
+    employmentStatus: 'active',
     
-    // Additional Information
-    isArmed: false,
+                  // Additional Information
+        photoUrl: '',
+        isArmed: false,
     bloodGroup: '',
     serviceYears: '',
     performanceRating: '',
@@ -224,11 +225,12 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState('basic'); // 'basic', 'contact', 'personal', 'professional', 'additional'
-  const [photoUri, setPhotoUri] = useState(null);
+  // Remove photoUri state - REMOVED
 
   const [errors, setErrors] = useState({});
   const [modalToast, setModalToast] = useState(null);
   const [existingEmployees, setExistingEmployees] = useState([]);
+  const [supervisorOptions, setSupervisorOptions] = useState([]);
 
   useEffect(() => {
     if (editingOfficer) {
@@ -241,6 +243,35 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
     // Load existing employees for duplicate checking
     loadExistingEmployees();
   }, [editingOfficer, visible]);
+
+  // Debug useEffect to monitor form changes
+  useEffect(() => {
+    console.log('🔍 AddOfficerModal: Form state changed - photoUrl:', form.photoUrl);
+  }, [form.photoUrl]);
+
+  // Calculate service years when joining date changes or component mounts
+  useEffect(() => {
+    if (form.joiningDate) {
+      const joiningDate = new Date(form.joiningDate);
+      const currentDate = new Date();
+      const yearsDiff = currentDate.getFullYear() - joiningDate.getFullYear();
+      const monthDiff = currentDate.getMonth() - joiningDate.getMonth();
+      const dayDiff = currentDate.getDate() - joiningDate.getDate();
+      
+      let serviceYears = yearsDiff;
+      if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
+        serviceYears = yearsDiff - 1;
+      }
+      
+      // Ensure service years is not negative
+      serviceYears = Math.max(0, serviceYears);
+      
+      // Only update if the calculated value is different from current
+      if (serviceYears.toString() !== form.serviceYears) {
+        updateForm('serviceYears', serviceYears.toString());
+      }
+    }
+  }, [form.joiningDate]);
 
   const loadSampleData = () => {
     const sampleDate = new Date('1990-05-15');
@@ -269,7 +300,7 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
       department: 'Investigation',
       postingStation: 'Central Police Station',
       shift: 'Morning',
-      employmentStatus: 'Active',
+      employmentStatus: 'active',
       
       // Additional Information
       photoUrl: '',
@@ -328,7 +359,7 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
       notes: 'Excellent performance in recent high-profile cases. Recommended for promotion.'
     });
     setActiveTab('basic');
-    setPhotoUri(null);
+    // setPhotoUri(null); // REMOVED
 
     
     Toast.show({
@@ -340,30 +371,30 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
 
   const resetForm = () => {
     setForm({
-      // Basic Information
-      badgeNumber: '',
-      fullName: '',
-      fatherName: '',
-      cnic: '',
-      dateOfBirth: new Date(),
-      gender: '',
+          // Basic Information
+    badgeNumber: '',
+    fullName: '',
+    fatherName: '',
+    cnic: '',
+    dateOfBirth: new Date('2000-01-01'),
+    gender: '',
       
       // Contact Information
       contactNumber: '',
       email: '',
       address: '',
       
-      // Employment Information
-      joiningDate: defaultJoiningDate,
-      rank: '',
-      department: '',
-      postingStation: '',
-      shift: '',
-      employmentStatus: 'Active',
+          // Employment Information
+    joiningDate: defaultJoiningDate,
+    rank: '',
+    department: '',
+    postingStation: '',
+    shift: '',
+    employmentStatus: 'active',
       
-      // Additional Information
-      photoUrl: '',
-      isArmed: false,
+              // Additional Information
+        photoUrl: '',
+        isArmed: false,
       bloodGroup: '',
       serviceYears: '',
       performanceRating: '',
@@ -402,7 +433,6 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
       emergencyContactPhone: '',
       dutyShift: '',
       status: 'active',
-      salary: '',
       education: '',
       specializations: '',
       languages: '',
@@ -419,14 +449,14 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
       notes: ''
     });
     setActiveTab('basic');
-    setPhotoUri(null);
+    // setPhotoUri(null); // REMOVED
 
     
-    Toast.show({
-      type: 'info',
-      text1: 'Form Cleared',
-      text2: 'All form fields have been reset',
-    });
+    // Toast.show({
+    //   type: 'info',
+    //   text1: 'Form Cleared',
+    //   text2: 'All form fields have been reset',
+    // });
   };
 
   const loadOfficerData = async () => {
@@ -457,7 +487,7 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
         department: editingOfficer.department || '',
         postingStation: editingOfficer.postingStation || editingOfficer.policeStation || '',
         shift: editingOfficer.shift || editingOfficer.dutyShift || '',
-        employmentStatus: editingOfficer.employmentStatus || editingOfficer.status || 'Active',
+        employmentStatus: editingOfficer.employmentStatus || editingOfficer.status || 'active',
         
         // Additional Information
         photoUrl: editingOfficer.photoUrl || '',
@@ -515,7 +545,13 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
   };
 
   const updateForm = (key, value) => {
-    setForm(prev => ({ ...prev, [key]: value }));
+    console.log('🔍 AddOfficerModal: updateForm called with key:', key, 'value:', value);
+    console.log('🔍 AddOfficerModal: Previous form state:', form);
+    setForm(prev => {
+      const newForm = { ...prev, [key]: value };
+      console.log('🔍 AddOfficerModal: New form state:', newForm);
+      return newForm;
+    });
   };
 
   const showModalToast = (type, title, message) => {
@@ -571,6 +607,15 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
       
       setExistingEmployees(uniqueEmployees);
       console.log('🔍 Set existingEmployees state with:', uniqueEmployees.length, 'employees');
+      
+      // Create supervisor options from existing employees
+      const supervisorOpts = uniqueEmployees.map(emp => ({
+        label: `${emp.fullName} (${emp.rank || 'N/A'})`,
+        value: emp.fullName,
+        id: emp.id || emp.$id
+      }));
+      setSupervisorOptions(supervisorOpts);
+      console.log('🔍 Created supervisor options:', supervisorOpts.length, 'options');
     } catch (error) {
       console.error('❌ Error loading existing employees:', error);
       console.error('❌ Error stack:', error.stack);
@@ -623,6 +668,42 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
         }
       }
 
+      // Validate promotion date is after joining date
+      if (form.lastPromotionDate && form.joiningDate) {
+        const promotionError = CUSTOM_VALIDATORS.promotionAfterJoining(form.lastPromotionDate, form.joiningDate);
+        if (promotionError) {
+          validation.errors.lastPromotionDate = promotionError;
+          validation.isValid = false;
+        }
+      }
+
+      // Validate performance rating (0-5)
+      if (form.performanceRating) {
+        const performanceError = CUSTOM_VALIDATORS.performanceRating(form.performanceRating);
+        if (performanceError) {
+          validation.errors.performanceRating = performanceError;
+          validation.isValid = false;
+        }
+      }
+
+      // Validate other dates are after joining date
+      const dateFieldsToValidate = [
+        { field: 'lastAdvanceDate', label: 'Last advance date' },
+        { field: 'lastLeaveDate', label: 'Last leave date' },
+        { field: 'lastOvertimeDate', label: 'Last overtime date' },
+        { field: 'lastEvaluationDate', label: 'Last evaluation date' }
+      ];
+
+      dateFieldsToValidate.forEach(({ field, label }) => {
+        if (form[field] && form.joiningDate) {
+          const dateError = CUSTOM_VALIDATORS.dateAfterJoining(form[field], form.joiningDate, label);
+          if (dateError) {
+            validation.errors[field] = dateError;
+            validation.isValid = false;
+          }
+        }
+      });
+
       // Additional validations for fields not in schema
       if (!form.gender) {
         validation.errors.gender = 'Gender is required';
@@ -634,22 +715,19 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
         validation.isValid = false;
       }
 
-      // Check for duplicate badge number (only for new officers, not when editing)
-      if (!isEditing && form.badgeNumber?.trim()) {
+      // Check for duplicate badge number (for both new and editing officers)
+      if (form.badgeNumber?.trim()) {
         console.log('🔍 Checking for duplicate badge number:', form.badgeNumber);
         console.log('🔍 Existing employees to check against:', existingEmployees);
         
-        const badgeExists = existingEmployees.some(emp => {
-          const empBadgeNumber = emp.badgeNumber || emp.employeeId || '';
-          const isDuplicate = empBadgeNumber.toLowerCase() === form.badgeNumber.toLowerCase();
-          if (isDuplicate) {
-            console.log('🔍 Found duplicate badge number:', empBadgeNumber, 'in employee:', emp);
-          }
-          return isDuplicate;
-        });
+        const badgeError = CUSTOM_VALIDATORS.uniqueBadgeNumber(
+          form.badgeNumber, 
+          existingEmployees, 
+          isEditing ? editingOfficer?.id || editingOfficer?.$id : null
+        );
         
-        if (badgeExists) {
-          validation.errors.badgeNumber = 'Badge number already exists';
+        if (badgeError) {
+          validation.errors.badgeNumber = badgeError;
           validation.isValid = false;
           console.log('🔍 Duplicate badge number detected:', form.badgeNumber);
         }
@@ -669,6 +747,10 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
     try {
       console.log('Starting form submission...');
       console.log('Form data:', form);
+      console.log('Form employmentStatus:', form.employmentStatus);
+      console.log('Form status:', form.status);
+      console.log('PhotoUrl in form:', form.photoUrl);
+      console.log('PhotoUrl type:', typeof form.photoUrl);
       console.log('Is editing:', isEditing);
       console.log('Editing officer:', editingOfficer);
       
@@ -704,6 +786,10 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
       };
 
       console.log('Prepared officer data:', officerData);
+      console.log('🔍 Status being saved:', officerData.status);
+      console.log('🔍 EmploymentStatus from form:', form.employmentStatus);
+      console.log('🔍 All fields in officerData:', Object.keys(officerData));
+      console.log('🔍 Form employmentStatus value:', form.employmentStatus);
 
       if (isEditing) {
         console.log('Updating existing officer...');
@@ -715,11 +801,7 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
           const result = await handleDataUpdate(key, editingOfficer.id, officerData, 'employees');
           console.log('Update result:', result);
           
-          Toast.show({
-            type: 'success',
-            text1: 'Success',
-            text2: formatSuccessMessage('updated', 'Officer')
-          });
+          // Removed success toast
           
           console.log('Update operation completed successfully');
           if (onSuccess && typeof onSuccess === 'function') {
@@ -736,11 +818,7 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
           const result = await handleDataSubmit(officerData, 'employees');
           console.log('Submit result:', result);
           
-          Toast.show({
-            type: 'success',
-            text1: 'Success',
-            text2: formatSuccessMessage('added', 'Officer')
-          });
+          // Removed success toast
           
           console.log('Add operation completed successfully');
           if (onSuccess && typeof onSuccess === 'function') {
@@ -774,36 +852,8 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
     return dept ? dept.color : '#8E8E93';
   };
 
-  // Photo upload function using document picker
-  const pickPhoto = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: 'image/*',
-        copyToCacheDirectory: true,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        const photo = result.assets[0];
-        setPhotoUri(photo.uri);
-        updateForm('photoUrl', photo.uri);
-
-        Toast.show({
-          type: 'success',
-          text1: 'Success',
-          text2: 'Photo uploaded successfully',
-        });
-      }
-    } catch (error) {
-      console.error('Error picking photo:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Failed to upload photo',
-      });
-    }
-  };
-
-
+  // Remove the pickPhoto function that uses DocumentPicker
+  // const pickPhoto = async () => { ... } - REMOVED
 
   const renderBasicInfoTab = () => (
     <View style={styles.tabContent}>
@@ -844,7 +894,7 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
       <DatePickerField
         label="Date of Birth *"
         value={form.dateOfBirth}
-        onDateChange={(date) => updateForm('dateOfBirth', date)}
+        onChange={(date) => updateForm('dateOfBirth', date)}
         placeholder="Select date of birth"
         required
         error={errors.dateOfBirth}
@@ -923,38 +973,46 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
         }}
       />
 
-            {/* Photo Upload Section */}
-      <View style={styles.photoSection}>
-        <Text style={styles.sectionTitle}>Profile Photo</Text>
-        <View style={styles.photoContainer}>
-          {photoUri || form.photoUrl ? (
-            <View style={styles.photoPreview}>
-              <RNImage
-                source={{ uri: photoUri || form.photoUrl }}
-                style={styles.photoImage}
-              />
-              <TouchableOpacity
-                style={styles.removePhotoButton}
-                onPress={() => {
-                  setPhotoUri(null);
-                  updateForm('photoUrl', '');
-                }}
-              >
-                <Ionicons name="close-circle" size={24} color="#FF3B30" />
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.photoPlaceholder}>
-              <Ionicons name="camera" size={48} color="#8E8E93" />
-              <Text style={styles.photoPlaceholderText}>No photo selected</Text>
-            </View>
-          )}
-          <TouchableOpacity style={styles.uploadPhotoButton} onPress={pickPhoto}>
-            <Ionicons name="cloud-upload" size={24} color="#007AFF" />
-            <Text style={styles.uploadPhotoButtonText}>Upload Photo</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      {/* Profile Photo Upload */}
+      <FileUploader
+        label="Profile Photo"
+        value={(() => {
+          console.log('🔍 FileUploader value calculation - Current photoUrl:', form.photoUrl);
+          console.log('🔍 FileUploader value calculation - photoUrl type:', typeof form.photoUrl);
+          console.log('🔍 FileUploader value calculation - photoUrl length:', form.photoUrl?.length);
+          console.log('🔍 FileUploader value calculation - photoUrl trimmed:', form.photoUrl?.trim());
+          const result = form.photoUrl && form.photoUrl.trim() ? { uri: form.photoUrl, mimeType: 'image/*' } : null;
+          console.log('🔍 FileUploader value calculation - Final result:', result);
+          return result;
+        })()}
+        onUpload={(file) => {
+          console.log('🔍 File uploaded:', file);
+          console.log('🔍 File URI:', file.uri);
+          console.log('🔍 File type:', typeof file.uri);
+          
+          // Ensure the URI is properly formatted
+          let photoUrl = file.uri;
+          if (photoUrl && typeof photoUrl === 'string') {
+            // Remove any potential encoding issues
+            photoUrl = photoUrl.trim();
+            console.log('🔍 Processed photoUrl:', photoUrl);
+          }
+          
+          updateForm('photoUrl', photoUrl);
+        }}
+        onRemove={() => {
+          console.log('🔍 AddOfficerModal: onRemove called');
+          console.log('🔍 AddOfficerModal: Current photoUrl before removal:', form.photoUrl);
+          console.log('🔍 AddOfficerModal: Current form state before removal:', form);
+          updateForm('photoUrl', '');
+          console.log('🔍 AddOfficerModal: photoUrl should be cleared now');
+          console.log('🔍 AddOfficerModal: updateForm called with photoUrl = ""');
+        }}
+        placeholder="Upload profile photo"
+        acceptTypes={['image/*']}
+        maxSize={5 * 1024 * 1024} // 5MB for images
+      />
+
     </View>
   );
 
@@ -992,25 +1050,50 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
       <DatePickerField
         label="Joining Date *"
         value={form.joiningDate}
-        onDateChange={(date) => updateForm('joiningDate', date)}
+        onChange={(date) => {
+          updateForm('joiningDate', date);
+          // Automatically calculate service years
+          if (date) {
+            const joiningDate = new Date(date);
+            const currentDate = new Date();
+            const yearsDiff = currentDate.getFullYear() - joiningDate.getFullYear();
+            const monthDiff = currentDate.getMonth() - joiningDate.getMonth();
+            const dayDiff = currentDate.getDate() - joiningDate.getDate();
+            
+            let serviceYears = yearsDiff;
+            if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
+              serviceYears = yearsDiff - 1;
+            }
+            
+            // Ensure service years is not negative
+            serviceYears = Math.max(0, serviceYears);
+            updateForm('serviceYears', serviceYears.toString());
+          } else {
+            // Clear service years if no joining date
+            updateForm('serviceYears', '');
+          }
+        }}
         placeholder="Select date of entry into force"
         required
         error={errors.joiningDate}
       />
       
       <InputField
-        label="Service Years"
+        label="Service Years (Auto-calculated from Joining Date)"
         value={form.serviceYears}
         onChangeText={(text) => updateForm('serviceYears', text)}
-        placeholder="Enter years of service"
+        placeholder="Automatically calculated from joining date"
         keyboardType="numeric"
+        editable={false}
+        style={{ backgroundColor: '#f8f9fa' }}
       />
       
       <DatePickerField
         label="Last Promotion Date"
         value={form.lastPromotionDate}
-        onDateChange={(date) => updateForm('lastPromotionDate', date)}
+        onChange={(date) => updateForm('lastPromotionDate', date)}
         placeholder="Select last promotion date"
+        error={errors.lastPromotionDate}
       />
     </View>
   );
@@ -1046,6 +1129,7 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
         onChangeText={(text) => updateForm('performanceRating', text)}
         placeholder="Enter performance rating (0.00-5.00)"
         keyboardType="decimal-pad"
+        error={errors.performanceRating}
       />
       
 
@@ -1111,11 +1195,12 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
         placeholder="Enter assigned equipment"
       />
 
-      <InputField
+      <SelectDropdown
         label="Supervisor"
-        value={form.supervisor}
-        onChangeText={(text) => updateForm('supervisor', text)}
-        placeholder="Enter supervisor name"
+        selectedValue={form.supervisor}
+        onValueChange={(value) => updateForm('supervisor', value)}
+        options={[{ label: 'No Supervisor', value: '' }, ...supervisorOptions]}
+        placeholder="Select supervisor"
       />
 
       <InputField
@@ -1128,8 +1213,9 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
       <DatePickerField
         label="Last Evaluation Date"
         value={form.lastEvaluationDate}
-        onDateChange={(date) => updateForm('lastEvaluationDate', date)}
+        onChange={(date) => updateForm('lastEvaluationDate', date)}
         placeholder="Select last evaluation date"
+        error={errors.lastEvaluationDate}
       />
     </View>
   );
@@ -1241,8 +1327,9 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
       <DatePickerField
         label="Last Advance Date"
         value={form.lastAdvanceDate}
-        onDateChange={(date) => updateForm('lastAdvanceDate', date)}
+        onChange={(date) => updateForm('lastAdvanceDate', date)}
         placeholder="Select last advance date"
+        error={errors.lastAdvanceDate}
       />
 
       <InputField
@@ -1270,8 +1357,8 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
   return (
     <Modal
       visible={visible}
-      animationType="slide"
-      transparent={true}
+      animationType="fade"
+      transparent={false}
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
@@ -1288,18 +1375,6 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
               <Text style={styles.headerTitle}>
                 {isEditing ? 'Edit Officer' : 'Add New Officer'}
               </Text>
-              {/* {!isEditing && (
-                <View style={styles.headerButtons}>
-                  <TouchableOpacity onPress={loadSampleData} style={styles.sampleDataButton}>
-                    <Ionicons name="refresh" size={20} color="#fff" />
-                    <Text style={styles.sampleDataButtonText}>Sample Data</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={resetForm} style={styles.clearFormButton}>
-                    <Ionicons name="trash" size={20} color="#fff" />
-                    <Text style={styles.clearFormButtonText}>Clear</Text>
-                  </TouchableOpacity>
-                </View>
-              )} */}
             </View>
           </LinearGradient>
 
@@ -1398,7 +1473,13 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
             </ScrollView>
           </View>
 
-          <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+          <ScrollView 
+            style={styles.scrollView} 
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="none"
+            contentContainerStyle={styles.scrollViewContent}
+          >
             {activeTab === 'basic' && renderBasicInfoTab()}
             {activeTab === 'contact' && renderContactTab()}
             {activeTab === 'personal' && renderPersonalTab()}
@@ -1457,28 +1538,22 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
 
 const styles = StyleSheet.create({
   modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#f8f9fa',
+    zIndex: 1000,
   },
   modalContent: {
+    flex: 1,
     backgroundColor: '#f8f9fa',
-    borderRadius: 20,
-    width: '95%',
-    height: '90%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 10,
   },
   header: {
     paddingTop: 20,
     paddingBottom: 20,
     paddingHorizontal: 20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
   },
   headerContent: {
     flexDirection: 'row',
@@ -1574,6 +1649,9 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
   },
+  scrollViewContent: {
+    paddingBottom: 20,
+  },
   tabContent: {
     gap: 16,
   },
@@ -1582,8 +1660,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#E5E5EA',
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
   },
   submitButton: {
     borderRadius: 12,
@@ -1637,205 +1713,12 @@ const styles = StyleSheet.create({
   switchThumbActive: {
     transform: [{ translateX: 20 }],
   },
-  // Photo upload styles
-  photoSection: {
-    marginTop: 16,
-  },
-  photoContainer: {
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  photoPreview: {
-    position: 'relative',
-    marginBottom: 16,
-  },
-  photoImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    borderWidth: 3,
-    borderColor: '#007AFF',
-  },
-  removePhotoButton: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 2,
-  },
-  photoPlaceholder: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#F2F2F7',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#E5E5EA',
-    borderStyle: 'dashed',
-    marginBottom: 16,
-  },
-  photoPlaceholderText: {
-    fontSize: 12,
-    color: '#8E8E93',
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  uploadPhotoButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F2F2F7',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#007AFF',
-    borderStyle: 'dashed',
-  },
-  uploadPhotoButtonText: {
-    marginLeft: 8,
-    fontSize: 16,
-    color: '#007AFF',
-    fontWeight: '500',
-  },
-  // Document upload styles
+  // Section title styles
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#1e293b',
     marginBottom: 8,
-  },
-  sectionSubtitle: {
-    fontSize: 14,
-    color: '#64748b',
-    marginBottom: 20,
-  },
-  documentSection: {
-    marginBottom: 20,
-    padding: 16,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
-  },
-  documentHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  documentTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#1e293b',
-    marginLeft: 8,
-  },
-  uploadButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    backgroundColor: '#F8F9FA',
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#007AFF',
-    borderStyle: 'dashed',
-  },
-  uploadButtonText: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: '#007AFF',
-    fontWeight: '500',
-  },
-  documentItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    backgroundColor: '#F8F9FA',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
-  },
-  documentInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  documentName: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#1e293b',
-  },
-  documentSize: {
-    fontSize: 12,
-    color: '#64748b',
-    marginTop: 2,
-  },
-  // Image preview styles for documents
-  imagePreview: {
-    position: 'relative',
-    flex: 1,
-    marginRight: 12,
-  },
-  documentImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    backgroundColor: '#F2F2F7',
-  },
-  imageOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderBottomLeftRadius: 8,
-    borderBottomRightRadius: 8,
-  },
-  removeButton: {
-    padding: 8,
-    borderRadius: 6,
-    backgroundColor: '#FFE5E5',
-  },
-  // Receipt specific styles
-  receiptImageContainer: {
-    position: 'relative',
-    flex: 1,
-    marginRight: 12,
-  },
-  receiptImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#F2F2F7',
-    borderWidth: 3,
-    borderColor: '#007AFF',
-  },
-  receiptOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderBottomLeftRadius: 60,
-    borderBottomRightRadius: 60,
-  },
-  receiptName: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#fff',
-    textAlign: 'center',
-  },
-  receiptSize: {
-    fontSize: 10,
-    color: '#fff',
-    textAlign: 'center',
-    marginTop: 2,
   },
   // Modal Toast Styles
   modalToastContainer: {

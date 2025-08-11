@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as DocumentPicker from 'expo-document-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -140,30 +139,39 @@ const EmployeeDocumentsScreen = () => {
   };
 
   const pickDocument = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: '*/*',
-        copyToCacheDirectory: true,
-      });
+    // Temporarily disabled due to DocumentPicker issues
+    Toast.show({
+      type: 'info',
+      text1: 'Upload Disabled',
+      text2: 'Document upload is temporarily disabled. Please contact support.',
+      position: 'top',
+    });
+    
+    // Original code commented out:
+    // try {
+    //   const result = await DocumentPicker.getDocumentAsync({
+    //     type: '*/*',
+    //     copyToCacheDirectory: true,
+    //   });
 
-      if (!result.canceled && result.assets[0]) {
-        const document = result.assets[0];
-        setSelectedDocument(document);
-        setNewDocument(prev => ({
-          ...prev,
-          documentUrl: document.uri,
-          documentName: document.name
-        }));
-        setErrors(prev => ({ ...prev, documentName: null }));
-      }
-    } catch (error) {
-      console.error('Error picking document:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Failed to pick document'
-      });
-    }
+    //   if (!result.canceled && result.assets[0]) {
+    //     const document = result.assets[0];
+    //     setSelectedDocument(document);
+    //     setNewDocument(prev => ({
+    //       ...prev,
+    //       documentUrl: document.uri,
+    //       documentName: document.name
+    //     }));
+    //     setErrors(prev => ({ ...prev, documentName: null }));
+    //   }
+    // } catch (error) {
+    //   console.error('Error picking document:', error);
+    //   Toast.show({
+    //     type: 'error',
+    //     text1: 'Error',
+    //     text2: 'Failed to pick document'
+    //   });
+    // }
   };
 
   const validateForm = () => {
@@ -209,22 +217,14 @@ const EmployeeDocumentsScreen = () => {
         setDocumentRecords(prev => prev.map(record => 
           record.$id === editingRecord.$id ? { ...record, ...documentData } : record
         ));
-        Toast.show({
-          type: 'success',
-          text1: 'Success',
-          text2: 'Document updated successfully'
-        });
+        // Removed success toast
       } else {
         const newDocumentRecord = {
           $id: Date.now().toString(),
           ...documentData
         };
         setDocumentRecords(prev => [newDocumentRecord, ...prev]);
-        Toast.show({
-          type: 'success',
-          text1: 'Success',
-          text2: 'Document added successfully'
-        });
+        // Removed success toast
       }
 
       setShowAddModal(false);
@@ -283,11 +283,7 @@ const EmployeeDocumentsScreen = () => {
     try {
       await handleDataDelete(`EmployeeDocuments_${recordToDelete.$id}`, recordToDelete.$id, 'employeeDocuments');
       setDocumentRecords(prev => prev.filter(record => record.$id !== recordToDelete.$id));
-      Toast.show({
-        type: 'success',
-        text1: 'Success',
-        text2: 'Document deleted successfully'
-      });
+      // Removed success toast
     } catch (error) {
       console.error('Error deleting document:', error);
       Toast.show({

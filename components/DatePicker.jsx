@@ -89,9 +89,10 @@ const styles = StyleSheet.create({
   modalContent: {
     backgroundColor: '#fff',
     borderRadius: 20,
-    width: '90%',
-    maxWidth: 400,
-    padding: 24,
+    width: '95%',
+    maxWidth: 500,
+    minHeight: 250,
+    padding: 28,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
@@ -99,16 +100,16 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#2c3e50',
-    marginBottom: 20,
+    marginBottom: 24,
     textAlign: 'center',
   },
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 12,
+    gap: 16,
   },
   cancelButton: {
     flex: 1,

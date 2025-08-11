@@ -12,7 +12,7 @@ const AttendanceModal = ({ visible, onClose, employees }) => {
   return (
     <Modal
       visible={visible}
-      animationType="slide"
+      animationType="fade"
       transparent={false}
       onRequestClose={onClose}
     >

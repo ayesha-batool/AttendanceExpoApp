@@ -1,5 +1,6 @@
+import { Picker } from '@react-native-picker/picker';
 import React, { useEffect, useState } from 'react';
-import { Picker, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 const countries = [
   { name: 'Pakistan', code: '92', flag: '🇵🇰' },
@@ -43,26 +44,28 @@ const PhoneNumberField = ({
       </Text>
 
       <View style={[styles.inputWrapper, error && { borderColor: '#ff4d4f' }]}>
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={selectedCountry.code}
-            onValueChange={(itemValue) => {
-              const country = countries.find((c) => c.code === itemValue);
-              setSelectedCountry(country);
-              onChange(`+${itemValue}${localNumber}`);
-            }}
-            style={styles.picker}
-            mode="dropdown"
-          >
-            {countries.map((country) => (
-              <Picker.Item
-                key={country.code}
-                label={`${country.flag} +${country.code}`}
-                value={country.code}
-              />
-            ))}
-          </Picker>
-        </View>
+                 <View style={styles.pickerContainer}>
+           <Picker
+             selectedValue={selectedCountry.code}
+             onValueChange={(itemValue) => {
+               const country = countries.find((c) => c.code === itemValue);
+               setSelectedCountry(country);
+               onChange(`+${itemValue}${localNumber}`);
+             }}
+             style={styles.picker}
+             mode="dropdown"
+             dropdownIconColor="#333"
+           >
+             {countries.map((country) => (
+               <Picker.Item
+                 key={country.code}
+                 label={`${country.flag} ${country.code}`}
+                 value={country.code}
+                 color="#333"
+               />
+             ))}
+           </Picker>
+         </View>
 
         <TextInput
           value={localNumber}
@@ -104,17 +107,19 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   pickerContainer: {
-    width: 85,
+    width: 100,
     backgroundColor: '#f0f0f0',
     borderColor: '#ccc',
     justifyContent: 'center',
+    alignItems: 'center',
   },
   picker: {
     height: 50,
     width: '100%',
     borderWidth: 0,
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
     color: '#333',
+    fontSize: 14,
   },
   input: {
     flex: 1,

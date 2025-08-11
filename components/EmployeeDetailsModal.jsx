@@ -28,6 +28,8 @@ const EmployeeDetailsModal = ({ visible, employee, onClose }) => {
     return (baseSalary + overtimePay - totalAdvances).toFixed(2);
   };
 
+
+
   const renderSection = (title, data) => (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -81,8 +83,8 @@ const EmployeeDetailsModal = ({ visible, employee, onClose }) => {
   return (
     <Modal
       visible={visible}
-      animationType="slide"
-      transparent={true}
+      animationType="fade"
+      transparent={false}
       onRequestClose={() => {
         console.log('Modal onRequestClose triggered');
         if (onClose) {
@@ -261,28 +263,22 @@ const EmployeeDetailsModal = ({ visible, employee, onClose }) => {
 
 const styles = StyleSheet.create({
   modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#f8f9fa',
+    zIndex: 1000,
   },
   modalContent: {
+    flex: 1,
     backgroundColor: '#f8f9fa',
-    borderRadius: 20,
-    width: '95%',
-    height: '90%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 10,
   },
   header: {
     paddingTop: 20,
     paddingBottom: 20,
     paddingHorizontal: 20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
   },
   headerContent: {
     flexDirection: 'row',
@@ -341,6 +337,27 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#8E8E93',
     marginTop: 8,
+  },
+  photoContainer: {
+    position: 'relative',
+  },
+  uploadOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  uploadText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4,
+    textAlign: 'center',
   },
   employeeName: {
     fontSize: 20,

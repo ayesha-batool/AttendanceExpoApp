@@ -119,8 +119,8 @@ const ExpenseDetailsModal = ({ visible, expense, onClose, onEdit, onDelete }) =>
   return (
     <Modal
       visible={visible}
-      animationType="slide"
-      transparent={true}
+      animationType="fade"
+      transparent={false}
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
@@ -249,22 +249,17 @@ const ExpenseDetailsModal = ({ visible, expense, onClose, onEdit, onDelete }) =>
 
 const styles = StyleSheet.create({
   modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#fff',
+    zIndex: 1000,
   },
   modalContent: {
+    flex: 1,
     backgroundColor: '#fff',
-    borderRadius: 20,
-    width: '90%',
-    maxHeight: '80%',
-    padding: 0,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 10,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -286,13 +281,14 @@ const styles = StyleSheet.create({
   },
   modalBody: {
     flex: 1,
-    padding: 20,
+    padding: 24,
+    paddingBottom: 32,
   },
   expenseHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
-    paddingBottom: 16,
+    marginBottom: 32,
+    paddingBottom: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
   },
@@ -324,18 +320,18 @@ const styles = StyleSheet.create({
     color: '#059669',
   },
   detailsSection: {
-    marginBottom: 24,
+    marginBottom: 32,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     color: '#1e293b',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   detailLabel: {
     fontSize: 14,
@@ -409,10 +405,10 @@ const styles = StyleSheet.create({
   modalFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: 20,
+    padding: 24,
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
-    gap: 12,
+    gap: 16,
   },
   editButton: {
     flex: 1,

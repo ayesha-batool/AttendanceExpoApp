@@ -13,7 +13,7 @@ const ExpensesManagementLayoutContent = () => {
         title="Expense Management"
         subtitle="Track & manage department expenses"
         icon="card"
-        gradientColors={['#10b981', '#059669', '#047857']}
+        gradientColors={['#8b5cf6', '#7c3aed', '#6d28d9']}
         showBackButton={true}
         actionButton={headerAction}
       />

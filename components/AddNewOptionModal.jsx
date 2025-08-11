@@ -47,13 +47,9 @@ const AddNewOptionModal = ({
 
     setLoading(true);
     try {
-      const result = await addCustomOption(fieldName, newOption.trim());
-      if (result) {
-        Toast.show({
-          type: 'success',
-          text1: 'Success',
-          text2: `New ${fieldLabel} added successfully`,
-        });
+      const result = await CustomOptionsService.addCustomOption(fieldName, newOption.trim());
+      if (result.success) {
+        // Removed success toast
         onSuccess(newOption.trim());
         setNewOption('');
         onClose();
@@ -61,7 +57,7 @@ const AddNewOptionModal = ({
         Toast.show({
           type: 'error',
           text1: 'Error',
-          text2: 'Failed to add new option',
+          text2: result.message || 'Failed to add new option',
         });
       }
     } catch (error) {
@@ -84,7 +80,7 @@ const AddNewOptionModal = ({
   return (
     <Modal
       visible={visible}
-      animationType="slide"
+      animationType="fade"
       transparent={true}
       onRequestClose={handleClose}
     >
@@ -152,8 +148,9 @@ const styles = StyleSheet.create({
   modalContent: {
     backgroundColor: '#fff',
     borderRadius: 20,
-    width: '90%',
-    maxWidth: 400,
+    width: '95%',
+    maxWidth: 500,
+    minHeight: 300,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.25,
@@ -164,7 +161,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    padding: 24,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },
@@ -179,13 +176,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   modalBody: {
-    padding: 20,
+    padding: 24,
+    paddingBottom: 32,
   },
   fieldLabel: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
     color: '#1e293b',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   textInput: {
     borderWidth: 1,
@@ -199,10 +197,10 @@ const styles = StyleSheet.create({
   modalFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: 20,
+    padding: 24,
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
-    gap: 12,
+    gap: 16,
   },
   cancelButton: {
     flex: 1,

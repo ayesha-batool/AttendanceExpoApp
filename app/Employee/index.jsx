@@ -66,10 +66,60 @@ const EmployeeScreen = () => {
 
   // Data fetching
   const fetchData = async () => {
+    console.log('🔍 fetchData called');
+    console.log('🔍 fetchData - timestamp:', new Date().toISOString());
     try {
       setLoading(true);
       const [employeesData, optionsData] = await Promise.all([getItems('employees'), getCustomOptions()]);
+      console.log('🔍 Raw employees data:', employeesData);
+      console.log('🔍 Number of raw employees:', employeesData?.length);
+      
       const validEmployees = employeesData.filter(item => item && typeof item === 'object');
+      console.log('🔍 Valid employees:', validEmployees);
+      console.log('🔍 Number of valid employees:', validEmployees.length);
+      
+      // Log each employee's details to debug
+      validEmployees.forEach((emp, index) => {
+        console.log(`🔍 Employee ${index + 1}:`, {
+          name: emp.fullName,
+          status: emp.status,
+          employmentStatus: emp.employmentStatus,
+          photoUrl: emp.photoUrl ? 'Has photo' : 'No photo',
+          id: emp.$id || emp.id
+        });
+      });
+      
+      // Log employees with photoUrl
+      const employeesWithPhoto = validEmployees.filter(emp => emp.photoUrl);
+      console.log('🔍 Employees with photoUrl:', employeesWithPhoto.length);
+      employeesWithPhoto.forEach((emp, index) => {
+        console.log(`🔍 Employee ${index + 1} with photo:`, {
+          name: emp.fullName,
+          photoUrl: emp.photoUrl,
+          photoUrlLength: emp.photoUrl?.length,
+          status: emp.status,
+          employmentStatus: emp.employmentStatus
+        });
+      });
+      
+      // Log employees without photoUrl for comparison
+      const employeesWithoutPhoto = validEmployees.filter(emp => !emp.photoUrl);
+      console.log('🔍 Employees without photoUrl:', employeesWithoutPhoto.length);
+      employeesWithoutPhoto.forEach((emp, index) => {
+        console.log(`🔍 Employee ${index + 1} without photo:`, {
+          name: emp.fullName,
+          status: emp.status,
+          employmentStatus: emp.employmentStatus
+        });
+      });
+      
+      console.log('🔍 Setting employees in state:', validEmployees.length);
+      console.log('🔍 Total employees in system:', validEmployees.length);
+      console.log('🔍 Employees with photoUrl:', validEmployees.filter(emp => emp.photoUrl).length);
+      console.log('🔍 Employees without photoUrl:', validEmployees.filter(emp => !emp.photoUrl).length);
+      console.log('🔍 Active employees:', validEmployees.filter(emp => emp.status?.toLowerCase() === 'active').length);
+      console.log('🔍 Inactive employees:', validEmployees.filter(emp => emp.status?.toLowerCase() === 'inactive').length);
+      console.log('🔍 Employees with undefined status:', validEmployees.filter(emp => !emp.status).length);
       setEmployees(validEmployees);
       setFilteredEmployees(validEmployees);
       setCustomOptions(optionsData);
@@ -77,50 +127,124 @@ const EmployeeScreen = () => {
       if (validEmployees.length > 0) {
         const names = validEmployees.map(emp => emp.fullName || emp.name || 'Unknown').join(', ');
         const message = validEmployees.length === 1 ? `Loaded employee: ${names}` : `Loaded ${validEmployees.length} employees: ${names}`;
-        showToast('success', 'Employees Loaded', message, 4000);
+        // showToast('success', 'Employees Loaded', message, 4000);
       } else {
-        showToast('info', 'No Employees', 'No employees found in the system');
+        // showToast('info', 'No Employees', 'No employees found in the system');
       }
     } catch (error) {
-      showToast('error', 'Error', 'Failed to load employees data');
+      // showToast('error', 'Error', 'Failed to load employees data');
     } finally {
       setLoading(false);
     }
   };
 
   // Filter and search logic
-  const applyFiltering = () => {
+    const applyFiltering = () => {
     let filtered = [...employees];
+    console.log('🔍 Starting filtering with', filtered.length, 'employees');
+    console.log('🔍 Current filters state:', filters);
+    console.log('🔍 Current search query:', searchQuery);
+    console.log('🔍 Active tab:', activeTab);
+    console.log('🔍 Filters object keys:', Object.keys(filters));
+    console.log('🔍 Filters object values:', Object.values(filters));
+    console.log('🔍 Any active filters:', Object.values(filters).some(f => f));
+      console.log('🔍 Employees before filtering:', filtered.map(emp => ({
+        name: emp.fullName,
+        status: emp.status,
+        employmentStatus: emp.employmentStatus,
+        hasStatus: !!emp.status,
+        hasEmploymentStatus: !!emp.employmentStatus
+      })));
     
     // Filter by active tab
     if (activeTab === 'employees') {
-      filtered = filtered.filter(emp => emp.status?.toLowerCase() === 'active');
+      const beforeStatusFilter = filtered.length;
+      console.log('🔍 Before status filter - employees:', filtered.map(emp => ({ name: emp.fullName, status: emp.status, employmentStatus: emp.employmentStatus })));
+      filtered = filtered.filter(emp => {
+        const status = emp.status?.toLowerCase();
+        const employmentStatus = emp.employmentStatus?.toLowerCase();
+        const isInactive = status === 'inactive' || employmentStatus === 'inactive';
+        console.log(`🔍 Employee ${emp.fullName}: status=${status}, employmentStatus=${employmentStatus}, isInactive=${isInactive}`);
+        
+        // Show all employees except inactive ones
+        return !isInactive;
+      });
+      console.log('🔍 After status filter (all except inactive):', beforeStatusFilter, '->', filtered.length);
+      console.log('🔍 After status filter - remaining employees:', filtered.map(emp => ({ 
+        name: emp.fullName, 
+        status: emp.status, 
+        employmentStatus: emp.employmentStatus,
+        hasStatus: !!emp.status,
+        hasEmploymentStatus: !!emp.employmentStatus
+      })));
+      
+      // Log employees with photoUrl
+      const employeesWithPhoto = filtered.filter(emp => emp.photoUrl);
+      console.log('🔍 Employees with photoUrl:', employeesWithPhoto.length);
+      console.log('🔍 Employees without photoUrl:', filtered.filter(emp => !emp.photoUrl).length);
     } else if (activeTab === 'inactive') {
-      filtered = filtered.filter(emp => emp.status?.toLowerCase() === 'inactive');
+      const beforeStatusFilter = filtered.length;
+      filtered = filtered.filter(emp => {
+        const status = emp.status?.toLowerCase();
+        const employmentStatus = emp.employmentStatus?.toLowerCase();
+        return status === 'inactive' || employmentStatus === 'inactive';
+      });
+      console.log('🔍 After status filter (inactive):', beforeStatusFilter, '->', filtered.length);
     }
     
     // Apply search
     if (searchQuery.trim()) {
+      const beforeSearchFilter = filtered.length;
       const query = searchQuery.toLowerCase();
+      console.log('🔍 Applying search filter with query:', query);
+      console.log('🔍 Employees before search filter:', filtered.map(emp => ({
+        name: emp.fullName,
+        badgeNumber: emp.badgeNumber,
+        email: emp.email,
+        phone: emp.phone,
+        rank: emp.rank,
+        station: emp.station
+      })));
       filtered = filtered.filter(employee =>
         ['fullName', 'name', 'badgeNumber', 'email', 'phone', 'rank', 'station']
           .some(field => employee[field]?.toLowerCase().includes(query))
       );
+      console.log('🔍 After search filter:', beforeSearchFilter, '->', filtered.length, '(query:', searchQuery, ')');
+      if (filtered.length === 0 && beforeSearchFilter > 0) {
+        console.log('🔍 WARNING: All employees filtered out by search!');
+      }
     }
     
     // Apply filters
     Object.entries(filters).forEach(([key, value]) => {
       if (value) {
+        const beforeFilter = filtered.length;
         const fieldMap = { station: 'station', rank: 'rank', shift: 'shift', status: 'status' };
-        filtered = filtered.filter(employee => employee[fieldMap[key]] === value);
+        const fieldName = fieldMap[key];
+        console.log(`🔍 Applying ${key} filter with value: ${value}, field: ${fieldName}`);
+        console.log(`🔍 Employees before ${key} filter:`, filtered.map(emp => ({ 
+          name: emp.fullName, 
+          [fieldName]: emp[fieldName],
+          hasField: !!emp[fieldName]
+        })));
+        filtered = filtered.filter(employee => employee[fieldName] === value);
+        console.log(`🔍 After ${key} filter:`, beforeFilter, '->', filtered.length, `(value: ${value})`);
+        console.log(`🔍 Employees after ${key} filter:`, filtered.map(emp => ({ 
+          name: emp.fullName, 
+          [fieldName]: emp[fieldName]
+        })));
       }
     });
     
+    console.log('🔍 Final filtered employees:', filtered.length);
+    console.log('🔍 Employees being shown in list:', filtered.length);
+    console.log('🔍 Employee names in list:', filtered.map(emp => emp.fullName || emp.name || 'Unknown').join(', '));
     setFilteredEmployees(filtered);
   };
 
   // CRUD operations
   const handleAdd = () => {
+    console.log('Add button pressed!');
     updateSelected('editEmployee', null);
     updateModal('addOfficer', true);
   };
@@ -154,7 +278,7 @@ const EmployeeScreen = () => {
         (emp.id || emp.$id) === (employee.id || employee.$id) ? updatedEmployee : emp
       ));
       
-      showToast('success', 'Success', `${employee.fullName} status updated to ${newStatus}`);
+      // Removed success toast for status update
     } catch (error) {
       showToast('error', 'Error', 'Failed to update employee status');
     }
@@ -167,7 +291,7 @@ const EmployeeScreen = () => {
       await handleDataDelete(key, selected.deleteEmployee.id || selected.deleteEmployee.$id, 'employees');
       setEmployees(prev => prev.filter(emp => (emp.id || emp.$id) !== (selected.deleteEmployee.id || selected.deleteEmployee.$id)));
       setFilteredEmployees(prev => prev.filter(emp => (emp.id || emp.$id) !== (selected.deleteEmployee.id || selected.deleteEmployee.$id)));
-      showToast('success', 'Success', 'Employee deleted successfully');
+      // Removed success toast for delete operation
     } catch (error) {
       showToast('error', 'Error', 'Failed to delete employee');
     } finally {
@@ -190,14 +314,23 @@ const EmployeeScreen = () => {
 
   // Effects
   useEffect(() => { fetchData(); }, []);
-  useFocusEffect(useCallback(() => { fetchData(); }, []));
-  useEffect(() => { setHeaderActionButton({ icon: 'add', onPress: handleAdd }); return () => clearHeaderAction(); }, []);
+  useFocusEffect(useCallback(() => { 
+    console.log('🔍 Employee screen focused - timestamp:', new Date().toISOString());
+    fetchData(); 
+  }, []));
+  // Remove header action button since we're using floating action button
+  // useEffect(() => { setHeaderActionButton({ icon: 'add', onPress: handleAdd }); return () => clearHeaderAction(); }, []);
   useEffect(() => { applyFiltering(); }, [activeTab, employees, searchQuery, filters]);
 
   if (loading) return <LoadingState />;
 
-  const activeEmployees = filteredEmployees.filter(emp => emp.status?.toLowerCase() === 'active');
-  const inactiveEmployees = filteredEmployees.filter(emp => emp.status?.toLowerCase() === 'inactive');
+  // Log final display counts
+  console.log('🔍 === FINAL DISPLAY COUNTS ===');
+  console.log('🔍 Active tab:', activeTab);
+  console.log('🔍 Total employees in system:', employees.length);
+  console.log('🔍 Total filtered employees:', filteredEmployees.length);
+  console.log('🔍 Employees being shown in UI:', filteredEmployees.length);
+  console.log('🔍 ===============================');
 
   return (
     <View style={styles.container}>
@@ -205,16 +338,13 @@ const EmployeeScreen = () => {
       <View style={styles.tabContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScrollContainer}>
           <View style={styles.tabSliderContainer}>
-            <View style={[styles.tabSlider, { 
-              left: activeTab === 'employees' ? '0%' : activeTab === 'inactive' ? '33.33%' : '66.66%' 
-            }]} />
             {[
-              { key: 'employees', icon: 'people', label: 'Team Members' },
+              { key: 'employees', icon: 'people', label: 'All Employees' },
               { key: 'inactive', icon: 'person-remove', label: 'Inactive' },
               { key: 'attendance', icon: 'calendar', label: 'Attendance' }
             ].map(tab => (
               <TouchableOpacity key={tab.key} style={[styles.tab, activeTab === tab.key && styles.activeTab]} onPress={() => setActiveTab(tab.key)}>
-                <Ionicons name={tab.icon} size={20} color={activeTab === tab.key ? '#1e40af' : '#64748b'} />
+                <Ionicons name={tab.icon} size={20} color={activeTab === tab.key ? '#fff' : '#64748b'} />
                 <Text style={[styles.tabText, activeTab === tab.key && styles.activeTabText]}>{tab.label}</Text>
               </TouchableOpacity>
             ))}
@@ -242,8 +372,10 @@ const EmployeeScreen = () => {
             )}
           </View>
 
+
+
           {/* Employee List */}
-          {(activeTab === 'employees' ? activeEmployees : inactiveEmployees).length === 0 ? (
+          {filteredEmployees.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Ionicons name={activeTab === 'employees' ? 'people-outline' : 'person-remove-outline'} size={64} color="#9ca3af" />
               <Text style={styles.emptyTitle}>
@@ -252,12 +384,12 @@ const EmployeeScreen = () => {
               <Text style={styles.emptyMessage}>
                 {searchQuery || Object.values(filters).some(f => f) 
                   ? 'Try adjusting your search or filter criteria'
-                  : activeTab === 'employees' ? 'Start by adding your first employee' : 'All employees are currently active'}
+                  : activeTab === 'employees' ? 'Start by adding your first employee' : 'No inactive employees found'}
               </Text>
             </View>
           ) : (
             <FlatList
-              data={activeTab === 'employees' ? activeEmployees : inactiveEmployees}
+              data={filteredEmployees}
               keyExtractor={(item) => item.id || item.$id}
               renderItem={({ item }) => (
                 <EmployeeCard
@@ -317,7 +449,13 @@ const EmployeeScreen = () => {
       <AddOfficerModal
         visible={modals.addOfficer}
         onClose={() => { updateModal('addOfficer', false); updateSelected('editEmployee', null); }}
-        onSuccess={() => { fetchData(); }}
+        onSuccess={() => { 
+          console.log('🔍 onSuccess called, fetching data...');
+          setTimeout(() => {
+            console.log('🔍 Fetching data after delay...');
+            fetchData(); 
+          }, 500); // Add 500ms delay to ensure data is saved
+        }}
         editingOfficer={selected.editEmployee}
       />
 
@@ -325,21 +463,34 @@ const EmployeeScreen = () => {
         visible={modals.details}
         employee={selected.employee}
         onClose={() => { updateModal('details', false); updateSelected('employee', null); }}
+        onEmployeeUpdate={() => { 
+          console.log('🔍 Employee updated, fetching data...');
+          setTimeout(() => {
+            console.log('🔍 Fetching data after employee update...');
+            fetchData(); 
+          }, 500); // Add 500ms delay to ensure data is saved
+        }}
       />
+
+      {/* Floating Action Button */}
+      <TouchableOpacity style={styles.fab} onPress={handleAdd}>
+        <LinearGradient colors={['#1e40af', '#1e3a8a']} style={styles.fabGradient}>
+          <Ionicons name="add" size={24} color="#fff" />
+        </LinearGradient>
+      </TouchableOpacity>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
-  tabContainer: { backgroundColor: '#fff', paddingHorizontal: 24, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
-  tabScrollContainer: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8 },
-  tabSliderContainer: { flexDirection: 'row', position: 'relative', height: 56, backgroundColor: '#f1f5f9', borderRadius: 16, padding: 6, marginHorizontal: 8, minWidth: 400 },
-  tabSlider: { position: 'absolute', height: '100%', width: '33.33%', backgroundColor: '#fff', borderRadius: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
-  tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, paddingHorizontal: 16, borderRadius: 12, zIndex: 2, minWidth: 100 },
-  activeTab: { backgroundColor: 'transparent' },
-  tabText: { fontSize: 14, fontWeight: '600', color: '#64748b', marginLeft: 8 },
-  activeTabText: { color: '#1e40af' },
+  tabContainer: { backgroundColor: '#fff', padding:1, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+  tabScrollContainer: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4,margin:"auto" },
+  tabSliderContainer: { flexDirection: 'row', height: 48, backgroundColor: 'white', borderRadius: 12, padding: 4, marginHorizontal: 4, minWidth: 320 },
+  tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, paddingHorizontal: 4, borderRadius: 8, minWidth: 80 },
+  activeTab: { backgroundColor: '#1e40af' },
+  tabText: { fontSize: 13, fontWeight: '600', color: '#64748b', marginLeft: 6 },
+  activeTabText: { color: '#fff' },
   searchFilterContainer: { flexDirection: 'row', alignItems: 'center', padding: 20, gap: 12 },
   filterButton: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0' },
   filterButtonText: { fontSize: 14, fontWeight: '600', color: '#1e40af', marginLeft: 6 },
@@ -358,7 +509,25 @@ const styles = StyleSheet.create({
   clearButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   applyButton: { flex: 1, borderRadius: 12 },
   applyGradient: { paddingVertical: 14, paddingHorizontal: 20, borderRadius: 12, alignItems: 'center' },
-  applyButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' }
+  applyButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  fab: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    zIndex: 1000,
+  },
+  fabGradient: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  }
 });
 
 export default EmployeeScreen;

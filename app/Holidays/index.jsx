@@ -4,15 +4,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
-  Dimensions,
-  Modal,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    Alert,
+    Dimensions,
+    Modal,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 import InputField from '../../components/InputField';
@@ -168,19 +168,11 @@ const PoliceLeaveManagementScreen = () => {
       };
 
       if (selectedLeave) {
-        await handleDataUpdate('leaves', selectedLeave.$id, leaveData, 'leaves');
-        Toast.show({
-          type: 'success',
-          text1: 'Success',
-          text2: 'Leave request updated successfully'
-        });
+        await handleDataUpdate(`leaves_${selectedLeave.$id}`, selectedLeave.$id, leaveData, 'leaves');
+        // Removed success toast
       } else {
-        await handleDataSubmit('leaves', leaveData);
-        Toast.show({
-          type: 'success',
-          text1: 'Success',
-          text2: 'Leave request submitted successfully'
-        });
+        await handleDataSubmit(leaveData, 'leaves');
+        // Removed success toast
       }
 
       setShowAddModal(false);
@@ -237,12 +229,8 @@ const PoliceLeaveManagementScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await handleDataDelete('leaves', leaveId);
-              Toast.show({
-                type: 'success',
-                text1: 'Success',
-                text2: 'Leave request deleted successfully'
-              });
+              await handleDataDelete(`leaves_${leaveId}`, leaveId, 'leaves');
+              // Removed success toast
               fetchData();
             } catch (error) {
               console.error('Error deleting leave:', error);
@@ -284,17 +272,13 @@ const PoliceLeaveManagementScreen = () => {
 
   const updateLeaveStatus = async (leaveId, newStatus) => {
     try {
-      await handleDataUpdate('leaves', leaveId, {
+      await handleDataUpdate(`leaves_${leaveId}`, leaveId, {
         status: newStatus,
         approvedBy: currentUser?.$id,
         lastModified: new Date().toISOString()
       }, 'leaves');
       
-      Toast.show({
-        type: 'success',
-        text1: 'Success',
-        text2: `Leave request ${newStatus} successfully`
-      });
+      // Removed success toast
       
       fetchData();
     } catch (error) {

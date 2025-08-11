@@ -3,12 +3,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import {
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
-import Toast from 'react-native-toast-message';
 
 const PageHeader = ({ 
   title, 
@@ -26,13 +25,7 @@ const PageHeader = ({
     console.log('Back button pressed');
     console.log('Router state:', { canGoBack: router.canGoBack() });
     
-    // Add visual feedback
-    Toast.show({
-      type: 'info',
-      text1: 'Navigation',
-      text2: router.canGoBack() ? 'Going back...' : 'Navigating to Dashboard...',
-      position: 'top',
-    });
+    // Removed navigation toast as requested
     
     if (onIconPress) {
       console.log('Using custom onIconPress');
@@ -67,7 +60,7 @@ const PageHeader = ({
       <View style={styles.headerContent}>
         <View style={styles.titleContainer}>
           <View style={styles.leftSection}>
-            {showBackButton && (
+            {/* {showBackButton && (
               <TouchableOpacity 
                 style={styles.backButton} 
                 onPress={handleIconPress}
@@ -76,7 +69,7 @@ const PageHeader = ({
               >
                 <Ionicons name={iconName} size={20} color="#fff" />
               </TouchableOpacity>
-            )}
+            )} */}
             {icon && (
               <View style={styles.headerIconContainer}>
                 <Ionicons name={icon} size={24} color="#fff" />
@@ -92,7 +85,12 @@ const PageHeader = ({
           {actionButton && (
             <TouchableOpacity 
               style={styles.inlineActionButton} 
-              onPress={actionButton.onPress}
+              onPress={() => {
+                console.log('Action button pressed, calling:', actionButton.onPress);
+                actionButton.onPress();
+              }}
+              activeOpacity={0.7}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Ionicons name={actionButton.icon} size={20} color="#fff" />
             </TouchableOpacity>
@@ -105,9 +103,9 @@ const PageHeader = ({
 
 const styles = StyleSheet.create({
   header: {
-    paddingTop: 20,
-    paddingBottom: 40,
-    paddingRight: 24,
+    paddingTop:40,
+    paddingBottom:20,
+    paddingHorizontal:20,
   },
   headerContent: {
     flexDirection: 'column',
@@ -115,7 +113,7 @@ const styles = StyleSheet.create({
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
   },
   leftSection: {
     flexDirection: 'row',
@@ -137,11 +135,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 8,
   },
   titleAndActionContainer: {
     // display: 'flex',
     flex: 1,
-    marginLeft: 16,
     textAlign: 'center',
     justifyContent: 'center',
     alignItems: 'center',
@@ -159,10 +157,14 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
   inlineActionButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     padding: 12,
     borderRadius: 12,
     marginLeft: 16,
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

@@ -1,10 +1,10 @@
 import React from 'react';
 import {
-    Image as RNImage,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Image as RNImage,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 
@@ -107,16 +107,7 @@ const EmployeeContainer = ({
             </View>
           )}
           
-          {/* Status Indicator */}
-          {showStatus && (
-            <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(status) }]}>
-              <Icon 
-                name={getStatusIcon(status)} 
-                size={8} 
-                color="#fff" 
-              />
-            </View>
-          )}
+
         </View>
 
         {/* Officer Information */}
@@ -207,13 +198,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
   },
   content: {
     flexDirection: 'row',
@@ -221,7 +205,8 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     position: 'relative',
-    marginRight: 12,
+    marginRight: 20,
+  
   },
   avatar: {
     width: 50,
@@ -235,19 +220,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#007AFF',
     justifyContent: 'center',
     alignItems: 'center',
+ 
   },
-  statusIndicator: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
+
   infoContainer: {
     flex: 1,
   },
@@ -324,8 +299,6 @@ const styles = StyleSheet.create({
     gap: 4,
     marginTop: 8,
     paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
   },
   dutyStatusText: {
     fontSize: 12,

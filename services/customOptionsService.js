@@ -21,6 +21,57 @@ const DEFAULT_OPTIONS = {
     'Evening (2 PM - 10 PM)',
     'Night (10 PM - 6 AM)'
   ],
+  gender: [
+    'Male',
+    'Female',
+    'Other'
+  ],
+  departments: [
+    'Traffic',
+    'Investigation',
+    'Patrol',
+    'Special Ops',
+    'Administration',
+    'Cyber Crime',
+    'Narcotics',
+    'Forensic'
+  ],
+  employment_status: [
+    'Active',
+    'Inactive',
+    'Suspended',
+    'Retired',
+    'Transferred',
+    'On Leave',
+    'Probation'
+  ],
+  blood_groups: [
+    'A+',
+    'A-',
+    'B+',
+    'B-',
+    'AB+',
+    'AB-',
+    'O+',
+    'O-'
+  ],
+  education_levels: [
+    'High School',
+    'Diploma',
+    'Bachelor\'s Degree',
+    'Master\'s Degree',
+    'PhD',
+    'Police Academy',
+    'Military Training',
+    'Other'
+  ],
+  marital_status: [
+    'Single',
+    'Married',
+    'Divorced',
+    'Widowed',
+    'Separated'
+  ],
   banks: [
     'HBL',
     'UBL',
@@ -77,6 +128,12 @@ const STORAGE_KEYS = {
   stations: 'custom_stations',
   ranks: 'custom_ranks',
   shifts: 'custom_shifts',
+  gender: 'custom_gender',
+  departments: 'custom_departments',
+  employment_status: 'custom_employment_status',
+  blood_groups: 'custom_blood_groups',
+  education_levels: 'custom_education_levels',
+  marital_status: 'custom_marital_status',
   banks: 'custom_banks',
   vehicleTypes: 'custom_vehicle_types',
   expenseCategories: 'custom_expense_categories',

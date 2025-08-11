@@ -195,10 +195,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     position: 'relative',
+   
   },
   employeeInfo: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+
   },
   employeeAvatar: {
     width: 48,
@@ -206,7 +208,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 30
   },
   employeeDetails: {
     flex: 1,

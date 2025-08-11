@@ -329,8 +329,8 @@ const UniversalModal = ({
   return (
     <Modal
       visible={visible}
-      animationType="slide"
-      transparent={true}
+      animationType="fade"
+      transparent={false}
       onRequestClose={onClose}
     >
       <View style={styles.modalContainer}>
@@ -390,23 +390,17 @@ const UniversalModal = ({
 
 const styles = StyleSheet.create({
   modalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000, // Much lower than toast z-index
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#fff',
+    zIndex: 1000,
   },
   modalContent: {
+    flex: 1,
     backgroundColor: '#fff',
-    borderRadius: 12,
-    width: '90%',
-    maxHeight: '80%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-    zIndex: 1001, // Much lower than toast z-index
   },
   modalHeader: {
     flexDirection: 'row',

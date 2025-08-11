@@ -148,6 +148,49 @@ export const VALIDATION_SCHEMAS = {
     joiningDate: [
       (value) => VALIDATION_RULES.required(value, 'Joining Date'),
       (value) => VALIDATION_RULES.pastDate(value, 'Joining Date')
+    ],
+    lastPromotionDate: [
+      (value, formData) => {
+        if (value && formData.joiningDate) {
+          return CUSTOM_VALIDATORS.promotionAfterJoining(value, formData.joiningDate);
+        }
+        return null;
+      }
+    ],
+    lastAdvanceDate: [
+      (value, formData) => {
+        if (value && formData.joiningDate) {
+          return CUSTOM_VALIDATORS.dateAfterJoining(value, formData.joiningDate, 'Last advance date');
+        }
+        return null;
+      }
+    ],
+    lastLeaveDate: [
+      (value, formData) => {
+        if (value && formData.joiningDate) {
+          return CUSTOM_VALIDATORS.dateAfterJoining(value, formData.joiningDate, 'Last leave date');
+        }
+        return null;
+      }
+    ],
+    lastOvertimeDate: [
+      (value, formData) => {
+        if (value && formData.joiningDate) {
+          return CUSTOM_VALIDATORS.dateAfterJoining(value, formData.joiningDate, 'Last overtime date');
+        }
+        return null;
+      }
+    ],
+    lastEvaluationDate: [
+      (value, formData) => {
+        if (value && formData.joiningDate) {
+          return CUSTOM_VALIDATORS.dateAfterJoining(value, formData.joiningDate, 'Last evaluation date');
+        }
+        return null;
+      }
+    ],
+    performanceRating: [
+      (value) => CUSTOM_VALIDATORS.performanceRating(value)
     ]
   },
 
@@ -236,7 +279,7 @@ export const VALIDATION_SCHEMAS = {
 };
 
 // Main validation function
-export const validateField = (value, fieldName, validators) => {
+export const validateField = (value, fieldName, validators, formData = {}) => {
   if (!Array.isArray(validators)) {
     return null;
   }
@@ -246,7 +289,7 @@ export const validateField = (value, fieldName, validators) => {
       continue;
     }
     
-    const error = validator(value, fieldName);
+    const error = validator(value, fieldName, formData);
     if (error) {
       return error;
     }
@@ -271,7 +314,7 @@ export const validateForm = (formData, schema) => {
     }
     
     const value = formData[fieldName];
-    const error = validateField(value, fieldName, validators);
+    const error = validateField(value, fieldName, validators, formData);
     if (error) {
       errors[fieldName] = error;
     }
@@ -331,7 +374,7 @@ export const CUSTOM_VALIDATORS = {
   },
 
   // Validate expense amount range
-  expenseAmountRange: (amount, min = 0, max = 100000) => {
+  expenseAmountRange: (amount, min = 0, max = 10000000) => {
     if (amount) {
       const numAmount = parseFloat(amount);
       if (numAmount < min) {
@@ -339,6 +382,65 @@ export const CUSTOM_VALIDATORS = {
       }
       if (numAmount > max) {
         return `Amount must be no more than ${max}`;
+      }
+    }
+    return null;
+  },
+
+  // Validate performance rating (0-5)
+  performanceRating: (rating) => {
+    if (rating) {
+      const numRating = parseFloat(rating);
+      if (isNaN(numRating)) {
+        return 'Performance rating must be a valid number';
+      }
+      if (numRating < 0) {
+        return 'Performance rating must be at least 0';
+      }
+      if (numRating > 5) {
+        return 'Performance rating must be no more than 5';
+      }
+    }
+    return null;
+  },
+
+  // Validate badge number uniqueness
+  uniqueBadgeNumber: (badgeNumber, existingEmployees, currentEmployeeId = null) => {
+    if (badgeNumber && existingEmployees) {
+      const isDuplicate = existingEmployees.some(emp => {
+        const empBadgeNumber = emp.badgeNumber || emp.employeeId || '';
+        const isSameEmployee = currentEmployeeId && (emp.id === currentEmployeeId || emp.$id === currentEmployeeId);
+        return empBadgeNumber.toLowerCase() === badgeNumber.toLowerCase() && !isSameEmployee;
+      });
+      
+      if (isDuplicate) {
+        return 'Badge number already exists';
+      }
+    }
+    return null;
+  },
+
+  // Validate promotion date is after joining date
+  promotionAfterJoining: (promotionDate, joiningDate) => {
+    if (promotionDate && joiningDate) {
+      const promotion = new Date(promotionDate);
+      const joining = new Date(joiningDate);
+      
+      if (promotion <= joining) {
+        return 'Promotion date must be later than joining date';
+      }
+    }
+    return null;
+  },
+
+  // Validate any date is after joining date
+  dateAfterJoining: (date, joiningDate, fieldName) => {
+    if (date && joiningDate) {
+      const checkDate = new Date(date);
+      const joining = new Date(joiningDate);
+      
+      if (checkDate <= joining) {
+        return `${fieldName} must be later than joining date`;
       }
     }
     return null;

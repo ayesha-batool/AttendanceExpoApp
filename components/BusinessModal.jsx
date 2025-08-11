@@ -46,8 +46,8 @@ const BusinessModal = ({ visible, onClose }) => {
 
   return (
     <Modal
-      animationType="slide"
-      transparent={true}
+      animationType="fade"
+      transparent={false}
       visible={visible}
       onRequestClose={onClose}
     >
@@ -93,9 +93,13 @@ const BusinessModal = ({ visible, onClose }) => {
 
 const styles = StyleSheet.create({
   overlay: {
-    flex: 1,
-    backgroundColor: 'transparent',
-    justifyContent: 'flex-end',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#fff',
+    zIndex: 1000,
   },
   modalContainer: {
     backgroundColor: 'white',

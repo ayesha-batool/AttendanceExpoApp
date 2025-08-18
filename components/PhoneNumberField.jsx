@@ -26,7 +26,7 @@ const PhoneNumberField = ({
 
   // Sync local number with full value
   useEffect(() => {
-    if (value?.startsWith(`+${selectedCountry.code}`)) {
+    if (value && typeof value === 'string' && value.startsWith(`+${selectedCountry.code}`)) {
       const stripped = value.replace(`+${selectedCountry.code}`, '');
       setLocalNumber(stripped);
     }

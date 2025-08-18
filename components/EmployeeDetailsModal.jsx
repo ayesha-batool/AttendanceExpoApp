@@ -28,24 +28,82 @@ const EmployeeDetailsModal = ({ visible, employee, onClose }) => {
     return (baseSalary + overtimePay - totalAdvances).toFixed(2);
   };
 
-
-
-  const renderSection = (title, data) => (
+  const renderSection = (title, data, icon = null) => (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
+      <View style={styles.sectionHeader}>
+        {icon && <Ionicons name={icon} size={20} color="#007AFF" style={styles.sectionIcon} />}
+        <Text style={styles.sectionTitle}>{title}</Text>
+      </View>
       <View style={styles.sectionContent}>
         {data}
       </View>
     </View>
   );
 
-  const renderField = (label, value, icon = null) => (
-    <View style={styles.field}>
+  const renderField = (label, value, icon = null, isHighlighted = false) => (
+    <View style={[styles.field, isHighlighted && styles.highlightedField]}>
       <View style={styles.fieldHeader}>
         {icon && <Ionicons name={icon} size={16} color="#007AFF" style={styles.fieldIcon} />}
         <Text style={styles.fieldLabel}>{label}</Text>
       </View>
-      <Text style={styles.fieldValue}>{value || 'Not specified'}</Text>
+      <Text style={[styles.fieldValue, isHighlighted && styles.highlightedValue]}>
+        {value || 'Not specified'}
+      </Text>
+    </View>
+  );
+
+  const renderStatusBadge = (status, type = 'default') => {
+    const getStatusConfig = () => {
+      switch (status?.toLowerCase()) {
+        case 'active':
+          return { color: '#22c55e', bgColor: '#dcfce7', icon: 'checkmark-circle' };
+        case 'suspended':
+          return { color: '#ef4444', bgColor: '#fee2e2', icon: 'close-circle' };
+        case 'retired':
+          return { color: '#f59e0b', bgColor: '#fef3c7', icon: 'time' };
+        case 'on leave':
+          return { color: '#8b5cf6', bgColor: '#ede9fe', icon: 'calendar' };
+        default:
+          return { color: '#6b7280', bgColor: '#f3f4f6', icon: 'help-circle' };
+      }
+    };
+
+    const config = getStatusConfig();
+    
+    return (
+      <View style={[styles.statusBadge, { backgroundColor: config.bgColor }]}>
+        <Ionicons name={config.icon} size={14} color={config.color} />
+        <Text style={[styles.statusText, { color: config.color }]}>
+          {status || 'Unknown'}
+        </Text>
+      </View>
+    );
+  };
+
+  const renderPayrollCard = () => (
+    <View style={styles.payrollCard}>
+      <View style={styles.payrollHeader}>
+        <Ionicons name="cash" size={24} color="#007AFF" />
+        <Text style={styles.payrollTitle}>Payroll Summary</Text>
+      </View>
+      <View style={styles.payrollGrid}>
+        <View style={styles.payrollItem}>
+          <Text style={styles.payrollLabel}>Base Salary</Text>
+          <Text style={styles.payrollAmount}>₹{employee.salary || '0'}</Text>
+        </View>
+        <View style={styles.payrollItem}>
+          <Text style={styles.payrollLabel}>Overtime Rate</Text>
+          <Text style={styles.payrollAmount}>{employee.overtimeRate || '1.5'}x</Text>
+        </View>
+        <View style={styles.payrollItem}>
+          <Text style={styles.payrollLabel}>Bonus</Text>
+          <Text style={styles.payrollAmount}>₹{employee.bonus || '0'}</Text>
+        </View>
+        <View style={styles.payrollItem}>
+          <Text style={styles.payrollLabel}>Total Pay</Text>
+          <Text style={styles.payrollAmount}>₹{calculateTotalPay()}</Text>
+        </View>
+      </View>
     </View>
   );
 
@@ -83,54 +141,42 @@ const EmployeeDetailsModal = ({ visible, employee, onClose }) => {
   return (
     <Modal
       visible={visible}
-      animationType="fade"
+      animationType="slide"
       transparent={false}
       onRequestClose={() => {
-        console.log('Modal onRequestClose triggered');
         if (onClose) {
           onClose();
         }
       }}
     >
       <View style={styles.modalOverlay}>
-        <TouchableOpacity 
-          style={styles.modalOverlay} 
-          activeOpacity={1} 
-          onPress={onClose}
+        {/* Header */}
+        <LinearGradient
+          colors={['#007AFF', '#0056CC']}
+          style={styles.header}
         >
-          <TouchableOpacity 
-            style={styles.modalContent} 
-            activeOpacity={1} 
-            onPress={() => {}} // Prevent closing when tapping inside modal
-          >
-          {/* Header */}
-          <LinearGradient
-            colors={['#007AFF', '#0056CC']}
-            style={styles.header}
-          >
-            <View style={styles.headerContent}>
-              <TouchableOpacity 
-                onPress={() => {
-                  console.log('Close button pressed');
-                  if (onClose) {
-                    onClose();
-                  } else {
-                    console.log('onClose function is not provided');
-                  }
-                }} 
-                style={styles.closeButton}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="arrow-back" size={24} color="#fff" />
-              </TouchableOpacity>
-              <Text style={styles.headerTitle}>Employee Details</Text>
-              <View style={styles.headerSpacer} />
-            </View>
-          </LinearGradient>
+          <View style={styles.headerContent}>
+            <TouchableOpacity 
+              onPress={onClose} 
+              style={styles.closeButton}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="arrow-back" size={24} color="#fff" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Employee Details</Text>
+            <View style={styles.headerSpacer} />
+          </View>
+        </LinearGradient>
 
-          <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-            {/* Employee Photo */}
-            <View style={styles.photoSection}>
+        <ScrollView 
+          style={styles.scrollView} 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollViewContent}
+          bounces={true}
+        >
+          {/* Employee Photo & Basic Info */}
+          <View style={styles.heroSection}>
+            <View style={styles.photoContainer}>
               {employee.photoUrl ? (
                 <RNImage
                   source={{ uri: employee.photoUrl }}
@@ -139,144 +185,116 @@ const EmployeeDetailsModal = ({ visible, employee, onClose }) => {
               ) : (
                 <View style={styles.photoPlaceholder}>
                   <Ionicons name="person" size={48} color="#8E8E93" />
-                  <Text style={styles.photoPlaceholderText}>No Photo</Text>
                 </View>
               )}
+              <View style={styles.photoOverlay}>
+                <Ionicons name="camera" size={20} color="#fff" />
+              </View>
+            </View>
+            
+            <View style={styles.heroInfo}>
               <Text style={styles.employeeName}>{employee.fullName || 'Unknown Officer'}</Text>
               <Text style={styles.employeeBadge}>Badge: {employee.badgeNumber || employee.employeeId || 'N/A'}</Text>
+              <Text style={styles.employeeRank}>{employee.rank || 'N/A'}</Text>
+              {renderStatusBadge(employee.status)}
             </View>
+          </View>
 
-            {/* Basic Information */}
-            {renderSection('Basic Information', (
-              <>
-                {renderField('Badge Number', employee.badgeNumber || employee.employeeId, 'id-card')}
-                {renderField('Full Name', employee.fullName, 'person')}
-                {renderField("Father's Name", employee.fatherName, 'person')}
-                {renderField('CNIC', employee.cnic, 'card')}
-                {renderField('Date of Birth', formatDate(employee.dateOfBirth), 'calendar')}
-                {renderField('Gender', employee.gender, 'male-female')}
-              </>
-            ))}
+          {/* Payroll Card */}
+          {renderPayrollCard()}
 
-            {/* Contact Information */}
-            {renderSection('Contact Information', (
-              <>
-                {renderField('Contact Number', employee.contactNumber || employee.phone, 'call')}
-                {renderField('Email', employee.email, 'mail')}
-                {renderField('Address', employee.address, 'location')}
-              </>
-            ))}
+          {/* Basic Information */}
+          {renderSection('Basic Information', (
+            <>
+              {renderField('Badge Number', employee.badgeNumber || employee.employeeId, 'id-card')}
+              {renderField('Full Name', employee.fullName, 'person', true)}
+              {renderField("Father's Name", employee.fatherName, 'person')}
+              {renderField('CNIC', employee.cnic, 'card')}
+              {renderField('Date of Birth', formatDate(employee.dateOfBirth), 'calendar')}
+              {renderField('Gender', employee.gender, 'male-female')}
+            </>
+          ), 'person')}
 
-            {/* Employment Information */}
-            {renderSection('Employment Information', (
-              <>
-                {renderField('Joining Date', formatDate(employee.joiningDate || employee.dateOfJoining), 'calendar')}
-                {renderField('Department', employee.department, 'business')}
-                {renderField('Rank', employee.rank, 'ribbon')}
-                {renderField('Posting Station', employee.postingStation || employee.policeStation, 'location')}
-                {renderField('Shift', employee.shift || employee.dutyShift, 'time')}
-                {renderField('Employment Status', employee.employmentStatus || employee.status, 'checkmark-circle')}
-                {renderField('Service Years', employee.serviceYears, 'time')}
-                {renderField('Last Promotion Date', formatDate(employee.lastPromotionDate), 'trending-up')}
-              </>
-            ))}
+          {/* Contact Information */}
+          {renderSection('Contact Information', (
+            <>
+              {renderField('Contact Number', employee.contactNumber || employee.phone, 'call')}
+              {renderField('Email', employee.email, 'mail')}
+              {renderField('Address', employee.address, 'location')}
+            </>
+          ), 'call')}
 
-            {/* Personal Information */}
-            {renderSection('Personal Information', (
-              <>
-                {renderField('Blood Group', employee.bloodGroup, 'medical')}
-                {renderField('Is Armed Officer', employee.isArmed ? 'Yes' : 'No', 'shield')}
-                {renderField('Education Level', employee.education, 'school')}
-                {renderField('Marital Status', employee.maritalStatus, 'heart')}
-                {renderField('Spouse Name', employee.spouseName, 'person')}
-                {renderField('Children', employee.children, 'people')}
-                {renderField('Languages Known', employee.languages, 'language')}
-                {renderField('Medical Conditions', employee.medicalConditions, 'medical')}
-                {renderField('Allergies', employee.allergies, 'warning')}
-              </>
-            ))}
+          {/* Employment Information */}
+          {renderSection('Employment Information', (
+            <>
+              {renderField('Joining Date', formatDate(employee.joiningDate), 'calendar')}
+              {renderField('Department', employee.department, 'business')}
+              {renderField('Rank', employee.rank, 'ribbon')}
+              {renderField('Posting Station', employee.postingStation, 'location')}
+              {renderField('Shift', employee.shift || employee.dutyShift, 'time')}
+              {renderField('Service Years', employee.serviceYears, 'time')}
+              {renderField('Last Promotion Date', formatDate(employee.lastPromotionDate), 'trending-up')}
+            </>
+          ), 'business')}
 
-            {/* Professional Information */}
-            {renderSection('Professional Information', (
-              <>
-                {renderField('Weapon License Number', employee.weaponLicenseNumber, 'shield')}
-                {renderField('Driving License Number', employee.drivingLicenseNumber, 'car')}
-                {renderField('Training Certifications', employee.trainingCertifications, 'library')}
-                {renderField('Specializations', employee.specializations, 'star')}
-                {renderField('Performance Rating', employee.performanceRating, 'star')}
-                {renderField('Supervisor', employee.supervisor, 'person')}
-                {renderField('Work Location', employee.workLocation, 'location')}
-                {renderField('Vehicle Assigned', employee.vehicleAssigned, 'car')}
-                {renderField('Equipment Assigned', employee.equipmentAssigned, 'construct')}
-                {renderField('Last Evaluation Date', formatDate(employee.lastEvaluationDate), 'calendar')}
-                {renderField('Disciplinary Actions', employee.disciplinaryActions, 'warning')}
-              </>
-            ))}
+          {/* Payroll Information */}
+          {renderSection('Payroll Details', (
+            <>
+              {renderField('Payment Type', employee.paymentType || 'Monthly', 'cash')}
+              {renderField('Working Days', employee.workingDays?.join(', ') || 'Mon-Fri', 'calendar')}
+              {renderField('Check-in Time', employee.checkInTime || '09:00', 'time')}
+              {renderField('Check-out Time', employee.checkOutTime || '17:00', 'time')}
+              {renderField('Leaves Allowed/Month', employee.leavesAllowedPerMonth || '2', 'calendar')}
+              {renderField('Overtime Rate', employee.overtimeRate ? `${employee.overtimeRate}x` : '1.5x', 'time')}
+            </>
+          ), 'cash')}
 
-            {/* Payroll Information */}
-            {renderSection('Payroll Information', (
-              <>
-                {renderField('Base Salary', employee.salary ? `$${employee.salary}` : 'Not specified', 'cash')}
-                {renderField('Overtime Rate', employee.overtimeRate ? `$${employee.overtimeRate}/hour` : 'Not specified', 'time')}
-                {renderField('Monthly Overtime Hours', employee.monthlyOvertimeHours, 'time')}
-                {renderField('Total Advances', employee.totalAdvances ? `$${employee.totalAdvances}` : 'Not specified', 'card')}
-                {renderField('Last Advance Date', formatDate(employee.lastAdvanceDate), 'calendar')}
-                {renderField('Benefits', employee.benefits, 'gift')}
-                {renderField('Allowances', employee.allowances, 'card')}
-                {renderField('Total Pay (After Advances)', `$${calculateTotalPay()}`, 'calculator')}
-              </>
-            ))}
+          {/* Professional Information */}
+          {renderSection('Professional Information', (
+            <>
+              {renderField('Weapon License Number', employee.weaponLicenseNumber, 'shield')}
+              {renderField('Driving License Number', employee.drivingLicenseNumber, 'car')}
+              {renderField('Training Certifications', employee.trainingCertifications, 'library')}
+              {renderField('Performance Rating', employee.performanceRating, 'star')}
+              {renderField('Supervisor', employee.supervisor, 'person')}
+              {renderField('Work Location', employee.workLocation, 'location')}
+              {renderField('Vehicle Assigned', employee.vehicleAssigned, 'car')}
+              {renderField('Equipment Assigned', employee.equipmentAssigned, 'construct')}
+              {renderField('Disciplinary Actions', employee.disciplinaryActions, 'warning')}
+            </>
+          ), 'shield')}
 
-            {/* Emergency Contact */}
-            {renderSection('Emergency Contact', (
-              <>
-                {renderField('Emergency Contact', employee.emergencyContact, 'call')}
-                {renderField('Emergency Contact Phone', employee.emergencyContactPhone, 'call')}
-              </>
-            ))}
+          {/* Documents */}
+          {(employee.uploadedDocuments || employee.documents) && renderSection('Documents', (
+            <View style={styles.documentsContainer}>
+              {renderDocument(employee.uploadedDocuments?.cnicDocument || employee.documents?.cnicDocument, 'CNIC Document', 'id-card')}
+              {renderDocument(employee.uploadedDocuments?.educationalCertificate || employee.documents?.educationalCertificate, 'Educational Certificate', 'school')}
+              {renderDocument(employee.uploadedDocuments?.weaponLicense || employee.documents?.weaponLicense, 'Weapon License', 'shield')}
+              {renderDocument(employee.uploadedDocuments?.drivingLicense || employee.documents?.drivingLicense, 'Driving License', 'car')}
+              {renderDocument(employee.uploadedDocuments?.medicalCertificate || employee.documents?.medicalCertificate, 'Medical Certificate', 'medical')}
+              {renderDocument(employee.uploadedDocuments?.trainingCertifications || employee.documents?.trainingCertifications, 'Training Certifications', 'library')}
+              {renderDocument(employee.uploadedDocuments?.employmentContract || employee.documents?.employmentContract, 'Employment Contract', 'document-text')}
+              {renderDocument(employee.uploadedDocuments?.receipt || employee.documents?.receipt, 'Receipt', 'receipt')}
+            </View>
+          ), 'document')}
 
-            {/* Documents */}
-            {(employee.uploadedDocuments || employee.documents) && renderSection('Documents', (
-              <View style={styles.documentsContainer}>
-                {renderDocument(employee.uploadedDocuments?.cnicDocument || employee.documents?.cnicDocument, 'CNIC Document', 'id-card')}
-                {renderDocument(employee.uploadedDocuments?.educationalCertificate || employee.documents?.educationalCertificate, 'Educational Certificate', 'school')}
-                {renderDocument(employee.uploadedDocuments?.weaponLicense || employee.documents?.weaponLicense, 'Weapon License', 'shield')}
-                {renderDocument(employee.uploadedDocuments?.drivingLicense || employee.documents?.drivingLicense, 'Driving License', 'car')}
-                {renderDocument(employee.uploadedDocuments?.medicalCertificate || employee.documents?.medicalCertificate, 'Medical Certificate', 'medical')}
-                {renderDocument(employee.uploadedDocuments?.trainingCertifications || employee.documents?.trainingCertifications, 'Training Certifications', 'library')}
-                {renderDocument(employee.uploadedDocuments?.employmentContract || employee.documents?.employmentContract, 'Employment Contract', 'document-text')}
-                {renderDocument(employee.uploadedDocuments?.receipt || employee.documents?.receipt, 'Receipt', 'receipt')}
-              </View>
-            ))}
-
-            {/* Notes */}
-            {employee.notes && renderSection('Notes', (
-              <Text style={styles.notesText}>{employee.notes}</Text>
-            ))}
-                     </ScrollView>
-           </TouchableOpacity>
-         </TouchableOpacity>
-       </View>
-     </Modal>
+          {/* Notes */}
+          {employee.notes && renderSection('Notes', (
+            <Text style={styles.notesText}>{employee.notes}</Text>
+          ), 'chatbubble')}
+        </ScrollView>
+      </View>
+    </Modal>
   );
 };
 
 const styles = StyleSheet.create({
   modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#f8f9fa',
-    zIndex: 1000,
-  },
-  modalContent: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f8fafc',
   },
   header: {
-    paddingTop: 20,
+    paddingTop: 50,
     paddingBottom: 20,
     paddingHorizontal: 20,
   },
@@ -296,72 +314,73 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#fff',
     flex: 1,
     textAlign: 'center',
   },
   headerSpacer: {
-    width: 40,
+    width: 44,
   },
   scrollView: {
     flex: 1,
-    padding: 20,
   },
-  photoSection: {
+  scrollViewContent: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  heroSection: {
+    flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 24,
-    paddingVertical: 20,
+    padding: 20,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  photoContainer: {
+    position: 'relative',
+    marginRight: 16,
   },
   employeePhoto: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    borderWidth: 4,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 3,
     borderColor: '#007AFF',
-    marginBottom: 12,
   },
   photoPlaceholder: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: '#F2F2F7',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#E5E5EA',
     borderStyle: 'dashed',
-    marginBottom: 12,
   },
-  photoPlaceholderText: {
-    fontSize: 12,
-    color: '#8E8E93',
-    marginTop: 8,
-  },
-  photoContainer: {
-    position: 'relative',
-  },
-  uploadOverlay: {
+  photoOverlay: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    borderRadius: 60,
+    right: 0,
+    backgroundColor: '#007AFF',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  uploadText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 4,
-    textAlign: 'center',
+  heroInfo: {
+    flex: 1,
   },
   employeeName: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 24,
+    fontWeight: '700',
     color: '#1e293b',
     marginBottom: 4,
   },
@@ -369,37 +388,117 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#64748b',
     fontWeight: '500',
+    marginBottom: 4,
   },
-  section: {
-    marginBottom: 24,
+  employeeRank: {
+    fontSize: 16,
+    color: '#374151',
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 4,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  payrollCard: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  payrollHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  payrollTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginLeft: 8,
+  },
+  payrollGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  payrollItem: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: '#f8fafc',
+    padding: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  payrollLabel: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  payrollAmount: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  section: {
+    marginBottom: 20,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  sectionIcon: {
+    marginRight: 8,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e1e5e9',
-    paddingBottom: 8,
+    color: '#1e293b',
   },
   sectionContent: {
-    gap: 12,
+    gap: 16,
   },
   field: {
-    marginBottom: 8,
+    paddingVertical: 8,
+  },
+  highlightedField: {
+    backgroundColor: '#f0f9ff',
+    padding: 12,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#007AFF',
   },
   fieldHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   fieldIcon: {
     marginRight: 8,
@@ -407,36 +506,38 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#6b7280',
+    color: '#64748b',
     flex: 1,
   },
   fieldValue: {
     fontSize: 16,
-    color: '#1a1a1a',
+    color: '#1e293b',
     marginLeft: 24,
     lineHeight: 22,
+    fontWeight: '500',
+  },
+  highlightedValue: {
+    color: '#007AFF',
+    fontWeight: '700',
   },
   notesText: {
     fontSize: 16,
-    color: '#1a1a1a',
+    color: '#1e293b',
     lineHeight: 22,
     fontStyle: 'italic',
+    backgroundColor: '#f8fafc',
+    padding: 16,
+    borderRadius: 8,
   },
-  // Document styles
   documentsContainer: {
     gap: 16,
   },
   documentItem: {
-    backgroundColor: '#fff',
+    backgroundColor: '#f8fafc',
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    borderColor: '#e2e8f0',
   },
   documentHeader: {
     flexDirection: 'row',
@@ -459,17 +560,17 @@ const styles = StyleSheet.create({
     height: 150,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: '#e2e8f0',
   },
   documentInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 16,
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#fff',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: '#e2e8f0',
     borderStyle: 'dashed',
   },
   documentName: {

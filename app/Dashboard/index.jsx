@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -6,19 +7,20 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Toast from 'react-native-toast-message';
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getItems } from '../../services/dataHandler';
+import { useAuth } from '../../context/AuthContext';
+import { customOptionsService, dataService } from '../../services/unifiedDataService';
 
 const { width: screenWidth } = Dimensions.get('window');
 
 const DashboardScreen = () => {
   const router = useRouter();
+  const { user } = useAuth();
   const [employees, setEmployees] = useState([]);
   const [cases, setCases] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [upcomingHolidays, setUpcomingHolidays] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [onDutyCount, setOnDutyCount] = useState(0);
+  const [deviceInfo, setDeviceInfo] = useState({ local: null, appwrite: null });
 
   useEffect(() => {
     fetchData();
@@ -31,11 +33,11 @@ const DashboardScreen = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [employeesData, casesData, expensesData] = await Promise.all([
-        getItems('employees'),
-        getItems('cases'),
-        getItems('expenses')
-      ]);
+              const [employeesData, casesData, expensesData] = await Promise.all([
+          dataService.getItems('employees'),
+          dataService.getItems('cases'),
+          dataService.getItems('expenses')
+        ]);
       const validEmployees = employeesData.filter(item => item && typeof item === 'object');
       const validCases = casesData.filter(item => item && typeof item === 'object');
       const validExpenses = expensesData.filter(item => item && typeof item === 'object');
@@ -43,9 +45,8 @@ const DashboardScreen = () => {
       setCases(validCases);
       setExpenses(validExpenses);
       
-      // Get real-time on-duty count
-      const currentOnDutyCount = await getCurrentlyOnDutyCount();
-      setOnDutyCount(currentOnDutyCount);
+      // Check device IDs
+      await checkDeviceIds();
       
       try {
         const holidaysData = await AsyncStorage.getItem('employee_holidays');
@@ -63,11 +64,7 @@ const DashboardScreen = () => {
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Failed to load dashboard data',
-      });
+    
     } finally {
       setLoading(false);
     }
@@ -81,47 +78,78 @@ const DashboardScreen = () => {
     return cases.filter(caseItem => caseItem.status === 'active' || caseItem.status === 'investigation').length;
   };
 
-  const getOnDutyCount = () => {
-    // Count employees who are active and currently on duty
-    const activeEmployees = employees.filter(emp => 
-      emp.status === 'active' || 
-      emp.employmentStatus === 'active'
-    );
-    
-    // For now, return active employees count
-    // In a real implementation, you would also check attendance data
-    // to see who is actually clocked in/on duty right now
-    return activeEmployees.length;
+
+  const handleInitializeDefaults = async () => {
+    try {
+      const result = await customOptionsService.initializeDefaultOptions();
+      
+      Toast.show({
+        type: result.success ? 'success' : 'error',
+        text1: 'Initialize Defaults',
+        text2: result.message || result.error,
+      });
+    } catch (error) {
+      console.error('Initialize failed:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Initialize Failed',
+        text2: error.message,
+      });
+    }
   };
 
-  const getCurrentlyOnDutyCount = async () => {
+  const handleCheckDefaultsStatus = async () => {
     try {
-      // Get attendance data to see who is actually clocked in today
-      const attendanceData = await AsyncStorage.getItem('attendance');
-      if (attendanceData) {
-        const attendance = JSON.parse(attendanceData);
-        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-        
-        // Count employees who are checked in today and haven't checked out
-        let onDutyCount = 0;
-        attendance.forEach(record => {
-          if (record.date === today && record.status === 'Present' && !record.checkOut) {
-            onDutyCount++;
-          }
-        });
-        
-        return onDutyCount;
-      }
+      const status = await customOptionsService.checkDefaultOptionsStatus();
+      
+      Toast.show({
+        type: 'info',
+        text1: 'Default Options Status',
+        text2: 'Check console for details',
+      });
     } catch (error) {
-      console.error('Error getting attendance data:', error);
+      console.error('Status check failed:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Status Check Failed',
+        text2: error.message,
+      });
     }
-    
-    // Fallback to active employees count
-    return getOnDutyCount();
   };
+
+
 
   const getUpcomingHolidaysCount = () => {
     return upcomingHolidays.length;
+  };
+
+  const checkDeviceIds = async () => {
+    try {
+      // Get local device ID from storage
+      const localDeviceId = await AsyncStorage.getItem('deviceId');
+      
+      // Get device ID from Appwrite if online
+      let appwriteDeviceId = null;
+      try {
+        const appwriteData = await dataService.getItems('employees');
+        if (appwriteData.length > 0) {
+          // Get the first employee's deviceId from Appwrite
+          const firstEmployee = appwriteData[0];
+          appwriteDeviceId = firstEmployee.deviceId;
+        }
+      } catch (error) {
+        console.log('Could not fetch Appwrite device ID:', error.message);
+      }
+      
+      setDeviceInfo({
+        local: localDeviceId,
+        appwrite: appwriteDeviceId
+      });
+      
+      console.log('Device IDs:', { local: localDeviceId, appwrite: appwriteDeviceId });
+    } catch (error) {
+      console.error('Error checking device IDs:', error);
+    }
   };
 
   const getMonthlyExpenses = () => {
@@ -198,6 +226,13 @@ const DashboardScreen = () => {
               </View>
             </View>
           </View>
+          {user && (
+            <TouchableOpacity style={styles.userInitialsContainer} onPress={() => router.push('/auth')}>
+              <Text style={styles.userInitials}>
+                {user.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </LinearGradient>
 
@@ -215,16 +250,6 @@ const DashboardScreen = () => {
           </View>
           <View style={styles.kpiCard}>
             <View style={styles.kpiIconContainer}>
-              <Ionicons name="checkmark-circle" size={20} color="#10b981" />
-            </View>
-            <View style={styles.kpiContent}>
-              <Text style={styles.kpiValue}>{onDutyCount}</Text>
-              <Text style={styles.kpiLabel}>On Duty</Text>
-              <Text style={styles.kpiSubtext}>Currently clocked in</Text>
-            </View>
-          </View>
-          <View style={styles.kpiCard}>
-            <View style={styles.kpiIconContainer}>
               <Ionicons name="folder" size={20} color="#dc2626" />
             </View>
             <View style={styles.kpiContent}>
@@ -233,16 +258,16 @@ const DashboardScreen = () => {
               <Text style={styles.kpiSubtext}>Ongoing investigations</Text>
             </View>
           </View>
-                     <View style={styles.kpiCard}>
-             <View style={styles.kpiIconContainer}>
-               <Ionicons name="card" size={20} color="#8b5cf6" />
-             </View>
-             <View style={styles.kpiContent}>
-               <Text style={styles.kpiValue}>${getTotalExpenses().toLocaleString()}</Text>
-               <Text style={styles.kpiLabel}>Total Expenses</Text>
-               <Text style={styles.kpiSubtext}>All time spending</Text>
-             </View>
-           </View>
+          <View style={styles.kpiCard}>
+            <View style={styles.kpiIconContainer}>
+              <Ionicons name="card" size={20} color="#8b5cf6" />
+            </View>
+            <View style={styles.kpiContent}>
+              <Text style={styles.kpiValue}>${getTotalExpenses().toLocaleString()}</Text>
+              <Text style={styles.kpiLabel}>Total Expenses</Text>
+              <Text style={styles.kpiSubtext}>All time spending</Text>
+            </View>
+          </View>
         </View>
       </View>
 
@@ -271,6 +296,11 @@ const DashboardScreen = () => {
             </LinearGradient>
           </TouchableOpacity>
         </View>
+
+
+
+        
+       
       </View>
     </ScrollView>
   );
@@ -306,13 +336,28 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between', 
     alignItems: 'center' 
   },
+  userInitialsContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  userInitials: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
   headerLeft: { 
     flex: 1 
   },
   titleContainer: { 
     flexDirection: 'row', 
     alignItems: 'center',
-    flexWrap: 'wrap'
+    flexWrap: 'wrap',
+    marginBottom: 20,
   },
   headerIconContainer: { 
     width: screenWidth > 768 ? 64 : 48, 
@@ -331,8 +376,9 @@ const styles = StyleSheet.create({
     fontSize: screenWidth > 768 ? 28 : 22, 
     fontWeight: 'bold', 
     color: '#fff', 
-    marginBottom: 4,
+   
     flexWrap: 'wrap'
+    
   },
   headerSubtitle: { 
     fontSize: screenWidth > 768 ? 16 : 14, 
@@ -340,22 +386,24 @@ const styles = StyleSheet.create({
     opacity: 0.9 
   },
   kpiSection: { 
-    padding: 12 
+    padding: 12,
+    
   },
   kpiGrid: { 
     flexDirection: 'row', 
-    flexWrap: 'wrap', 
-    gap: 12 
+    justifyContent: 'space-between',
+    gap: 8,
+    marginTop: 18
   },
   kpiCard: { 
-    width: screenWidth > 768 ? '48%' : '47%', 
+    flex: 1,
     backgroundColor: '#fff', 
     borderRadius: 12, 
     padding: 12, 
-    shadowColor: '#000', 
-    shadowOffset: { width: 0, height: 2 }, 
-    shadowOpacity: 0.08, 
-    shadowRadius: 8, 
+    boxShadowColor: '#000', 
+    boxShadowOffset: { width: 0, height: 2 }, 
+    boxShadowOpacity: 0.08, 
+    boxShadowRadius: 8, 
     elevation: 3,
     marginBottom: 8
   },
@@ -401,10 +449,10 @@ const styles = StyleSheet.create({
   },
   actionCard: { 
     borderRadius: 16, 
-    shadowColor: '#000', 
-    shadowOffset: { width: 0, height: 4 }, 
-    shadowOpacity: 0.1, 
-    shadowRadius: 12, 
+    boxShadowColor: '#000', 
+    boxShadowOffset: { width: 0, height: 4 }, 
+    boxShadowOpacity: 0.1, 
+    boxShadowRadius: 12, 
     elevation: 4 
   },
   actionGradient: { 
@@ -423,6 +471,30 @@ const styles = StyleSheet.create({
     fontSize: 14, 
     color: '#fff', 
     opacity: 0.9 
+  },
+  debugSection: {
+    marginTop: 16,
+  },
+  debugButton: {
+    borderRadius: 12,
+    boxShadowColor: '#000',
+    boxShadowOffset: { width: 0, height: 2 },
+    boxShadowOpacity: 0.1,
+    boxShadowRadius: 8,
+    elevation: 3,
+  },
+  debugGradient: {
+    padding: 16,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  debugButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    marginLeft: 8,
   },
 });
 

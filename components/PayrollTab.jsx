@@ -2,15 +2,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from 'react';
 import {
-    FlatList,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  FlatList,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import Toast from 'react-native-toast-message';
-import { getItems } from '../services/dataHandler';
+import { dataService } from '../services/unifiedDataService';
 
 const PayrollTab = ({ employees }) => {
   const [payrollData, setPayrollData] = useState([]);
@@ -28,10 +28,10 @@ const PayrollTab = ({ employees }) => {
       setLoading(true);
       
       // Fetch attendance records
-      const attendanceRecords = await getItems('attendance');
+      const attendanceRecords = await dataService.getItems('attendance');
       
       // Fetch advance records
-      const advanceRecords = await getItems('advances');
+      const advanceRecords = await dataService.getItems('advances');
       
       const calculatedPayroll = employees.map(employee => {
         // Filter attendance for current month/year
@@ -136,7 +136,7 @@ const PayrollTab = ({ employees }) => {
 
       // Update each employee with new data
       for (const employee of updatedEmployees) {
-        const { handleDataUpdate } = await import('../services/dataHandler');
+        const { dataService } = await import('../services/unifiedDataService');
         await handleDataUpdate(`employees_${employee.id || employee.$id}`, employee.id || employee.$id, employee, 'employees');
       }
 
@@ -306,11 +306,11 @@ const styles = StyleSheet.create({
   periodSelector: { padding: 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
   periodTitle: { fontSize: 20, fontWeight: '700', color: '#1e293b', textAlign: 'center' },
   summaryContainer: { flexDirection: 'row', padding: 20, gap: 12 },
-  summaryCard: { flex: 1, backgroundColor: '#fff', padding: 16, borderRadius: 12, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  summaryCard: { flex: 1, backgroundColor: '#fff', padding: 16, borderRadius: 12, alignItems: 'center', boxShadowColor: '#000', boxShadowOffset: { width: 0, height: 2 }, boxShadowOpacity: 0.05, boxShadowRadius: 4, elevation: 2 },
   summaryLabel: { fontSize: 12, fontWeight: '600', color: '#6b7280', marginTop: 8, marginBottom: 4 },
   summaryValue: { fontSize: 16, fontWeight: '700', color: '#1e293b' },
   payrollList: { padding: 20 },
-  payrollCard: { backgroundColor: '#fff', borderRadius: 16, padding: 20, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
+  payrollCard: { backgroundColor: '#fff', borderRadius: 16, padding: 20, marginBottom: 16, boxShadowColor: '#000', boxShadowOffset: { width: 0, height: 4 }, boxShadowOpacity: 0.1, boxShadowRadius: 8, elevation: 4 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
   employeeInfo: { flex: 1 },
   employeeName: { fontSize: 18, fontWeight: '700', color: '#1e293b', marginBottom: 4 },
@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 20, fontWeight: '600', color: '#374151', marginTop: 16, marginBottom: 8 },
   emptyMessage: { fontSize: 14, color: '#6b7280', textAlign: 'center' },
   sampleDataContainer: { padding: 20 },
-  sampleDataButton: { borderRadius: 12, shadowColor: '#10b981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+  sampleDataButton: { borderRadius: 12, boxShadowColor: '#10b981', boxShadowOffset: { width: 0, height: 4 }, boxShadowOpacity: 0.3, boxShadowRadius: 8, elevation: 4 },
   sampleDataGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, paddingHorizontal: 24, borderRadius: 12 },
   sampleDataButtonText: { color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 8 }
 });

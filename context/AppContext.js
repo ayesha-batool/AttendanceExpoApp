@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { getItems, handleDataDelete, syncPendingLocalData, useNetworkStatus } from "../services/dataHandler";
+import { dataService, useNetworkStatus } from "../services/unifiedDataService";
 
 // Create context
 const AppContext = createContext();
@@ -19,8 +19,7 @@ export const AppProvider = ({ children }) => {
         let data = []; // ✅ Declare it here so it's available outside try block
     
         try {
-            console.log("Fetching for collection:", collectionId);
-            data = await getItems(collectionId);
+            data = await dataService.getItems(collectionId);
             setItems(data);
             setFilteredItems(data);
             if (collectionId) {
@@ -30,7 +29,6 @@ export const AppProvider = ({ children }) => {
             console.error("Fetch failed:", err);
         } finally {
             setIsLoading(false);
-            console.log("Fetched data:", data); // ✅ Safe to access now
         }
     };
     
@@ -49,7 +47,7 @@ export const AppProvider = ({ children }) => {
 
     const deleteItem = async (docId) => {
         try {
-            await handleDataDelete(`Items_${docId}`, docId, currentCollection);
+            await dataService.deleteData(`Items_${docId}`, docId, currentCollection);
             await fetchItems(currentCollection);
         } catch (err) {
             console.error("Delete failed:", err);
@@ -59,7 +57,7 @@ export const AppProvider = ({ children }) => {
 
     useEffect(() => {
         if (isConnected) {
-            syncPendingLocalData();
+            dataService.syncPendingData();
         }
     }, [isConnected]);
 

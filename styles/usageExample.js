@@ -3,13 +3,13 @@ import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import {
     borderRadius,
+    boxShadows,
     colors,
     commonStyles,
     getDetailIconColor,
     getIconColor,
     getSummaryIconColor,
     icons,
-    shadows,
     spacing,
     typography
 } from './designSystem';
@@ -103,7 +103,7 @@ export const CustomComponent = () => {
       backgroundColor: colors.background,
       padding: spacing.md,
       borderRadius: borderRadius.lg,
-      ...shadows.sm,
+      ...boxShadows.sm,
     },
     title: {
       fontSize: typography.xl,
@@ -122,7 +122,7 @@ export const CustomComponent = () => {
       paddingHorizontal: spacing.lg,
       borderRadius: borderRadius.sm,
       alignItems: 'center',
-      ...shadows.base,
+      ...boxShadows.base,
     },
     buttonText: {
       color: colors.white,

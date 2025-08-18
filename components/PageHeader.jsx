@@ -3,10 +3,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import {
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 const PageHeader = ({ 
@@ -22,28 +22,20 @@ const PageHeader = ({
   const router = useRouter();
 
   const handleIconPress = () => {
-    console.log('Back button pressed');
-    console.log('Router state:', { canGoBack: router.canGoBack() });
-    
     // Removed navigation toast as requested
     
     if (onIconPress) {
-      console.log('Using custom onIconPress');
       onIconPress();
     } else if (showBackButton) {
-      console.log('Using default back navigation');
       try {
         // Try to go back first
         if (router.canGoBack()) {
-          console.log('Can go back, calling router.back()');
           router.back();
         } else {
-          console.log('Cannot go back, navigating to Dashboard');
           // If can't go back, navigate to dashboard
           router.push("/Dashboard");
         }
       } catch (error) {
-        console.log('Navigation error:', error);
         // Fallback to dashboard
         router.push("/Dashboard");
       }
@@ -60,33 +52,23 @@ const PageHeader = ({
       <View style={styles.headerContent}>
         <View style={styles.titleContainer}>
           <View style={styles.leftSection}>
-            {/* {showBackButton && (
-              <TouchableOpacity 
-                style={styles.backButton} 
-                onPress={handleIconPress}
-                activeOpacity={0.7}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons name={iconName} size={20} color="#fff" />
-              </TouchableOpacity>
-            )} */}
+          
             {icon && (
               <View style={styles.headerIconContainer}>
                 <Ionicons name={icon} size={24} color="#fff" />
               </View>
             )}
-          </View>
           <View style={styles.titleAndActionContainer}>
             <Text style={styles.headerTitle}>{title}</Text>
             {subtitle && (
               <Text style={styles.headerSubtitle}>{subtitle}</Text>
             )}
           </View>
+          </View>
           {actionButton && (
             <TouchableOpacity 
               style={styles.inlineActionButton} 
               onPress={() => {
-                console.log('Action button pressed, calling:', actionButton.onPress);
                 actionButton.onPress();
               }}
               activeOpacity={0.7}

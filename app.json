@@ -3,6 +3,7 @@
     "name": "shelfie_clean",
     "slug": "shelfie_clean",
     "version": "1.0.0",
+    "description": "APK Download Link: https://expo.dev/artifacts/eas/eJrc5bfS9jknDX7GTTbAa.apk",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "shelfieclean",
@@ -16,7 +17,8 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.ayeshabatool.shelfie_clean"
     },
     "web": {
       "bundler": "metro",
@@ -37,6 +39,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "cba50b01-2f1d-4fbf-b4fc-88021d36b947"
+      }
+    },
+    "owner": "ayeshabatool"
   }
 }

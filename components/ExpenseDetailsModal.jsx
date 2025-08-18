@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 import React from 'react';
 import {
-    Alert,
     Modal,
     Image as RNImage,
     ScrollView,
@@ -13,7 +12,13 @@ import {
 } from 'react-native';
 
 const ExpenseDetailsModal = ({ visible, expense, onClose, onEdit, onDelete }) => {
-  if (!expense) return null;
+  // Safety checks to prevent crashes
+  if (!expense || !visible || typeof expense !== 'object') return null;
+  
+  // Ensure required props are functions
+  if (typeof onClose !== 'function' || typeof onEdit !== 'function' || typeof onDelete !== 'function') {
+    return null;
+  }
 
   const getCategoryColor = (category) => {
     const colors = {
@@ -42,6 +47,7 @@ const ExpenseDetailsModal = ({ visible, expense, onClose, onEdit, onDelete }) =>
   };
 
   const getFileType = (filePath) => {
+    if (!filePath || typeof filePath !== 'string') return 'File';
     const extension = filePath.split('.').pop()?.toLowerCase();
     const fileTypes = {
       'pdf': 'PDF Document',
@@ -59,6 +65,7 @@ const ExpenseDetailsModal = ({ visible, expense, onClose, onEdit, onDelete }) =>
   };
 
   const isImageFile = (filePath) => {
+    if (!filePath || typeof filePath !== 'string') return false;
     const extension = filePath.split('.').pop()?.toLowerCase();
     const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
     return imageExtensions.includes(extension);
@@ -66,8 +73,7 @@ const ExpenseDetailsModal = ({ visible, expense, onClose, onEdit, onDelete }) =>
 
   const handleOpenReceipt = async () => {
     try {
-      if (!expense.receipt) {
-        Alert.alert('No Receipt', 'No receipt file is attached to this expense.');
+      if (!expense.receipt || typeof expense.receipt !== 'string') {
         return;
       }
 
@@ -79,7 +85,8 @@ const ExpenseDetailsModal = ({ visible, expense, onClose, onEdit, onDelete }) =>
         if (supported) {
           await Linking.openURL(receiptUrl);
         } else {
-          Alert.alert('Error', 'Cannot open this type of file.');
+          // Try to open in browser
+          await Linking.openURL(receiptUrl);
         }
         return;
       }
@@ -89,30 +96,25 @@ const ExpenseDetailsModal = ({ visible, expense, onClose, onEdit, onDelete }) =>
         const supported = await Linking.canOpenURL(receiptUrl);
         if (supported) {
           await Linking.openURL(receiptUrl);
-        } else {
-          Alert.alert('Error', 'Cannot open this type of file.');
         }
         return;
       }
 
       // For other file paths, try to open them directly
-      const supported = await Linking.canOpenURL(receiptUrl);
-      if (supported) {
-        await Linking.openURL(receiptUrl);
-      } else {
-        // If direct opening fails, show file info
-        Alert.alert(
-          'File Information',
-          `File: ${receiptUrl.split('/').pop()}\nType: ${getFileType(receiptUrl)}\n\nThis file type may not be supported for direct opening.`,
-          [
-            { text: 'OK', style: 'default' }
-          ]
-        );
+      try {
+        const supported = await Linking.canOpenURL(receiptUrl);
+        if (supported) {
+          await Linking.openURL(receiptUrl);
+        }
+      } catch (linkError) {
+        // If direct linking fails, try to construct a file:// URL
+        const fileUrl = `file://${receiptUrl}`;
+        await Linking.openURL(fileUrl);
       }
 
     } catch (error) {
-      console.error('Error opening receipt:', error);
-      Alert.alert('Error', 'Failed to open receipt file. Please try again.');
+      console.error('Failed to open receipt:', error);
+      // You could show an alert here to inform the user
     }
   };
 
@@ -120,7 +122,7 @@ const ExpenseDetailsModal = ({ visible, expense, onClose, onEdit, onDelete }) =>
     <Modal
       visible={visible}
       animationType="fade"
-      transparent={false}
+      transparent={true}
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
@@ -128,7 +130,13 @@ const ExpenseDetailsModal = ({ visible, expense, onClose, onEdit, onDelete }) =>
           {/* Header */}
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Expense Details</Text>
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <TouchableOpacity style={styles.closeButton} onPress={() => {
+              try {
+                onClose();
+              } catch (error) {
+                // Handle any errors when closing modal
+              }
+            }}>
               <Ionicons name="close" size={24} color="#666" />
             </TouchableOpacity>
           </View>
@@ -140,13 +148,13 @@ const ExpenseDetailsModal = ({ visible, expense, onClose, onEdit, onDelete }) =>
                 <Ionicons name={getCategoryIcon(expense.category)} size={24} color="#fff" />
               </View>
               <View style={styles.expenseInfo}>
-                <Text style={styles.expenseTitle}>{expense.title}</Text>
+                <Text style={styles.expenseTitle}>{expense.title || 'Untitled Expense'}</Text>
                 <Text style={styles.expenseCategory}>
-                  {expense.category?.replace('_', ' ').toUpperCase()}
+                  {(expense.category || 'other')?.replace('_', ' ').toUpperCase()}
                 </Text>
               </View>
               <Text style={styles.expenseAmount}>
-                ${parseFloat(expense.amount || 0).toLocaleString()}
+                ${(parseFloat(expense.amount || 0) || 0).toLocaleString()}
               </Text>
             </View>
 
@@ -158,7 +166,7 @@ const ExpenseDetailsModal = ({ visible, expense, onClose, onEdit, onDelete }) =>
                 <Ionicons name="calendar" size={16} color="#6b7280" />
                 <Text style={styles.detailLabel}>Date:</Text>
                 <Text style={styles.detailValue}>
-                  {new Date(expense.date).toLocaleDateString()}
+                  {expense.date ? new Date(expense.date).toLocaleDateString() : 'No date'}
                 </Text>
               </View>
 
@@ -186,12 +194,15 @@ const ExpenseDetailsModal = ({ visible, expense, onClose, onEdit, onDelete }) =>
                   </View>
                   
                   {/* Show image preview if it's an image file */}
-                  {isImageFile(expense.receipt) && !expense.receipt.startsWith('data:') ? (
+                  {isImageFile(expense.receipt) && expense.receipt && !expense.receipt.startsWith('data:') ? (
                     <View style={styles.receiptImageContainer}>
                       <RNImage
                         source={{ uri: expense.receipt }}
                         style={styles.receiptImage}
                         resizeMode="cover"
+                        onError={() => {
+                          // Handle image loading errors silently
+                        }}
                       />
                       <TouchableOpacity style={styles.receiptButton} onPress={handleOpenReceipt}>
                         <View style={styles.receiptButtonContent}>
@@ -206,7 +217,7 @@ const ExpenseDetailsModal = ({ visible, expense, onClose, onEdit, onDelete }) =>
                         <Ionicons name="document-text" size={20} color="#3b82f6" />
                         <View style={styles.receiptInfo}>
                           <Text style={styles.receiptFileName}>
-                            {expense.receipt.split('/').pop() || 'Receipt File'}
+                            {expense.receipt && typeof expense.receipt === 'string' ? expense.receipt.split('/').pop() || 'Receipt File' : 'Receipt File'}
                           </Text>
                           <Text style={styles.receiptFileType}>
                             {getFileType(expense.receipt)}
@@ -231,12 +242,24 @@ const ExpenseDetailsModal = ({ visible, expense, onClose, onEdit, onDelete }) =>
 
           {/* Footer Actions */}
           <View style={styles.modalFooter}>
-            <TouchableOpacity style={styles.editButton} onPress={onEdit}>
+            <TouchableOpacity style={styles.editButton} onPress={() => {
+              try {
+                onEdit();
+              } catch (error) {
+                // Handle any errors when editing
+              }
+            }}>
               <Ionicons name="create" size={20} color="#fff" />
               <Text style={styles.editButtonText}>Edit</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.deleteButton} onPress={onDelete}>
+            <TouchableOpacity style={styles.deleteButton} onPress={() => {
+              try {
+                onDelete();
+              } catch (error) {
+                // Handle any errors when deleting
+              }
+            }}>
               <Ionicons name="trash" size={20} color="#fff" />
               <Text style={styles.deleteButtonText}>Delete</Text>
             </TouchableOpacity>
@@ -249,17 +272,23 @@ const ExpenseDetailsModal = ({ visible, expense, onClose, onEdit, onDelete }) =>
 
 const styles = StyleSheet.create({
   modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#fff',
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
     zIndex: 1000,
   },
   modalContent: {
-    flex: 1,
     backgroundColor: '#fff',
+    borderRadius: 20,
+    width: '95%',
+    maxHeight: '85%',
+    minHeight: '60%',
+    boxShadowColor: '#000',
+    boxShadowOffset: { width: 0, height: 10 },
+    boxShadowOpacity: 0.25,
+    boxShadowRadius: 20,
+    elevation: 10,
   },
   modalHeader: {
     flexDirection: 'row',

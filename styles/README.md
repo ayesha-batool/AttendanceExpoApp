@@ -38,7 +38,7 @@ import {
   typography, 
   spacing, 
   borderRadius, 
-  shadows, 
+  boxShadows, 
   icons, 
   commonStyles,
   getIconColor,
@@ -77,14 +77,14 @@ const MyComponent = () => {
 ### 3. Use Design System Tokens
 
 ```javascript
-import { colors, typography, spacing, borderRadius, shadows } from '../styles/designSystem';
+import { colors, typography, spacing, borderRadius, boxShadows } from '../styles/designSystem';
 
 const customStyles = StyleSheet.create({
   container: {
     backgroundColor: colors.background,
     padding: spacing.md,
     borderRadius: borderRadius.lg,
-    ...shadows.sm,
+    ...boxShadows.sm,
   },
   title: {
     fontSize: typography.xl,
@@ -96,7 +96,7 @@ const customStyles = StyleSheet.create({
     backgroundColor: colors.primary,
     padding: spacing.base,
     borderRadius: borderRadius.sm,
-    ...shadows.base,
+    ...boxShadows.base,
   },
 });
 ```

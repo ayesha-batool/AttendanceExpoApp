@@ -6,7 +6,9 @@ import {
     View,
 } from 'react-native';
 
-const DeleteConfirmationModal = ({ visible, onClose, onConfirm, employeeName }) => {
+const DeleteConfirmationModal = ({ visible, onClose, onConfirm, employeeName, itemName }) => {
+  const displayName = itemName || employeeName || 'this item';
+  
   return (
     <Modal
       visible={visible}
@@ -18,7 +20,7 @@ const DeleteConfirmationModal = ({ visible, onClose, onConfirm, employeeName }) 
         <View style={styles.deleteModalContent}>
           <Text style={styles.deleteModalTitle}>Confirm Delete</Text>
           <Text style={styles.deleteModalText}>
-            Are you sure you want to delete {employeeName}? This action cannot be undone.
+            Are you sure you want to delete {displayName}? This action cannot be undone.
           </Text>
           <View style={styles.deleteModalButtons}>
             <TouchableOpacity

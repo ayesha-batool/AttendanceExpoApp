@@ -10,7 +10,7 @@ import {
     View,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
-import CustomOptionsService from '../services/customOptionsService';
+import { customOptionsService } from '../services/unifiedDataService';
 
 const AddNewOptionModal = ({ 
   visible, 
@@ -34,9 +34,10 @@ const AddNewOptionModal = ({
     }
 
     // Check if option already exists
-    if (existingOptions.some(option => 
-      (typeof option === 'string' ? option : option.label || option.value).toLowerCase() === newOption.toLowerCase()
-    )) {
+    if (existingOptions && existingOptions.some(option => {
+      const optionValue = typeof option === 'string' ? option : (option?.label || option?.value || '');
+      return optionValue.toLowerCase() === newOption.toLowerCase();
+    })) {
       Toast.show({
         type: 'error',
         text1: 'Error',
@@ -47,7 +48,7 @@ const AddNewOptionModal = ({
 
     setLoading(true);
     try {
-      const result = await CustomOptionsService.addCustomOption(fieldName, newOption.trim());
+      const result = await customOptionsService.addOption(fieldName, newOption.trim());
       if (result.success) {
         // Removed success toast
         onSuccess(newOption.trim());
@@ -90,19 +91,19 @@ const AddNewOptionModal = ({
             colors={['#3b82f6', '#2563eb', '#1d4ed8']}
             style={styles.modalHeader}
           >
-            <Text style={styles.modalTitle}>Add New {fieldLabel}</Text>
+            <Text style={styles.modalTitle}>Add New {fieldLabel || 'Option'}</Text>
             <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
               <Ionicons name="close" size={24} color="#fff" />
             </TouchableOpacity>
           </LinearGradient>
 
           <View style={styles.modalBody}>
-            <Text style={styles.fieldLabel}>New {fieldLabel} Name</Text>
+            <Text style={styles.fieldLabel}>New {fieldLabel || 'Option'} Name</Text>
             <TextInput
               style={styles.textInput}
               value={newOption}
               onChangeText={setNewOption}
-              placeholder={`Enter new ${fieldLabel.toLowerCase()} name`}
+              placeholder={`Enter new ${(fieldLabel || 'option').toLowerCase()} name`}
               placeholderTextColor="#9ca3af"
               autoFocus={true}
               maxLength={50}
@@ -151,10 +152,10 @@ const styles = StyleSheet.create({
     width: '95%',
     maxWidth: 500,
     minHeight: 300,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
+    boxShadowColor: '#000',
+    boxShadowOffset: { width: 0, height: 10 },
+    boxShadowOpacity: 0.25,
+    boxShadowRadius: 20,
     elevation: 10,
   },
   modalHeader: {
@@ -217,10 +218,10 @@ const styles = StyleSheet.create({
   submitButton: {
     flex: 1,
     borderRadius: 12,
-    shadowColor: '#3b82f6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    boxShadowColor: '#3b82f6',
+    boxShadowOffset: { width: 0, height: 4 },
+    boxShadowOpacity: 0.3,
+    boxShadowRadius: 8,
     elevation: 4,
   },
   submitGradient: {

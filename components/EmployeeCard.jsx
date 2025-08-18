@@ -85,6 +85,35 @@ const EmployeeCard = ({
                   {employee.status || 'Unknown'}
                 </Text>
               </View>
+              <View style={styles.cardActions}>
+          <TouchableOpacity
+            onPress={() => onToggleStatus(employee)}
+            style={[
+              styles.actionButton,
+              isActive ? styles.deactivateBtn : styles.activateBtn
+            ]}
+          >
+            <Ionicons 
+              name={isActive ? "pause-circle-outline" : "play-circle-outline"} 
+              size={16} 
+              color={isActive ? "#f59e0b" : "#10b981"} 
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => onEdit(employee)}
+            style={[styles.actionButton, styles.editBtn]}
+          >
+            <Ionicons name="pencil-outline" size={16} color="#667eea" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => onDelete(employee)}
+            style={[styles.actionButton, styles.deleteBtn]}
+          >
+            <Ionicons name="trash-outline" size={16} color="#f5576c" />
+          </TouchableOpacity>
+        </View>
             </View>
 
             <Text style={[
@@ -136,43 +165,14 @@ const EmployeeCard = ({
               </View>
             </View>
 
-            {/* Department Color Indicator */}
-            {employee.department && (
+             {employee.department && (
               <View style={[styles.departmentIndicator, { backgroundColor: getDepartmentColor(employee.department) }]} />
             )}
           </View>
         </View>
 
         {/* Action Buttons */}
-        <View style={styles.cardActions}>
-          <TouchableOpacity
-            onPress={() => onToggleStatus(employee)}
-            style={[
-              styles.actionButton,
-              isActive ? styles.deactivateBtn : styles.activateBtn
-            ]}
-          >
-            <Ionicons 
-              name={isActive ? "pause-circle-outline" : "play-circle-outline"} 
-              size={16} 
-              color={isActive ? "#f59e0b" : "#10b981"} 
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => onEdit(employee)}
-            style={[styles.actionButton, styles.editBtn]}
-          >
-            <Ionicons name="pencil-outline" size={16} color="#667eea" />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => onDelete(employee)}
-            style={[styles.actionButton, styles.deleteBtn]}
-          >
-            <Ionicons name="trash-outline" size={16} color="#f5576c" />
-          </TouchableOpacity>
-        </View>
+      
       </LinearGradient>
     </TouchableOpacity>
   );
@@ -180,35 +180,66 @@ const EmployeeCard = ({
 
 const styles = StyleSheet.create({
   employeeCard: {
-    marginBottom: 8,
+    marginBottom: 12,
     borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    boxShadowColor: '#000',
+    boxShadowOffset: { width: 0, height: 2 },
+    boxShadowOpacity: 0.06,
+    boxShadowRadius: 20,
     elevation: 3,
+    maxWidth: '100%',
+    alignSelf: 'stretch',
+    backgroundColor: '#fff',
+ 
   },
   inactiveEmployeeCard: {
-    opacity: 0.7,
+    opacity: 0.6,
   },
   employeeCardGradient: {
     borderRadius: 12,
-    padding: 16,
+    padding: 14,
     position: 'relative',
-   
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+  },
+  statusIconsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginBottom: 8,
+    gap: 6,
+  },
+  statusIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    boxShadowColor: '#000',
+    boxShadowOffset: { width: 0, height: 1 },
+    boxShadowOpacity: 0.1,
+    boxShadowRadius: 2,
+    elevation: 1,
   },
   employeeInfo: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    marginBottom: 12,
+    marginRight: 12
 
   },
   employeeAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 30
+    marginRight: 16,
+    boxShadowColor: '#000',
+    boxShadowOffset: { width: 0, height: 1 },
+    boxShadowOpacity: 0.08,
+    boxShadowRadius: 2,
+    elevation: 1,
+ 
   },
   employeeDetails: {
     flex: 1,
@@ -222,47 +253,59 @@ const styles = StyleSheet.create({
   },
   employeeName: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '700',
+    color: '#1e293b',
     flex: 1,
+    marginBottom: 3,
   },
   inactiveEmployeeName: {
-    color: '#6c757d',
+    color: '#64748b',
   },
   statusBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingVertical: 3,
     borderRadius: 12,
-    marginLeft: 8,
+    marginLeft: 6,
+    boxShadowColor: '#000',
+    boxShadowOffset: { width: 0, height: 1 },
+    boxShadowOpacity: 0.08,
+    boxShadowRadius: 1,
+    elevation: 1,
   },
   statusBadgeText: {
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#fff',
     textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
   employeeId: {
     fontSize: 12,
-    color: '#6c757d',
+    color: '#64748b',
     marginBottom: 8,
+    fontWeight: '500',
   },
   inactiveEmployeeText: {
-    color: '#adb5bd',
+    color: '#94a3b8',
   },
   infoRow: {
     flexDirection: 'row',
     marginBottom: 6,
+    flexWrap: 'wrap',
   },
   infoItem: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
     marginRight: 12,
+    minWidth: '45%',
+    marginBottom: 3,
   },
   infoText: {
     fontSize: 12,
-    color: '#6c757d',
-    marginLeft: 4,
+    color: '#475569',
+    marginLeft: 5,
+    fontWeight: '500',
   },
   departmentIndicator: {
     position: 'absolute',
@@ -272,12 +315,15 @@ const styles = StyleSheet.create({
     width: 4,
     borderTopLeftRadius: 12,
     borderBottomLeftRadius: 12,
+    marginHorizontal: 5
   },
   cardActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    marginTop: 12,
+ 
+    marginHorizontal:12,
     gap: 8,
+ 
   },
   actionButton: {
     width: 32,
@@ -285,16 +331,21 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f8fafc',
+    boxShadowColor: '#000',
+    boxShadowOffset: { width: 0, height: 1 },
+    boxShadowOpacity: 0.05,
+    boxShadowRadius: 2,
+    elevation: 1,
   },
   activateBtn: {
-    backgroundColor: '#d1fae5',
+    backgroundColor: '#dcfce7',
   },
   deactivateBtn: {
     backgroundColor: '#fef3c7',
   },
   editBtn: {
-    backgroundColor: '#e0e7ff',
+    backgroundColor: '#dbeafe',
   },
   deleteBtn: {
     backgroundColor: '#fee2e2',

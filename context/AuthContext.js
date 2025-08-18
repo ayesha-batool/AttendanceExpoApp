@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { authService } from '../services/authService'; // Adjust path if needed
+import { authService } from '../services/unifiedDataService';
 
 const AuthContext = createContext();
 export const useAuth = () => useContext(AuthContext);
@@ -21,8 +21,13 @@ export const AuthProvider = ({ children }) => {
   };
 
   const getUser = async () => {
-    const user = await authService.getUser();
-    setCurrentUser(user);
+    try {
+      const user = await authService.getUser();
+      setCurrentUser(user);
+    } catch (error) {
+      console.error("Error getting user in AuthContext:", error);
+      setCurrentUser(null);
+    }
   };
 
   useEffect(() => {

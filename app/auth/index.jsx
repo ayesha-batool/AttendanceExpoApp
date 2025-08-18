@@ -3,14 +3,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-    Dimensions,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
 import Toast from 'react-native-toast-message';
 import Icon from "react-native-vector-icons/Ionicons";
@@ -255,10 +255,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    boxboxShadowColor: '#000',
+    boxboxShadowOffset: { width: 0, height: 4 },
+    boxboxShadowOpacity: 0.3,
+    boxboxShadowRadius: 8,
     elevation: 8,
   },
   appTitle: {
@@ -267,17 +267,11 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginBottom: 8,
     textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
   },
   appSubtitle: {
     fontSize: 18,
     color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
   formContainer: {
     paddingHorizontal: 24,
@@ -286,10 +280,10 @@ const styles = StyleSheet.create({
   formBox: {
     borderRadius: 24,
     padding: 32,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
+    boxboxShadowColor: '#000',
+    boxboxShadowOffset: { width: 0, height: 10 },
+    boxboxShadowOpacity: 0.25,
+    boxboxShadowRadius: 20,
     elevation: 10,
   },
   formHeader: {
@@ -314,10 +308,10 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 20,
     paddingHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
+    boxboxShadowColor: '#000',
+    boxboxShadowOffset: { width: 0, height: 2 },
+    boxboxShadowOpacity: 0.05,
+    boxboxShadowRadius: 4,
     elevation: 2,
   },
   inputIcon: {
@@ -358,10 +352,10 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginTop: 8,
     marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
+    boxboxShadowColor: '#000',
+    boxboxShadowOffset: { width: 0, height: 4 },
+    boxboxShadowOpacity: 0.2,
+    boxboxShadowRadius: 8,
     elevation: 6,
   },
   buttonGradient: {

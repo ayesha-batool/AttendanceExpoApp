@@ -10,12 +10,12 @@ import EmptyState from '../../components/EmptyState';
 import ExpenseCard from '../../components/ExpenseCard';
 import ExpenseDetailsModal from '../../components/ExpenseDetailsModal';
 import ExpenseForm from '../../components/ExpenseForm';
+import LoadingOverlay from '../../components/LoadingOverlay';
 import LoadingState from '../../components/LoadingState';
 import SearchBar from '../../components/SearchBar';
 
 import { useExpensesContext } from '../../context/ExpensesContext';
-import CustomOptionsService from '../../services/customOptionsService';
-import { getItems, handleDataDelete, handleDataSubmit, handleDataUpdate, removeDuplicateEntries } from '../../services/dataHandler';
+import { customOptionsService, dataService } from '../../services/unifiedDataService';
 
 const ExpensesManagementScreen = () => {
   const { setHeaderActionButton, clearHeaderAction } = useExpensesContext();
@@ -34,13 +34,10 @@ const ExpensesManagementScreen = () => {
   });
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Constants - compressed
-  const departmentOptions = [
-    { label: 'Patrol', value: 'patrol' }, { label: 'Investigation', value: 'investigation' },
-    { label: 'Traffic', value: 'traffic' }, { label: 'Administration', value: 'administration' },
-    { label: 'Training', value: 'training' }, { label: 'Equipment', value: 'equipment' }
-  ];
+  const [departmentOptions, setDepartmentOptions] = useState([]);
+  const [activeTab, setActiveTab] = useState('all'); // 'all', 'paid', 'unpaid'
 
   // Utility functions - compressed
   const showToast = (type, text1, text2) => Toast.show({ type, text1, text2 });
@@ -52,21 +49,56 @@ const ExpensesManagementScreen = () => {
     return expense?.id || expense?.$id || null;
   };
 
-  // Load category options
-  const loadCategoryOptions = async () => {
+  // Tab Navigation Component
+  const TabNavigation = () => {
+    const tabs = [
+      { key: 'all', label: 'All', icon: 'list' },
+      { key: 'paid', label: 'Paid', icon: 'checkmark-circle' },
+      { key: 'unpaid', label: 'Unpaid', icon: 'time' }
+    ];
+
+    return (
+      <View style={styles.tabContainer}>
+        {tabs.map((tab) => (
+          <TouchableOpacity
+            key={tab.key}
+            style={[styles.tab, activeTab === tab.key && styles.activeTab]}
+            onPress={() => setActiveTab(tab.key)}
+          >
+            <Ionicons
+              name={tab.icon}
+              size={16}
+              color={activeTab === tab.key ? '#fff' : '#667eea'}
+            />
+            <Text style={[styles.tabText, activeTab === tab.key && styles.activeTabText]}>
+              {tab.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
+
+  // Load dropdown options
+  const loadDropdownOptions = async () => {
     try {
-      const allCategories = await CustomOptionsService.getAllOptions('expenseCategories');
-      const options = allCategories.map(category => ({
+      const [categories, departments] = await Promise.all([
+        customOptionsService.getOptions('expense_categories'),
+        customOptionsService.getOptions('departments')
+      ]);
+      
+      const categoryOptions = categories.map(category => ({
         label: category, value: category.toLowerCase().replace(/\s+/g, '_')
       }));
-      setCategoryOptions(options);
+      
+      const departmentOptions = departments.map(department => ({
+        label: department, value: department.toLowerCase().replace(/\s+/g, '_')
+      }));
+      
+      setCategoryOptions(categoryOptions);
+      setDepartmentOptions(departmentOptions);
     } catch (error) {
-      setCategoryOptions([
-        { label: 'Fuel', value: 'fuel' }, { label: 'Equipment', value: 'equipment' },
-        { label: 'Training', value: 'training' }, { label: 'Maintenance', value: 'maintenance' },
-        { label: 'Office Supplies', value: 'office_supplies' }, { label: 'Travel', value: 'travel' },
-        { label: 'Other', value: 'other' }
-      ]);
+      console.error('Error loading dropdown options:', error);
     }
   };
 
@@ -74,34 +106,20 @@ const ExpensesManagementScreen = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      console.log('🔍 Fetching expenses data from local storage...');
       
-      // First, clean up any duplicate entries in AsyncStorage
-      await removeDuplicateEntries('expenses');
-      
-      const expensesData = await getItems('expenses');
-      console.log('🔍 Raw expenses data:', expensesData);
+      const expensesData = await dataService.getItems('expenses');
       
       const validExpenses = expensesData.filter(item => item && typeof item === 'object');
-      console.log('🔍 Valid expenses after filtering:', validExpenses.length);
       
       // Remove duplicates based on ID (in-memory deduplication)
       const uniqueExpenses = removeDuplicateExpenses(validExpenses);
-      console.log('🔍 Unique expenses after deduplication:', uniqueExpenses.length);
       
-      // Only load from local storage, no default data
       setExpenses(uniqueExpenses);
       setFilteredExpenses(uniqueExpenses);
-      
-      if (uniqueExpenses.length === 0) {
-        console.log('🔍 No expenses found in local storage, showing empty state');
-      } else {
-        console.log('🔍 Loaded expenses from local storage:', uniqueExpenses.length, 'items');
-      }
+    
     } catch (error) {
-      console.error('❌ Error loading expenses data:', error);
+      console.error('Failed to load expenses data:', error);
       showToast('error', 'Error', 'Failed to load expenses data');
-      // Set empty arrays on error
       setExpenses([]);
       setFilteredExpenses([]);
     } finally {
@@ -119,25 +137,37 @@ const ExpensesManagementScreen = () => {
       if (id && !seen.has(id)) {
         seen.add(id);
         unique.push(expense);
-      } else if (id) {
-        console.log('🔍 Removing duplicate expense with ID:', id);
+      } else if (!id) {
+        // If no ID, still include the expense but with a warning
+        console.warn('Expense without ID found:', expense);
+        unique.push(expense);
       }
     }
     
     return unique;
   };
 
-  // Search logic only
-  const applySearch = () => {
-    let filtered = [...expenses];
+  // Search and filter expenses
+  const handleSearch = (query) => {
+    setSearchQuery(query);
     
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(expense =>
-        ['title', 'description', 'department', 'category', 'notes'].some(field =>
-          expense[field]?.toLowerCase().includes(query)
-        )
+    let filtered = expenses;
+    
+    // Filter by search query
+    if (query.trim()) {
+      filtered = filtered.filter(expense => 
+        expense.title?.toLowerCase().includes(query.toLowerCase()) ||
+        expense.category?.toLowerCase().includes(query.toLowerCase()) ||
+        expense.department?.toLowerCase().includes(query.toLowerCase()) ||
+        expense.description?.toLowerCase().includes(query.toLowerCase())
       );
+    }
+    
+    // Filter by payment status
+    if (activeTab === 'paid') {
+      filtered = filtered.filter(expense => expense.status === 'paid');
+    } else if (activeTab === 'unpaid') {
+      filtered = filtered.filter(expense => expense.status !== 'paid');
     }
     
     setFilteredExpenses(filtered);
@@ -169,64 +199,59 @@ const ExpensesManagementScreen = () => {
   const confirmDelete = async () => {
     if (!selected.deleteExpense) return;
     
-    setIsDeleting(true);
     try {
-      console.log('🔍 confirmDelete called for expense:', selected.deleteExpense);
+      setIsDeleting(true);
+      
       const expenseId = getExpenseId(selected.deleteExpense);
       
       if (!expenseId) {
         throw new Error('Invalid expense ID');
       }
       
-      // Use the correct key format for deletion
       const key = `expenses_${expenseId}`;
-      await handleDataDelete(key, expenseId, 'expenses');
+              await dataService.deleteData(key, expenseId, 'expenses');
       
       // Remove from state
-      setExpenses(prev => {
-        const filtered = prev.filter(expense => getExpenseId(expense) !== expenseId);
-        console.log('🔍 Expenses state after deletion - before:', prev.length, 'after:', filtered.length);
-        return filtered;
-      });
+      setExpenses(prev => prev.filter(expense => getExpenseId(expense) !== expenseId));
+      setFilteredExpenses(prev => prev.filter(expense => getExpenseId(expense) !== expenseId));
       
-      setFilteredExpenses(prev => {
-        const filtered = prev.filter(expense => getExpenseId(expense) !== expenseId);
-        console.log('🔍 Filtered expenses state after deletion - before:', prev.length, 'after:', filtered.length);
-        return filtered;
-      });
-      
-      console.log('🔍 Expense deleted successfully from state');
       showToast('success', 'Success', 'Expense deleted successfully');
+      
     } catch (error) {
-      console.error('❌ Error deleting expense:', error);
-      showToast('error', 'Error', 'Failed to delete expense');
+      console.error('Error deleting expense:', error);
+      showToast('error', 'Error', error.message || 'Failed to delete expense');
     } finally {
-      // Close modal first, then clear selection to prevent refetch
       updateModal('delete', false);
-      // Add a small delay before clearing selection to prevent immediate refetch
-      setTimeout(() => {
-        updateSelected('deleteExpense', null);
-        setIsDeleting(false);
-      }, 100);
+      updateSelected('deleteExpense', null);
+      setIsDeleting(false);
     }
   };
 
   const saveExpense = async (expenseData) => {
-    console.log('🔍 saveExpense called with:', expenseData);
-    console.log('🔍 saveExpense - timestamp:', new Date().toISOString());
+    if (isSaving) {
+      showToast('error', 'Error', 'Please wait, saving in progress...');
+      return;
+    }
+
+    // Handle option refresh requests
+    if (expenseData.refreshOptions && expenseData.fieldName) {
+      await loadDropdownOptions();
+      return;
+    }
+
     try {
-      if (selected.isEdit) {
-        const expenseId = getExpenseId(expenseData);
+      setIsSaving(true);
+      
+      if (selected.isEdit && selected.editExpense) {
+        const expenseId = getExpenseId(selected.editExpense);
         
         if (!expenseId) {
           throw new Error('Invalid expense ID for update');
         }
         
-        // Use the correct key format for update
         const key = `expenses_${expenseId}`;
-        await handleDataUpdate(key, expenseId, expenseData, 'expenses');
+        await dataService.updateData(key, expenseId, expenseData, 'expenses');
         
-        // Update state with the new data
         const updatedExpense = { ...expenseData, $id: expenseId, id: expenseId };
         
         setExpenses(prev => prev.map(expense => 
@@ -238,10 +263,8 @@ const ExpensesManagementScreen = () => {
         
         showToast('success', 'Success', 'Expense updated successfully');
       } else {
-        const newExpense = await handleDataSubmit(expenseData, 'expenses');
-        console.log('🔍 saveExpense - new expense created:', newExpense);
+        const newExpense = await dataService.saveData(expenseData, 'expenses');
         
-        // Ensure the new expense has consistent ID structure
         const expenseWithId = { 
           ...newExpense, 
           id: newExpense.$id || newExpense.id,
@@ -253,12 +276,17 @@ const ExpensesManagementScreen = () => {
         
         showToast('success', 'Success', 'Expense added successfully');
       }
+      
+      // Close modal and reset state
       updateModal('add', false);
       updateSelected('isEdit', false);
       updateSelected('editExpense', null);
+      
     } catch (error) {
-      console.error('❌ Error saving expense:', error);
-      showToast('error', 'Error', 'Failed to save expense');
+      console.error('Error saving expense:', error);
+      showToast('error', 'Error', error.message || 'Failed to save expense');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -270,7 +298,6 @@ const ExpensesManagementScreen = () => {
 
   // Stats calculations - compressed
   const totalExpenses = expenses.reduce((sum, expense) => sum + (parseFloat(expense.amount) || 0), 0);
-  const filteredTotal = filteredExpenses.reduce((sum, expense) => sum + (parseFloat(expense.amount) || 0), 0);
   const topCategory = Object.entries(
     expenses.reduce((acc, expense) => {
       const cat = expense.category || 'other';
@@ -281,30 +308,30 @@ const ExpensesManagementScreen = () => {
 
   // Calculate totals
   const calculateTotals = () => {
-    const total = filteredExpenses.reduce((sum, expense) => sum + (parseFloat(expense.amount) || 0), 0);
-    const count = filteredExpenses.length;
-    return { total, count };
+    const total = expenses.reduce((sum, expense) => sum + (parseFloat(expense.amount) || 0), 0);
+    const count = expenses.length;
+    const filteredTotal = filteredExpenses.reduce((sum, expense) => sum + (parseFloat(expense.amount) || 0), 0);
+    const filteredCount = filteredExpenses.length;
+    return { total, count, filteredTotal, filteredCount };
   };
 
-  const { total, count } = calculateTotals();
+  const { total, count, filteredTotal, filteredCount } = calculateTotals();
 
   // Effects
   useEffect(() => {
     fetchData();
-    loadCategoryOptions();
+    loadDropdownOptions();
   }, []);
 
   useFocusEffect(useCallback(() => {
     // Only refetch data when returning to the screen, not on initial load
     // This prevents double fetching on mount
     if (expenses.length > 0 && !isDeleting) {
-      console.log('🔍 useFocusEffect - refetching data due to focus');
       fetchData();
     } else if (isDeleting) {
-      console.log('🔍 useFocusEffect - skipping refetch due to ongoing delete operation');
-    }
-    // Always reload category options as they might have been updated
-    loadCategoryOptions();
+      }
+    // Always reload dropdown options as they might have been updated
+    loadDropdownOptions();
   }, [selected.deleteExpense, isDeleting]));
 
   // Remove header action button since we're using floating action button
@@ -314,8 +341,8 @@ const ExpensesManagementScreen = () => {
   // }, []);
 
   useEffect(() => {
-    applySearch();
-  }, [searchQuery, expenses]);
+    handleSearch(searchQuery);
+  }, [searchQuery, expenses, activeTab]);
 
   if (loading) return <LoadingState />;
 
@@ -332,11 +359,13 @@ const ExpensesManagementScreen = () => {
         <View style={styles.searchFilter}>
           <SearchBar
             value={searchQuery}
-            onChangeText={setSearchQuery}
+            onChangeText={handleSearch}
             placeholder="Search expenses..."
             onClear={() => setSearchQuery('')}
           />
+          
         </View>
+          <TabNavigation />
       </View>
 
       {/* Expenses List */}
@@ -369,23 +398,48 @@ const ExpensesManagementScreen = () => {
         onClose={() => { updateModal('add', false); updateSelected('isEdit', false); updateSelected('editExpense', null); }}
         onSave={saveExpense}
         expense={selected.editExpense}
-        isEditMode={selected.isEdit}
+        isEdit={selected.isEdit}
+        categoryOptions={categoryOptions}
+        departmentOptions={departmentOptions}
       />
 
       <ExpenseDetailsModal
         visible={modals.details}
         expense={selected.expense}
-        onClose={() => { updateModal('details', false); updateSelected('expense', null); }}
-        onEdit={() => { updateModal('details', false); handleEdit(selected.expense); }}
-        onDelete={() => { updateModal('details', false); handleDelete(selected.expense); }}
+        onClose={() => { 
+          updateModal('details', false); 
+          updateSelected('expense', null); 
+        }}
+        onEdit={() => { 
+          updateModal('details', false); 
+          handleEdit(selected.expense); 
+        }}
+        onDelete={() => { 
+          updateModal('details', false); 
+          handleDelete(selected.expense); 
+        }}
       />
 
       <DeleteConfirmationModal
         visible={modals.delete}
         onConfirm={confirmDelete}
         onClose={() => { updateModal('delete', false); updateSelected('deleteExpense', null); }}
-        title="Delete Expense"
-        message="Are you sure you want to delete this expense? This action cannot be undone."
+        itemName={selected.deleteExpense?.title || 'this expense'}
+      />
+
+      {/* Loading Overlay */}
+      <LoadingOverlay 
+        visible={isSaving || isDeleting} 
+        message={
+          isSaving ? 'Saving expense...' : 
+          isDeleting ? 'Deleting expense...' : 
+          'Processing...'
+        }
+        type={
+          isSaving ? 'save' : 
+          isDeleting ? 'delete' : 
+          'default'
+        }
       />
 
       {/* Floating Action Button */}
@@ -423,13 +477,13 @@ const styles = StyleSheet.create({
     gap: 6
   },
   statRow: { flexDirection: 'row', gap: 6 },
-  statCard: { flex: 1, minHeight:70, borderRadius: 16, padding: 20, flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 8 },
+  statCard: { flex: 1, minHeight:70, borderRadius: 16, padding: 20, flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', boxShadowColor: '#000', boxShadowOffset: { width: 0, height: 4 }, boxShadowOpacity: 0.15, boxShadowRadius: 12, elevation: 8 },
   fullCard: { flex: 0, width: '100%' },
   statIcon: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   statContent: { flex: 1 },
   statValue: { fontSize: 20, fontWeight: 'bold', color: '#1e293b', marginBottom: 2 },
   statLabel: { fontSize: 12, color: '#64748b', fontWeight: '500' },
-  searchFilter: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  searchFilter: { flexDirection: 'row', alignItems: 'center', gap: 6 ,width:'100%'},
 
   list: { padding: 20 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center' },
@@ -461,12 +515,40 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    boxShadowColor: '#000',
+    boxShadowOffset: { width: 0, height: 4 },
+    boxShadowOpacity: 0.3,
+    boxShadowRadius: 8,
     elevation: 8,
-  }
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    backgroundColor: '#e0e7ff',
+    borderRadius: 12,
+    paddingVertical: 8,
+    marginHorizontal: 20,
+    marginBottom: 10,
+  },
+  tab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 10,
+    gap: 8,
+  },
+  activeTab: {
+    backgroundColor: '#667eea',
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#667eea',
+  },
+  activeTabText: {
+    color: '#fff',
+  },
 });
 
 export default ExpensesManagementScreen;

@@ -4,6 +4,8 @@ import Toast, { BaseToast, ErrorToast } from "react-native-toast-message";
 import { AppProvider } from "../context/AppContext";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 import { EmployeeProvider } from "../context/EmployeeContext";
+// import { initHybridStorage } from "../services/appwrite";
+
 
 const toastConfig = {
   success: (props) => (
@@ -18,13 +20,15 @@ const toastConfig = {
         top: 50,
         left: 20,
         right: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
+        boxShadowColor: '#000',
+        boxShadowOffset: { width: 0, height: 4 },
+        boxShadowOpacity: 0.3,
+        boxShadowRadius: 8,
+        minHeight: 60,
       }}
       contentContainerStyle={{
         paddingHorizontal: 15,
+        paddingVertical: 10,
       }}
       text1Style={{
         fontSize: 16,
@@ -49,13 +53,15 @@ const toastConfig = {
         top: 50,
         left: 20,
         right: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
+        boxShadowColor: '#000',
+        boxShadowOffset: { width: 0, height: 4 },
+        boxShadowOpacity: 0.3,
+        boxShadowRadius: 8,
+        minHeight: 60,
       }}
       contentContainerStyle={{
         paddingHorizontal: 15,
+        paddingVertical: 10,
       }}
       text1Style={{
         fontSize: 16,
@@ -80,7 +86,7 @@ const RootLayout = () => {
             config={toastConfig} 
             position="top"
             topOffset={50}
-            visibilityTime={3000}
+            visibilityTime={4000}
             style={{
               zIndex: 999999,
               elevation: 999999,
@@ -95,6 +101,12 @@ const RootLayout = () => {
 const AuthenticatedLayout = () => {
   const { currentUser, loading } = useAuth();
   const router = useRouter();
+  
+  // useEffect(() => {
+  //   // Initialize hybrid storage when app starts
+  //   initHybridStorage();
+  // }, []);
+  
   useEffect(() => {
     if (!loading && !currentUser) {
       if (router.canGoBack()) {
@@ -120,19 +132,19 @@ const AuthenticatedLayout = () => {
       <Stack.Screen name="Employee" />
       <Stack.Screen name="Cases" />
       <Stack.Screen name="ExpensesManagement" />
-      <Stack.Screen name="VehicleManagement" />
-      <Stack.Screen name="Payroll" />
+      {/* <Stack.Screen name="VehicleManagement" /> */}
+      {/* <Stack.Screen name="Payroll" /> */}
       <Stack.Screen name="Attendance" />
-      <Stack.Screen name="Leave" />
-      <Stack.Screen name="OverTime" />
-      <Stack.Screen name="Holidays" />
-      <Stack.Screen name="Fines" />
-      <Stack.Screen name="Advance" />
-      <Stack.Screen name="Remarks" />
-      <Stack.Screen name="InactiveEmployee" />
-      <Stack.Screen name="EmployeeDocuments" />
-      <Stack.Screen name="notes" />
-      <Stack.Screen name="phone" />
+      {/* <Stack.Screen name="Leave" /> */}
+      {/* <Stack.Screen name="OverTime" /> */}
+      {/* <Stack.Screen name="Holidays" /> */}
+      {/* <Stack.Screen name="Fines" /> */}
+      {/* <Stack.Screen name="Advance" /> */}
+      {/* <Stack.Screen name="Remarks" /> */}
+      {/* <Stack.Screen name="InactiveEmployee" /> */}
+      {/* <Stack.Screen name="EmployeeDocuments" /> */}
+     
+      {/* <Stack.Screen name="phone" /> */}
     </Stack>
   );
 };

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-    Alert,
     Modal,
     StyleSheet,
     Text,
@@ -8,7 +7,6 @@ import {
     View
 } from 'react-native';
 import InputField from './InputField';
-
 const DatePicker = ({ 
   visible, 
   onClose, 
@@ -27,7 +25,7 @@ const DatePicker = ({
         onConfirm(tempDate);
         onClose();
       } else {
-        Alert.alert('Invalid Date', 'Please enter date in YYYY-MM-DD format');
+  
       }
     } else {
       onClose();
@@ -93,10 +91,10 @@ const styles = StyleSheet.create({
     maxWidth: 500,
     minHeight: 250,
     padding: 28,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
+    boxShadowColor: '#000',
+    boxShadowOffset: { width: 0, height: 10 },
+    boxShadowOpacity: 0.3,
+    boxShadowRadius: 20,
     elevation: 10,
   },
   modalTitle: {
@@ -131,10 +129,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#667eea',
     borderRadius: 12,
     alignItems: 'center',
-    shadowColor: '#667eea',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    boxShadowColor: '#667eea',
+    boxShadowOffset: { width: 0, height: 4 },
+    boxShadowOpacity: 0.3,
+    boxShadowRadius: 8,
     elevation: 4,
   },
   confirmButtonText: {

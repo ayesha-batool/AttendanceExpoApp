@@ -12,7 +12,7 @@
     "**/*.ts",
     "**/*.tsx",
     "**/*.jsx",
-    "services/dataHandler.js",
+    "services/unifiedDataHandler.js",
     "context/AppContext.js",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"

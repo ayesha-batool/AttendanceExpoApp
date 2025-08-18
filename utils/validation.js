@@ -135,7 +135,7 @@ export const VALIDATION_SCHEMAS = {
     shift: [
       (value) => VALIDATION_RULES.required(value, 'Shift')
     ],
-    employmentStatus: [
+    status: [
       (value) => VALIDATION_RULES.required(value, 'Employment Status')
     ],
     salary: [
@@ -274,6 +274,36 @@ export const VALIDATION_SCHEMAS = {
     ],
     checkOutTime: [
       (value) => VALIDATION_RULES.required(value, 'Check-out Time')
+    ]
+  },
+
+  // Case validation schema
+  case: {
+    title: [
+      (value) => VALIDATION_RULES.required(value, 'Case Title'),
+      (value) => VALIDATION_RULES.minLength(value, 'Case Title', 3),
+      (value) => VALIDATION_RULES.maxLength(value, 'Case Title', 200)
+    ],
+    status: [
+      (value) => VALIDATION_RULES.required(value, 'Status')
+    ],
+    priority: [
+      (value) => VALIDATION_RULES.required(value, 'Priority')
+    ],
+    category: [
+      (value) => VALIDATION_RULES.required(value, 'Category')
+    ],
+    description: [
+      (value) => VALIDATION_RULES.maxLength(value, 'Description', 1000)
+    ],
+    location: [
+      (value) => VALIDATION_RULES.maxLength(value, 'Location', 200)
+    ],
+    startDate: [
+      (value) => VALIDATION_RULES.date(value, 'Start Date')
+    ],
+    endDate: [
+      (value) => VALIDATION_RULES.date(value, 'End Date')
     ]
   }
 };
@@ -475,3 +505,6 @@ export const validateAsync = async (validationFn, data) => {
     };
   }
 };
+
+
+

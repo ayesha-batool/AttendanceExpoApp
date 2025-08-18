@@ -32,13 +32,13 @@ const styles = StyleSheet.create({
     margin: 12,
     borderRadius: 16,
     backgroundColor: '#f5f5f5',
-    shadowColor: '#000',
-    shadowOffset: {
+    boxShadowColor: '#000',
+    boxShadowOffset: {
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    boxShadowOpacity: 0.25,
+    boxShadowRadius: 3.84,
     elevation: 5,
     flex: 1,
     minHeight: 220,
@@ -50,6 +50,7 @@ const styles = StyleSheet.create({
   },
   iconContainer: {
     marginBottom: 20,
+    marginRight: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -58,13 +59,13 @@ const styles = StyleSheet.create({
     padding: 16,
 
     backgroundColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: {
+    boxShadowColor: '#000',
+    boxShadowOffset: {
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    boxShadowOpacity: 0.25,
+    boxShadowRadius: 3.84,
     elevation: 4,
   },
   icon: {
@@ -98,7 +99,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingVertical: 12,
     paddingHorizontal: 24,
-    marginTop: 8,
   },
   buttonText: {
     color: '#fff',

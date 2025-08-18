@@ -59,8 +59,8 @@ export const colors = {
   textLight: '#ADB5BD',
   textMuted: '#6C757D',
   
-  // Shadow Colors
-  shadow: '#000000',
+  // boxShadow Colors
+  boxShadow: '#000000',
 };
 
 // ============================================================================
@@ -124,43 +124,43 @@ export const borderRadius = {
 };
 
 // ============================================================================
-// SHADOWS
+// boxShadowS
 // ============================================================================
 
-export const shadows = {
+export const boxShadows = {
   sm: {
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+    boxShadowColor: colors.boxShadow,
+    boxShadowOffset: { width: 0, height: 1 },
+    boxShadowOpacity: 0.05,
+    boxShadowRadius: 2,
     elevation: 1,
   },
   base: {
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    boxShadowColor: colors.boxShadow,
+    boxShadowOffset: { width: 0, height: 2 },
+    boxShadowOpacity: 0.1,
+    boxShadowRadius: 4,
     elevation: 2,
   },
   md: {
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    boxShadowColor: colors.boxShadow,
+    boxShadowOffset: { width: 0, height: 4 },
+    boxShadowOpacity: 0.1,
+    boxShadowRadius: 8,
     elevation: 4,
   },
   lg: {
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
+    boxShadowColor: colors.boxShadow,
+    boxShadowOffset: { width: 0, height: 6 },
+    boxShadowOpacity: 0.15,
+    boxShadowRadius: 12,
     elevation: 6,
   },
   xl: {
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
+    boxShadowColor: colors.boxShadow,
+    boxShadowOffset: { width: 0, height: 8 },
+    boxShadowOpacity: 0.2,
+    boxShadowRadius: 16,
     elevation: 8,
   },
 };
@@ -288,7 +288,7 @@ export const commonStyles = StyleSheet.create({
     backgroundColor: colors.white,
     padding: spacing.sm,
     borderRadius: borderRadius.md,
-    ...shadows.sm,
+    ...boxShadows.sm,
     alignItems: 'center',
   },
   summaryIconContainer: {
@@ -324,7 +324,7 @@ export const commonStyles = StyleSheet.create({
     marginHorizontal: spacing.md,
     marginBottom: spacing.md,
     gap: spacing.sm,
-    ...shadows.sm,
+    ...boxShadows.sm,
   },
   searchInput: {
     flex: 1,
@@ -365,7 +365,7 @@ export const commonStyles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
     marginBottom: spacing.md,
-    ...shadows.md,
+    ...boxShadows.md,
     borderWidth: 1,
     borderColor: colors.borderLight,
   },
@@ -376,7 +376,7 @@ export const commonStyles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
     marginBottom: spacing.md,
-    ...shadows.md,
+    ...boxShadows.md,
     borderWidth: 1,
     borderColor: colors.borderLight,
   },
@@ -580,7 +580,7 @@ export const commonStyles = StyleSheet.create({
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    ...shadows.lg,
+    ...boxShadows.lg,
   },
   
   // Input Styles
@@ -658,7 +658,7 @@ export default {
   typography,
   spacing,
   borderRadius,
-  shadows,
+  boxShadows,
   icons,
   commonStyles,
   getIconColor,

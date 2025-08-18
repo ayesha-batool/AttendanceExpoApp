@@ -2,15 +2,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Toast from 'react-native-toast-message';
 import DatePickerField from '../../components/DatePickerField';
 import DeleteConfirmationModal from '../../components/DeleteConfirmationModal';
 import InputField from '../../components/InputField';
+import LoadingOverlay from '../../components/LoadingOverlay';
 import LoadingState from '../../components/LoadingState';
 import SearchBar from '../../components/SearchBar';
 import SelectDropdown from '../../components/SelectDropdown';
 import { useCasesContext } from '../../context/CasesContext';
-import { getItems, handleDataDelete, handleDataSubmit, handleDataUpdate } from '../../services/dataHandler';
+import { customOptionsService, dataService } from '../../services/unifiedDataService';
+import { validateForm, VALIDATION_SCHEMAS } from '../../utils/validation';
 
 const CasesScreen = () => {
   const { setHeaderActionButton, clearHeaderAction } = useCasesContext();
@@ -21,33 +24,97 @@ const CasesScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [modals, setModals] = useState({ case: false, delete: false, details: false });
   const [selected, setSelected] = useState({ case: null, deleteCase: null, isEdit: false, editCase: null });
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [formData, setFormData] = useState({
     title: '', description: '', status: 'active', priority: 'medium', 
     assignedOfficer: '', location: '', category: '', evidence: '', notes: '', startDate: '', endDate: ''
   });
+  const [errors, setErrors] = useState({});
 
-
-  const statusOptions = [
-    { label: 'Active', value: 'active' }, { label: 'Under Investigation', value: 'investigation' },
-    { label: 'Pending Review', value: 'pending' }, { label: 'Closed', value: 'closed' },
-    { label: 'Archived', value: 'archived' }
-  ];
-  const priorityOptions = [
-    { label: 'Low', value: 'low' }, { label: 'Medium', value: 'medium' },
-    { label: 'High', value: 'high' }, { label: 'Critical', value: 'critical' }
-  ];
-  const categoryOptions = ['Theft', 'Assault', 'Fraud', 'Drug Related', 'Traffic Violation', 'Domestic Violence', 'Property Crime', 'White Collar Crime', 'Organized Crime', 'Cyber Crime', 'Other'];
+  const [statusOptions, setStatusOptions] = useState([]);
+  const [priorityOptions, setPriorityOptions] = useState([]);
+  const [categoryOptions, setCategoryOptions] = useState([]);
+  const [customToast, setCustomToast] = useState(null);
 
   const updateModal = (key, value) => {
-    console.log('🔍 updateModal called:', { key, value });
     setModals(prev => {
       const newState = { ...prev, [key]: value };
-      console.log('🔍 New modal state:', newState);
       return newState;
     });
   };
   const updateSelected = (key, value) => setSelected(prev => ({ ...prev, [key]: value }));
   const updateFormData = (key, value) => setFormData(prev => ({ ...prev, [key]: value }));
+
+  // Load dropdown options from custom options service
+  const loadDropdownOptions = async () => {
+    try {
+      const [statusData, priorityData, categoryData] = await Promise.all([
+        customOptionsService.getOptions('case_status'),
+        customOptionsService.getOptions('case_priority'),
+        customOptionsService.getOptions('case_categories')
+      ]);
+
+      setStatusOptions(statusData.map(status => ({ label: status, value: status.toLowerCase().replace(/\s+/g, '_') })));
+      setPriorityOptions(priorityData.map(priority => ({ label: priority, value: priority.toLowerCase() })));
+      setCategoryOptions(categoryData);
+    } catch (error) {
+      console.error('Error loading dropdown options:', error);
+    }
+  };
+
+  const handleOptionAdded = (newOption, fieldName) => {
+    setCustomToast({
+      type: 'success',
+      title: 'Success',
+      message: `New ${fieldName.replace('_', ' ')} added successfully`
+    });
+    setTimeout(() => setCustomToast(null), 3000);
+    loadDropdownOptions(); // Refresh options
+  };
+
+  const handleOptionRemoved = (removedOption, fieldName) => {
+    setCustomToast({
+      type: 'success',
+      title: 'Success',
+      message: `${fieldName.replace('_', ' ')} removed successfully`
+    });
+    setTimeout(() => setCustomToast(null), 3000);
+    loadDropdownOptions(); // Refresh options
+  };
+
+  const validateFormData = () => {
+    try {
+      const formToValidate = {
+        title: formData.title || "",
+        status: formData.status || "",
+        priority: formData.priority || "",
+        category: formData.category || "",
+        description: formData.description || "",
+        location: formData.location || "",
+        startDate: formData.startDate || new Date().toISOString().split('T')[0]
+      };
+
+      const validation = validateForm(formToValidate, VALIDATION_SCHEMAS.case);
+
+      // Custom validations
+      if (formData.startDate && formData.endDate) {
+        const startDate = new Date(formData.startDate);
+        const endDate = new Date(formData.endDate);
+        if (endDate < startDate) {
+          validation.errors.endDate = "End date cannot be before start date";
+          validation.isValid = false;
+        }
+      }
+
+      setErrors(validation.errors);
+      return validation.isValid;
+    } catch (error) {
+      setErrors({ general: "Validation failed due to an unexpected error" });
+      return false;
+    }
+  };
 
   const handleDeleteCancel = () => { updateModal('delete', false); updateSelected('deleteCase', null); };
 
@@ -63,14 +130,27 @@ const CasesScreen = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [casesData, employeesData] = await Promise.all([getItems('cases'), getItems('employees')]);
+      
+      const [casesData, employeesData] = await Promise.all([
+        dataService.getItems('cases'),
+        dataService.getItems('employees')
+      ]);
+      
+    
       const validCases = casesData.filter(item => item && typeof item === 'object');
       const validEmployees = employeesData.filter(item => item && typeof item === 'object');
+      
       setCases(validCases);
       setFilteredCases(validCases);
       setEmployees(validEmployees);
+      
     } catch (error) {
-      console.error('Failed to load cases data:', error);
+      console.error('❌ Failed to load cases data:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to load data. Please try again.',
+      });
     } finally {
       setLoading(false);
     }
@@ -89,18 +169,15 @@ const CasesScreen = () => {
   };
 
   const handleAdd = () => {
-    console.log('🔍 handleAdd called - opening case modal');
     updateSelected('isEdit', false);
     updateSelected('editCase', null);
     const today = new Date().toISOString().split('T')[0];
-    console.log('🔍 Setting start date to:', today);
     setFormData({
-      title: '', description: '', status: '', priority: '', assignedOfficer: '',
+      title: '', description: '', status: 'active', priority: 'medium', assignedOfficer: '',
       startDate: today, endDate: '',
       location: '', category: '', evidence: '', notes: ''
     });
     updateModal('case', true);
-    console.log('🔍 Modal state after update:', { case: true });
   };
 
   const handleEdit = (caseItem) => {
@@ -121,55 +198,120 @@ const CasesScreen = () => {
   };
 
   const saveCase = async () => {
-    if (!formData.title.trim()) { Alert.alert('Error', 'Please enter a case title'); return; }
-    if (!formData.status) { Alert.alert('Error', 'Please select a case status'); return; }
-    if (!formData.priority) { Alert.alert('Error', 'Please select a priority level'); return; }
-    if (!formData.category) { Alert.alert('Error', 'Please select a case category'); return; }
-    if (!formData.startDate) { Alert.alert('Error', 'Please select a start date'); return; }
-    if (formData.endDate && new Date(formData.endDate) < new Date(formData.startDate)) {
-      Alert.alert('Error', 'End date cannot be before start date'); return;
+    if (isSaving) {
+      Toast.show({ type: 'error', text1: 'Error', text2: 'Please wait, saving in progress...' });
+      return;
+    }
+
+    // Validate form data
+    const isValid = validateFormData();
+    if (!isValid) {
+      // Get the first error from the current errors state
+      const errorMessages = Object.values(errors).filter(error => error && error.trim() !== '');
+      const firstError = errorMessages.length > 0 ? errorMessages[0] : 'Please check the form and try again';
+      
+      setCustomToast({
+        type: 'error',
+        title: 'Validation Error',
+        message: firstError
+      });
+      setTimeout(() => setCustomToast(null), 4000);
+      return;
     }
 
     try {
-      const caseData = { ...formData, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+      setIsSaving(true);
+      
+      const caseData = { 
+        ...formData, 
+      
+      };
+      
       if (selected.isEdit && selected.editCase) {
-        const key = `cases_${selected.editCase.id || selected.editCase.$id}`;
-        await handleDataUpdate(key, selected.editCase.id || selected.editCase.$id, caseData, 'cases');
-        setCases(prev => prev.map(c => (c.id || c.$id) === (selected.editCase.id || selected.editCase.$id) ? { ...caseData, id: selected.editCase.id || selected.editCase.$id } : c));
-        setFilteredCases(prev => prev.map(c => (c.id || c.$id) === (selected.editCase.id || selected.editCase.$id) ? { ...caseData, id: selected.editCase.id || selected.editCase.$id } : c));
-        // Case updated successfully
+        const caseId = selected.editCase.id || selected.editCase.$id;
+        const key = `cases_${caseId}`;
+        
+        await dataService.updateData(key, caseId, caseData, 'cases');
+        
+        const updatedCase = { ...caseData, id: caseId, $id: caseId };
+        setCases(prev => prev.map(c => (c.id || c.$id) === caseId ? updatedCase : c));
+        setFilteredCases(prev => prev.map(c => (c.id || c.$id) === caseId ? updatedCase : c));
+        setCustomToast({
+          type: 'success',
+          title: 'Success',
+          message: 'Case updated successfully'
+        });
+        setTimeout(() => setCustomToast(null), 3000);
       } else {
-        const newCase = await handleDataSubmit(caseData, 'cases');
-        setCases(prev => [...prev, newCase]);
-        setFilteredCases(prev => [...prev, newCase]);
-        // Case added successfully
+        const newCase = await dataService.saveData(caseData, 'cases');
+        
+        const caseWithId = { ...newCase, id: newCase.$id || newCase.id, $id: newCase.$id || newCase.id };
+        setCases(prev => [...prev, caseWithId]);
+        setFilteredCases(prev => [...prev, caseWithId]);
+        setCustomToast({
+          type: 'success',
+          title: 'Success',
+          message: 'Case added successfully'
+        });
+        setTimeout(() => setCustomToast(null), 3000);
       }
+      
+      // Close modal and reset state
       updateModal('case', false);
       updateSelected('isEdit', false);
       updateSelected('editCase', null);
       setFormData({ title: '', description: '', status: 'active', priority: 'medium', assignedOfficer: '', location: '', category: '', evidence: '', notes: '', startDate: '', endDate: '' });
+      
     } catch (error) {
       console.error('Failed to save case:', error);
+      Toast.show({ type: 'error', text1: 'Error', text2: error.message || 'Failed to save case' });
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const confirmDelete = async () => {
     if (!selected.deleteCase) return;
+    
     try {
-      const key = `cases_${selected.deleteCase.id || selected.deleteCase.$id}`;
-      await handleDataDelete(key, selected.deleteCase.id || selected.deleteCase.$id, 'cases');
-      setCases(prev => prev.filter(c => (c.id || c.$id) !== (selected.deleteCase.id || selected.deleteCase.$id)));
-      setFilteredCases(prev => prev.filter(c => (c.id || c.$id) !== (selected.deleteCase.id || selected.deleteCase.$id)));
-      // Case deleted successfully
+      setIsDeleting(true);
+      
+      const caseId = selected.deleteCase.id || selected.deleteCase.$id;
+      const key = `cases_${caseId}`;
+      
+              await dataService.deleteData(key, caseId, 'cases');
+      
+      setCases(prev => prev.filter(c => (c.id || c.$id) !== caseId));
+      setFilteredCases(prev => prev.filter(c => (c.id || c.$id) !== caseId));
+      Toast.show({ type: 'success', text1: 'Success', text2: 'Case deleted successfully' });
     } catch (error) {
       console.error('Failed to delete case:', error);
+      Toast.show({ type: 'error', text1: 'Error', text2: error.message || 'Failed to delete case' });
     } finally {
       updateModal('delete', false);
       updateSelected('deleteCase', null);
+      setIsDeleting(false);
     }
   };
 
-
+  const handleSync = async () => {
+    try {
+      setIsSyncing(true);
+      const result = await dataService.manualSync();
+      if (result.success) {
+        Toast.show({ type: 'success', text1: 'Success', text2: 'Sync completed successfully' });
+        // Refresh data after sync
+        await fetchData();
+      } else {
+        Toast.show({ type: 'error', text1: 'Error', text2: result.message });
+      }
+    } catch (error) {
+      console.error('❌ Sync failed:', error);
+      Toast.show({ type: 'error', text1: 'Error', text2: 'Sync failed: ' + error.message });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const stats = {
     total: cases.length,
@@ -179,9 +321,10 @@ const CasesScreen = () => {
   };
 
   useEffect(() => { fetchData(); }, []);
-  useFocusEffect(useCallback(() => { fetchData(); }, []));
-  // Remove header action button since we're using floating action button
-  // useEffect(() => { setHeaderActionButton({ icon: 'add', onPress: handleAdd }); return () => clearHeaderAction(); }, []);
+  useFocusEffect(useCallback(() => { 
+    fetchData(); 
+    loadDropdownOptions();
+  }, []));
   useEffect(() => { applySearch(); }, [searchQuery, cases]);
 
   if (loading) return <LoadingState />;
@@ -203,6 +346,7 @@ const CasesScreen = () => {
 
       <View style={styles.searchContainer}>
         <SearchBar value={searchQuery} onChangeText={setSearchQuery} placeholder="Search cases..." onClear={() => setSearchQuery('')} />
+       
       </View>
 
       {filteredCases.length === 0 ? (
@@ -265,9 +409,26 @@ const CasesScreen = () => {
       )}
 
       <Modal visible={modals.case} animationType="fade" transparent={false} onRequestClose={() => updateModal('case', false)}>
-        {console.log('🔍 Rendering case modal, visible:', modals.case)}
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
+            {/* Custom Toast Container */}
+            {customToast && (
+              <View style={[
+                styles.customToastContainer,
+                customToast.type === 'error' ? styles.errorToast : styles.successToast
+              ]}>
+                <Ionicons 
+                  name={customToast.type === 'error' ? 'alert-circle' : 'checkmark-circle'} 
+                  size={20} 
+                  color="#fff" 
+                />
+                <View style={styles.toastContent}>
+                  <Text style={styles.toastTitle}>{customToast.title}</Text>
+                  <Text style={styles.toastMessage}>{customToast.message}</Text>
+                </View>
+              </View>
+            )}
+            
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{selected.isEdit ? 'Edit Case' : 'Add New Case'}</Text>
               <TouchableOpacity style={styles.closeButton} onPress={() => updateModal('case', false)}>
@@ -275,11 +436,57 @@ const CasesScreen = () => {
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.modalBody}>
-              <InputField label="Case Title" value={formData.title} onChangeText={(text) => updateFormData('title', text)} placeholder="Enter case title" />
+                              <InputField 
+                  label="Case Title *" 
+                  value={formData.title} 
+                  onChangeText={(text) => updateFormData('title', text)} 
+                  placeholder="Enter case title" 
+                  error={errors.title}
+                  required
+                />
               <InputField label="Description" value={formData.description} onChangeText={(text) => updateFormData('description', text)} placeholder="Enter case description" multiline numberOfLines={3} />
-              <SelectDropdown label="Status" selectedValue={formData.status} onValueChange={(value) => updateFormData('status', value)} options={statusOptions} />
-              <SelectDropdown label="Priority" selectedValue={formData.priority} onValueChange={(value) => updateFormData('priority', value)} options={priorityOptions} />
-              <SelectDropdown label="Category" selectedValue={formData.category} onValueChange={(value) => updateFormData('category', value)} options={categoryOptions.map(cat => ({ label: cat, value: cat }))} />
+                              <SelectDropdown 
+                  label="Status *" 
+                  selectedValue={formData.status} 
+                  onValueChange={(value) => updateFormData('status', value)} 
+                  options={statusOptions}
+                  error={errors.status}
+                  required
+                  fieldName="case_status"
+                  fieldLabel="Status"
+                  onOptionAdded={handleOptionAdded}
+                  onOptionRemoved={handleOptionRemoved}
+                  showAddNewOption={true}
+                  showRemoveOption={true}
+                />
+                              <SelectDropdown 
+                  label="Priority *" 
+                  selectedValue={formData.priority} 
+                  onValueChange={(value) => updateFormData('priority', value)} 
+                  options={priorityOptions}
+                  error={errors.priority}
+                  required
+                  fieldName="case_priority"
+                  fieldLabel="Priority"
+                  onOptionAdded={handleOptionAdded}
+                  onOptionRemoved={handleOptionRemoved}
+                  showAddNewOption={true}
+                  showRemoveOption={true}
+                />
+                <SelectDropdown 
+                  label="Category *" 
+                  selectedValue={formData.category} 
+                  onValueChange={(value) => updateFormData('category', value)} 
+                  options={categoryOptions.map(cat => ({ label: cat, value: cat }))}
+                  error={errors.category}
+                  required
+                  fieldName="case_categories"
+                  fieldLabel="Category"
+                  onOptionAdded={handleOptionAdded}
+                  onOptionRemoved={handleOptionRemoved}
+                  showAddNewOption={true}
+                  showRemoveOption={true}
+                />
               <SelectDropdown label="Assigned Officer" selectedValue={formData.assignedOfficer} onValueChange={(value) => updateFormData('assignedOfficer', value)} options={[{ label: 'Unassigned', value: '' }, ...employeeOptions]} />
               <InputField label="Location" value={formData.location} onChangeText={(text) => updateFormData('location', text)} placeholder="Enter case location" />
               
@@ -287,15 +494,17 @@ const CasesScreen = () => {
                 label="Start Date *"
                 value={formData.startDate ? new Date(formData.startDate) : new Date()}
                 onChange={(date) => {
-                  console.log('🔍 Start date changed to:', date);
                   updateFormData('startDate', date.toISOString().split('T')[0]);
                 }}
+                error={errors.startDate}
+                required
               />
               
               <DatePickerField
                 label="End Date (Optional)"
                 value={formData.endDate ? new Date(formData.endDate) : new Date()}
                 onChange={(date) => updateFormData('endDate', date.toISOString().split('T')[0])}
+                error={errors.endDate}
                 optional={true}
               />
               
@@ -306,9 +515,15 @@ const CasesScreen = () => {
               <TouchableOpacity style={styles.cancelButton} onPress={() => updateModal('case', false)}>
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.saveButton} onPress={saveCase}>
-                <LinearGradient colors={['#dc2626', '#b91c1c']} style={styles.saveGradient}>
-                  <Text style={styles.saveButtonText}>{selected.isEdit ? 'Update' : 'Save'}</Text>
+              <TouchableOpacity 
+                style={[styles.saveButton, isSaving && styles.saveButtonDisabled]} 
+                onPress={saveCase}
+                disabled={isSaving}
+              >
+                <LinearGradient colors={isSaving ? ['#9ca3af', '#6b7280'] : ['#dc2626', '#b91c1c']} style={styles.saveGradient}>
+                  <Text style={[styles.saveButtonText, isSaving && styles.saveButtonTextDisabled]}>
+                    {isSaving ? 'Saving...' : (selected.isEdit ? 'Update' : 'Save')}
+                  </Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -375,8 +590,24 @@ const CasesScreen = () => {
         visible={modals.delete}
         onConfirm={confirmDelete}
         onClose={handleDeleteCancel}
-        title="Delete Case"
-        message="Are you sure you want to delete this case? This action cannot be undone."
+        itemName={selected.deleteCase?.title || 'this case'}
+      />
+
+      {/* Loading Overlay */}
+      <LoadingOverlay 
+        visible={isSaving || isDeleting || isSyncing} 
+        message={
+          isSaving ? 'Saving case...' : 
+          isDeleting ? 'Deleting case...' : 
+          isSyncing ? 'Syncing data...' : 
+          'Processing...'
+        }
+        type={
+          isSaving ? 'save' : 
+          isDeleting ? 'delete' : 
+          isSyncing ? 'sync' : 
+          'default'
+        }
       />
 
       {/* Floating Action Button */}
@@ -403,19 +634,62 @@ const StatCard = ({ icon, color, value, label }) => (
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
+  // Custom toast styles
+  customToastContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    marginBottom: 12,
+    borderRadius: 12,
+    marginHorizontal: 20,
+    marginTop: 20,
+    boxShadowColor: '#000',
+    boxShadowOffset: { width: 0, height: 4 },
+    boxShadowOpacity: 0.15,
+    boxShadowRadius: 8,
+    elevation: 4,
+  },
+  errorToast: {
+    backgroundColor: '#ef4444',
+    borderLeftWidth: 4,
+    borderLeftColor: '#dc2626',
+  },
+  successToast: {
+    backgroundColor: '#22c55e',
+    borderLeftWidth: 4,
+    borderLeftColor: '#16a34a',
+  },
+  toastContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  toastTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  toastMessage: {
+    color: '#fff',
+    fontSize: 14,
+    opacity: 0.95,
+    lineHeight: 20,
+  },
   stats: { padding: 12, gap: 8 },
   statRow: { flexDirection: 'row', gap: 8 },
-  statCard: { flex: 1, backgroundColor: '#fff', borderRadius: 8, padding: 12, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
+  statCard: { flex: 1, backgroundColor: '#fff', borderRadius: 8, padding: 12, flexDirection: 'row', alignItems: 'center', boxShadowColor: '#000', boxShadowOffset: { width: 0, height: 1 }, boxShadowOpacity: 0.06, boxShadowRadius: 4, elevation: 2 },
   statIconContainer: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginRight: 8 },
   statContent: { flex: 1 },
   statValue: { fontSize: 14, fontWeight: 'bold', color: '#1e293b', marginBottom: 1 },
   statLabel: { fontSize: 9, color: '#64748b', fontWeight: '500' },
-  searchContainer: { paddingHorizontal: 20, padding: 0 },
+  searchContainer: { paddingHorizontal: 20, padding: 0, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  syncButton: { padding: 8, borderRadius: 8, backgroundColor: '#f1f5f9' },
+  syncButtonDisabled: { opacity: 0.5 },
   casesList: { padding: 20 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
   emptyTitle: { fontSize: 20, fontWeight: '600', color: '#374151', marginTop: 16, marginBottom: 8 },
   emptyMessage: { fontSize: 14, color: '#6b7280', textAlign: 'center' },
-  caseCard: { marginBottom: 16, borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 4 },
+  caseCard: { marginBottom: 16, borderRadius: 16, boxShadowColor: '#000', boxShadowOffset: { width: 0, height: 4 }, boxShadowOpacity: 0.1, boxShadowRadius: 12, elevation: 4 },
   cardGradient: { borderRadius: 16, padding: 20 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
   cardTitleContainer: { flex: 1, marginRight: 12 },
@@ -444,6 +718,8 @@ const styles = StyleSheet.create({
   saveButton: { flex: 1, borderRadius: 12 },
   saveGradient: { paddingVertical: 14, paddingHorizontal: 20, borderRadius: 12, alignItems: 'center' },
   saveButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  saveButtonDisabled: { opacity: 0.6 },
+  saveButtonTextDisabled: { color: '#d1d5db' },
   editButton: { flex: 1, borderRadius: 12 },
   editGradient: { paddingVertical: 14, paddingHorizontal: 20, borderRadius: 12, alignItems: 'center' },
   editButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
@@ -468,10 +744,10 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    boxShadowColor: '#000',
+    boxShadowOffset: { width: 0, height: 4 },
+    boxShadowOpacity: 0.3,
+    boxShadowRadius: 8,
     elevation: 8,
   }
 });

@@ -5,8 +5,8 @@
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint"
   },
@@ -44,7 +44,6 @@
     "react-dom": "19.0.0",
     "react-native": "0.79.5",
     "react-native-country-picker-modal": "^2.0.0",
-    "react-native-document-picker": "^9.3.1",
     "react-native-gesture-handler": "~2.24.0",
     "react-native-phone-number-input": "^2.1.0",
     "react-native-reanimated": "~3.17.4",

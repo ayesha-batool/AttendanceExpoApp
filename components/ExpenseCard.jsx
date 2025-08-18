@@ -1,10 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import {
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 const ExpenseCard = ({ expense, onPress, onEdit, onDelete }) => {
@@ -52,6 +52,19 @@ const ExpenseCard = ({ expense, onPress, onEdit, onDelete }) => {
         </View>
         <View style={styles.amountContainer}>
           <Text style={styles.amount}>${parseFloat(expense.amount || 0).toLocaleString()}</Text>
+          {expense.status && (
+            <View style={[
+              styles.statusBadge, 
+              { backgroundColor: expense.status === 'paid' ? '#dcfce7' : '#fef3c7' }
+            ]}>
+              <Text style={[
+                styles.statusText,
+                { color: expense.status === 'paid' ? '#166534' : '#92400e' }
+              ]}>
+                {expense.status === 'paid' ? 'Paid' : 'Unpaid'}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -77,6 +90,22 @@ const ExpenseCard = ({ expense, onPress, onEdit, onDelete }) => {
             <Ionicons name="receipt" size={14} color="#6b7280" />
             <Text style={styles.infoText}>
               Receipt attached
+            </Text>
+          </View>
+        )}
+
+        {expense.status && (
+          <View style={styles.infoRow}>
+            <Ionicons 
+              name={expense.status === 'paid' ? 'checkmark-circle' : 'time'} 
+              size={14} 
+              color={expense.status === 'paid' ? '#10b981' : '#f59e0b'} 
+            />
+            <Text style={[
+              styles.infoText, 
+              { color: expense.status === 'paid' ? '#10b981' : '#f59e0b' }
+            ]}>
+              {expense.status === 'paid' ? 'Paid' : 'Unpaid'}
             </Text>
           </View>
         )}
@@ -115,10 +144,10 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    boxShadowColor: '#000',
+    boxShadowOffset: { width: 0, height: 2 },
+    boxShadowOpacity: 0.1,
+    boxShadowRadius: 8,
     elevation: 3,
   },
   cardHeader: {
@@ -161,6 +190,17 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#059669',
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  statusText: {
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
   },
   cardBody: {
     marginBottom: 12,

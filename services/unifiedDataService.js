@@ -88,7 +88,7 @@ const cleanDataForAppwrite = async (data, collectionId) => {
          expenses: [
        'title', 'amount', 'category', 'department', 'date', 
        'description', 'notes', 'updatedAt', 'deviceId', 'status'
-     ],
+    ],
                    employees: [
         'badgeNumber', 'fullName', 'fatherName', 'cnic', 'dateOfBirth',
         'gender', 'contactNumber', 'email', 'address', 'joiningDate',

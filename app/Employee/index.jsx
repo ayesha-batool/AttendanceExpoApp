@@ -164,9 +164,7 @@ customOptionsService.getOptions('employment_status')
         );
         return updated;
       });
-      
-      showToast('success', 'Success', `Employee status changed to ${newStatus}`);
-      
+          
     } catch (error) {
       showToast('error', 'Error', 'Failed to update employee status: ' + error.message);
     }

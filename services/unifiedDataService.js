@@ -12,8 +12,6 @@ const config = {
   casesCollectionId: process.env.EXPO_PUBLIC_APPWRITE_CASES_COLLECTION_ID || 'cases',
   expensesCollectionId: process.env.EXPO_PUBLIC_APPWRITE_EXPENSES_COLLECTION_ID || 'expenses',
   attendanceCollectionId: process.env.EXPO_PUBLIC_APPWRITE_ATTENDANCE_COLLECTION_ID || 'attendance',
-  holidaysCollectionId: process.env.EXPO_PUBLIC_APPWRITE_HOLIDAYS_COLLECTION_ID || 'holidays',
-  leavesCollectionId: process.env.EXPO_PUBLIC_APPWRITE_LEAVES_COLLECTION_ID || 'leaves',
   customOptionsCollectionId: 'customOptions'
 };
 
@@ -24,16 +22,57 @@ const databases = new Databases(client);
 const appwriteStorage = new Storage(client);
 
 try {
+  const endpoint = process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1';
+  const projectId = process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID;
+  
+  if (!projectId) {
+    console.error('🚨 EXPO_PUBLIC_APPWRITE_PROJECT_ID is not set! Please add it to your .env file');
+    throw new Error('Appwrite Project ID not configured');
+  }
+  
   client
-    .setEndpoint(process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1')
-    .setProject(process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID);
+    .setEndpoint(endpoint)
+    .setProject(projectId);
+    
   console.log('✅ Appwrite initialized successfully');
+  console.log('📍 Endpoint:', endpoint);
+  console.log('🆔 Project ID:', projectId);
 } catch (error) {
   console.error('❌ Failed to initialize Appwrite:', error);
+  console.error('💡 Please check your .env file and ensure EXPO_PUBLIC_APPWRITE_PROJECT_ID is set correctly');
 }
 
 // Utility functions
-const generateId = () => `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+const generateId = () => {
+  // Generate a valid Appwrite document ID (max 36 chars, alphanumeric + period, hyphen, underscore)
+  // Use a shorter timestamp + random string to ensure we stay under 36 chars
+  const timestamp = Date.now().toString().slice(-8); // Last 8 digits of timestamp
+  const randomStr = Math.random().toString(36).substring(2, 26); // 24 chars
+  return `${timestamp}_${randomStr}`; // 8 + 1 + 24 = 33 chars total
+};
+
+const validateAppwriteId = (id) => {
+  // Appwrite document ID requirements:
+  // - Max 36 characters
+  // - Valid chars: a-z, A-Z, 0-9, period, hyphen, underscore
+  // - Can't start with a special char
+  if (!id || typeof id !== 'string') return false;
+  if (id.length > 36) return false;
+  if (!/^[a-zA-Z0-9]/.test(id)) return false; // Must start with alphanumeric
+  if (!/^[a-zA-Z0-9._-]+$/.test(id)) return false; // Only valid characters
+  return true;
+};
+
+const generateValidAppwriteId = (originalId = null) => {
+  // If original ID is valid for Appwrite, use it; otherwise generate a new one
+  if (originalId && validateAppwriteId(originalId)) {
+    return originalId;
+  }
+  if (originalId) {
+    console.warn(`⚠️ Invalid Appwrite document ID detected: "${originalId}" (length: ${originalId.length}). Generating new valid ID.`);
+  }
+  return generateId();
+};
 const isOnline = async () => {
   try {
     const state = await Network.getNetworkStateAsync();
@@ -108,7 +147,7 @@ const cleanDataForAppwrite = async (data, collectionId) => {
     ],
                                        attendance: [
         'employeeId', 'employeeName', 'date', 'status',
-        'checkInTimes', 'checkOutTimes', 'totalWorkingHours', 'timestamp', 'deviceId'
+         'totalWorkingHours', 'timestamp', 'deviceId'
       ],
     
      
@@ -123,10 +162,21 @@ const cleanDataForAppwrite = async (data, collectionId) => {
   
   // Always ensure deviceId is present
   cleanData.deviceId = baseData.deviceId || await getDeviceId();
-  console.log("cleanData id",cleanData.deviceId)
   for (const field of allowedFieldsForCollection) {
     if (baseData.hasOwnProperty(field)) {
-      // Skip empty arrays and null/undefined values
+      // Don't skip empty arrays for attendance data (checkInTimes, checkOutTimes)
+      if (collectionId === 'attendance' && (field === 'checkInTimes' || field === 'checkOutTimes')) {
+        cleanData[field] = Array.isArray(baseData[field]) ? baseData[field] : [];
+        continue;
+      }
+        
+        // Handle timestamp field - convert null to current timestamp
+      if (field === 'timestamp' && (baseData[field] === null || baseData[field] === undefined)) {
+        cleanData[field] = new Date().toISOString();
+        continue;
+      }
+      
+      // Skip empty arrays and null/undefined values for other fields
       if (baseData[field] === null || baseData[field] === undefined || 
           (Array.isArray(baseData[field]) && baseData[field].length === 0)) {
         continue; // Skip this field entirely
@@ -167,6 +217,31 @@ const cleanDataForAppwrite = async (data, collectionId) => {
     }
   }
 
+  // Ensure we have at least some data
+  if (Object.keys(cleanData).length === 0) {
+    console.warn('⚠️ No data to send to Appwrite, using minimal data');
+    cleanData.deviceId = baseData.deviceId || await getDeviceId();
+  }
+  
+  // For attendance, ensure we have required fields
+  if (collectionId === 'attendance') {
+    if (!cleanData.employeeId && baseData.employeeId) {
+      cleanData.employeeId = baseData.employeeId;
+    }
+    if (!cleanData.employeeName && baseData.employeeName) {
+      cleanData.employeeName = baseData.employeeName;
+    }
+    if (!cleanData.date && baseData.date) {
+      cleanData.date = baseData.date;
+    }
+    if (!cleanData.status && baseData.status) {
+      cleanData.status = baseData.status;
+    }
+    if (!cleanData.timestamp) {
+      cleanData.timestamp = new Date().toISOString();
+    }
+  }
+  
   console.log('🧹 Cleaned data for Appwrite:', { 
     collection: collectionId,
     original: baseData, 
@@ -207,14 +282,12 @@ const storage = {
       const attendanceData = await getItems('attendance');
       console.log('📅 Attendance records:', attendanceData);
       
-      console.log('🎉 === HOLIDAYS DATA ===');
-      const holidaysData = await getItems('holidays');
-      console.log('🎉 Holidays records:', holidaysData);
+      
       
       // Also check for any custom options related to attendance
       const customKeys = allKeys.filter(key => key.startsWith('custom_'));
       const attendanceRelatedCustomKeys = customKeys.filter(key => 
-        key.includes('attendance') || key.includes('holiday') || key.includes('leave')
+        key.includes('attendance') 
       );
       
       if (attendanceRelatedCustomKeys.length > 0) {
@@ -226,7 +299,7 @@ const storage = {
       
       return {
         attendanceData,
-        holidaysData,
+      
         attendanceRelatedCustomKeys,
         totalKeys: allKeys.length
       };
@@ -536,10 +609,138 @@ const customOptionsService = {
 export const dataService = {
   async getItems(collectionId) {
     try {
+      // Check if online and try to sync from Appwrite first
+      if (await isOnline() && client && databases) {
+        try {
+          // Check if user is authenticated before making Appwrite calls
+          let user = null;
+          try {
+            user = await account.get();
+          } catch (authError) {
+            if (authError.message.includes('missing scope (account)') || authError.message.includes('User (role: guests)')) {
+              console.log(`👤 User not authenticated, using local data only for ${collectionId}`);
+              // Fall back to local storage only
+              const keys = await storage.getAllKeys();
+              const collectionKeys = keys.filter(key => key.startsWith(`${collectionId}_`));
+              
+              if (collectionKeys.length === 0) {
+                console.log(`📭 No local data found for ${collectionId}`);
+                return [];
+              }
+              
+              const items = await Promise.all(
+                collectionKeys.map(async key => {
+                  const data = await storage.get(key);
+                  if (!data) return null;
+                  return { ...data, id: data.id || key.split('_')[1], $id: data.$id || key.split('_')[1] };
+                })
+              );
+              
+              const validItems = items.filter(item => item !== null);
+              console.log(`📊 Returning ${validItems.length} local items for ${collectionId}`);
+              return validItems;
+            }
+            throw authError;
+          }
+          
+          if (!user) {
+            console.log(`👤 No authenticated user, using local data only for ${collectionId}`);
+            // Fall back to local storage only
+            const keys = await storage.getAllKeys();
+            const collectionKeys = keys.filter(key => key.startsWith(`${collectionId}_`));
+            
+            if (collectionKeys.length === 0) {
+              console.log(`📭 No local data found for ${collectionId}`);
+              return [];
+            }
+            
+            const items = await Promise.all(
+              collectionKeys.map(async key => {
+                const data = await storage.get(key);
+                if (!data) return null;
+                return { ...data, id: data.id || key.split('_')[1], $id: data.$id || key.split('_')[1] };
+              })
+            );
+            
+            const validItems = items.filter(item => item !== null);
+            console.log(`📊 Returning ${validItems.length} local items for ${collectionId}`);
+            return validItems;
+          }
+          
+          console.log(`🌐 Fetching ${collectionId} from Appwrite...`);
+          
+          const collectionMap = {
+            employees: config.employeesCollectionId,
+            cases: config.casesCollectionId,
+            expenses: config.expensesCollectionId,
+            attendance: config.attendanceCollectionId,
+            customOptions: config.customOptionsCollectionId
+          };
+          
+          const appwriteCollectionId = collectionMap[collectionId];
+          if (!appwriteCollectionId) {
+            console.warn(`⚠️ No Appwrite collection mapping for ${collectionId}`);
+            throw new Error('No collection mapping');
+          }
+          console.log("appwriteCollec tionId",appwriteCollectionId)
+          // Fetch from Appwrite
+          const appwriteDocuments = await databases.listDocuments(
+            config.databaseId,
+            appwriteCollectionId,
+            [Query.limit(100)] // Limit to 100 documents
+          );
+          
+          console.log(`📥 Received ${appwriteDocuments.documents.length} documents from Appwrite for ${collectionId}`);
+          
+          // Get all local keys for this collection
+          const localKeys = await storage.getAllKeys();
+          const collectionLocalKeys = localKeys.filter(key => key.startsWith(`${collectionId}_`));
+          console.log("collectionLocalKeys",collectionLocalKeys)
+          // Create a set of Appwrite document IDs for fast lookup
+          const appwriteDocIds = new Set(appwriteDocuments.documents.map(doc => doc.$id));
+          
+          // Remove local items that no longer exist in Appwrite (deletions)
+          for (const localKey of collectionLocalKeys) {
+            const localDocId = localKey.split('_')[1];
+            if (!appwriteDocIds.has(localDocId)) {
+              await storage.delete(localKey);
+              console.log(`🗑️ Removed deleted document ${localDocId} from local storage`);
+            }
+          }
+          
+          // Store each document in local storage (if not duplicate or if newer)
+          for (const doc of appwriteDocuments.documents) {
+            const localKey = `${collectionId}_${doc.$id}`;
+            const existingData = await storage.get(localKey);
+            
+            // Only save if it doesn't exist locally or if Appwrite version is newer
+            if (!existingData || (doc.$updatedAt && existingData.$updatedAt && doc.$updatedAt > existingData.$updatedAt)) {
+              const localData = {
+                ...doc,
+                id: doc.$id,
+                $id: doc.$id,
+                $createdAt: doc.$createdAt,
+                $updatedAt: doc.$updatedAt
+              };
+              await storage.save(localKey, localData);
+              console.log(`💾 Synced document ${doc.$id} to local storage`);
+            }
+          }
+          
+        } catch (appwriteError) {
+          console.error(`❌ Appwrite sync failed for ${collectionId}:`, appwriteError);
+          console.log(`📱 Falling back to local storage for ${collectionId}`);
+        }
+      } else {
+        console.log(`📱 Offline mode: using local storage for ${collectionId}`);
+      }
+      
+      // Get data from local storage
       const keys = await storage.getAllKeys();
       const collectionKeys = keys.filter(key => key.startsWith(`${collectionId}_`));
       
       if (collectionKeys.length === 0) {
+        console.log(`📭 No local data found for ${collectionId}`);
         return [];
       }
       
@@ -548,18 +749,14 @@ export const dataService = {
           const data = await storage.get(key);
           if (!data) return null;
           
-          // Clean up attendance data to remove checkInTimes and checkOutTimes
-          if (collectionId === 'attendance') {
-            const { checkInTimes, checkOutTimes, ...cleanData } = data;
-            return { ...cleanData, id: data.id || key.split('_')[1], $id: data.$id || key.split('_')[1] };
-          }
-          
           return { ...data, id: data.id || key.split('_')[1], $id: data.$id || key.split('_')[1] };
         })
       );
       
       const validItems = items.filter(item => item !== null);
+      console.log(`📊 Returning ${validItems.length} items for ${collectionId}`);
       return validItems;
+      
     } catch (error) {
       console.error(`❌ Error getting items for ${collectionId}:`, error);
       return [];
@@ -569,9 +766,9 @@ export const dataService = {
   async saveData(data, collectionId) {
     try {
       console.log(data)
-      const uniqueId = data.id || data.$id || generateId();
+      const uniqueId = generateValidAppwriteId(data.id || data.$id);
       const cleanData = { ...data, id: uniqueId, $id: uniqueId, deviceId: data.deviceId || await getDeviceId() };
-      
+      console.log("id",uniqueId)
       // Check for duplicates
       const existing = await dataService.getItems(collectionId);
       const duplicate = existing.find(item => {
@@ -597,26 +794,90 @@ export const dataService = {
       // Try to save to Appwrite
       if (await isOnline() && client && databases) {
         try {
+          // Check if user is authenticated before making Appwrite calls
+          let user = null;
+          try {
+            user = await account.get();
+          } catch (authError) {
+            if (authError.message.includes('missing scope (account)') || authError.message.includes('User (role: guests)')) {
+              console.log(`👤 User not authenticated, skipping Appwrite save for ${collectionId}`);
+              return cleanData;
+            }
+            throw authError;
+          }
+          
+          if (!user) {
+            console.log(`👤 No authenticated user, skipping Appwrite save for ${collectionId}`);
+            return cleanData;
+          }
           const collectionMap = {
             employees: config.employeesCollectionId,
             cases: config.casesCollectionId,
             expenses: config.expensesCollectionId,
             attendance: config.attendanceCollectionId,
-            holidays: config.holidaysCollectionId,
-            leaves: config.leavesCollectionId
+           
           };
-          const appwriteData = cleanDataForAppwrite(cleanData, collectionId);
-          console.log("cleanData",cleanData)
           
-          await databases.createDocument(
-            config.databaseId,
-            collectionMap[collectionId],
-            uniqueId,
-            appwriteData
-          );
-        } catch (error) {
+          const appwriteCollectionId = collectionMap[collectionId];
+          if (!appwriteCollectionId) {
+            console.warn(`⚠️ No Appwrite collection mapping for ${collectionId}`);
+            throw new Error('No collection mapping');
+          }
+          console.log(cleanData)
+          const appwriteData = await cleanDataForAppwrite(cleanData, collectionId);
+          console.log("🌐 Saving to Appwrite:", { collectionId, appwriteCollectionId, data: appwriteData });
+          
+          // Ensure we have valid data to send
+          if (!appwriteData || Object.keys(appwriteData).length === 0) {
+            console.warn('⚠️ No valid data to send to Appwrite, skipping save');
+            return cleanData;
+          }
+          console.log("appwriteData documentId",uniqueId)
+          
+          // Check if document already exists and update it, otherwise create new
+          try {
+            await databases.getDocument(
+              config.databaseId,
+              appwriteCollectionId,
+              uniqueId
+            );
+            // Document exists, update it
+            await databases.updateDocument(
+              config.databaseId,
+              appwriteCollectionId,
+              uniqueId,
+              appwriteData
+            );
+            console.log(`✅ Successfully updated in Appwrite: ${uniqueId}`);
+          } catch (getError) {
+            if (getError.message.includes('Document with the requested ID could not be found')) {
+              // Document doesn't exist, create it
+            const response=  await databases.createDocument(
+                config.databaseId,
+                appwriteCollectionId,
+                uniqueId,
+                appwriteData
+              );
+              console.log(`✅ Successfully created in Appwrite: ${response}`);
+            } else {
+              throw getError;
+            }
+          }
+          
+        } catch (appwriteError) {
+          console.error(`❌ Appwrite save failed for ${collectionId}:`, appwriteError);
+          
+          // Check if it's a project ID error
+          if (appwriteError.message && appwriteError.message.includes('project with requested id could not be found')) {
+            console.error('🚨 Appwrite Project ID Error: Please check your EXPO_PUBLIC_APPWRITE_PROJECT_ID environment variable');
+            console.error('Current project ID:', process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID);
+          }
+          
+          // Continue with local storage only
+          console.log(`📱 Continuing with local storage only for ${collectionId}`);
         }
       } else {
+        console.log(`📱 Offline mode: saving to local storage only for ${collectionId}`);
       }
       
       return cleanData;
@@ -655,29 +916,52 @@ export const dataService = {
       // Try to update in Appwrite
       if (await isOnline() && client && databases) {
         try {
+          // Check if user is authenticated before making Appwrite calls
+          let user = null;
+          try {
+            user = await account.get();
+          } catch (authError) {
+            if (authError.message.includes('missing scope (account)') || authError.message.includes('User (role: guests)')) {
+              console.log(`👤 User not authenticated, skipping Appwrite update for ${collectionId}`);
+              return cleanData;
+            }
+            throw authError;
+          }
+          
+          if (!user) {
+            console.log(`👤 No authenticated user, skipping Appwrite update for ${collectionId}`);
+            return cleanData;
+          }
           const collectionMap = {
             employees: config.employeesCollectionId,
             cases: config.casesCollectionId,
             expenses: config.expensesCollectionId,
             attendance: config.attendanceCollectionId,
-            holidays: config.holidaysCollectionId,
-            leaves: config.leavesCollectionId
+           
           };
           
-          const appwriteData = cleanDataForAppwrite(cleanData, collectionId);
+          const appwriteData = await cleanDataForAppwrite(cleanData, collectionId);
           console.log("appwriteData",appwriteData)
+          
+          // Validate that we have data to send
+          if (!appwriteData || Object.keys(appwriteData).length === 0) {
+            console.warn('⚠️ No valid data to send to Appwrite, skipping update');
+            return cleanData;
+          }
+          
           // Check if document exists first
           try {
+            const validDocumentId = generateValidAppwriteId(documentId);
             await databases.getDocument(
               config.databaseId,
               collectionMap[collectionId],
-              documentId
+              validDocumentId
             );
             // Document exists, update it
             await databases.updateDocument(
               config.databaseId,
               collectionMap[collectionId],
-              documentId,
+              validDocumentId,
               appwriteData
             );
           } catch (getError) {
@@ -686,7 +970,7 @@ export const dataService = {
               await databases.createDocument(
                 config.databaseId,
                 collectionMap[collectionId],
-                documentId,
+                validDocumentId,
                 appwriteData
               );
             } else {
@@ -715,20 +999,36 @@ export const dataService = {
       // Try to delete from Appwrite
       if (await isOnline() && client && databases) {
         try {
+          // Check if user is authenticated before making Appwrite calls
+          let user = null;
+          try {
+            user = await account.get();
+          } catch (authError) {
+            if (authError.message.includes('missing scope (account)') || authError.message.includes('User (role: guests)')) {
+              console.log(`👤 User not authenticated, skipping Appwrite delete for ${collectionId}`);
+              return { success: true, id: documentId };
+            }
+            throw authError;
+          }
+          
+          if (!user) {
+            console.log(`👤 No authenticated user, skipping Appwrite delete for ${collectionId}`);
+            return { success: true, id: documentId };
+          }
           const collectionMap = {
             employees: config.employeesCollectionId,
             cases: config.casesCollectionId,
             expenses: config.expensesCollectionId,
             attendance: config.attendanceCollectionId,
-            holidays: config.holidaysCollectionId,
-            leaves: config.leavesCollectionId
+          
           };
           
           console.log(`🌐 Deleting from Appwrite collection: ${collectionMap[collectionId]}`);
+          const validDocumentId = generateValidAppwriteId(documentId);
           await databases.deleteDocument(
             config.databaseId,
             collectionMap[collectionId],
-            documentId
+            validDocumentId
           );
           console.log(`✅ Successfully deleted from Appwrite`);
         } catch (error) {
@@ -920,7 +1220,7 @@ export const dataService = {
      // Sync pending data (for backward compatibility)
        async syncPendingData() {
       try {
-        const collections = ['employees', 'cases', 'expenses', 'attendance', 'holidays', 'leaves'];
+        const collections = ['employees', 'cases', 'expenses', 'attendance'];
         let totalSynced = 0;
         let totalUpdated = 0;
        
@@ -935,8 +1235,7 @@ export const dataService = {
                 cases: config.casesCollectionId,
                 expenses: config.expensesCollectionId,
                 attendance: config.attendanceCollectionId,
-                holidays: config.holidaysCollectionId,
-                leaves: config.leavesCollectionId
+             
               };
              
              const appwriteDocs = await databases.listDocuments(
@@ -957,11 +1256,10 @@ export const dataService = {
                     cases: config.casesCollectionId,
                     expenses: config.expensesCollectionId,
                     attendance: config.attendanceCollectionId,
-                    holidays: config.holidaysCollectionId,
-                    leaves: config.leavesCollectionId
+                   
                   };
                  
-                 const cleanData = cleanDataForAppwrite(item, collectionId);
+                 const cleanData = await cleanDataForAppwrite(item, collectionId);
                  console.log(`🌐 Processing item for sync:`, cleanData);
                  
                  // Check if document already exists in Appwrite
@@ -993,7 +1291,7 @@ export const dataService = {
                    await databases.createDocument(
                      config.databaseId,
                      collectionMap[collectionId],
-                     item.id || item.$id,
+                     generateValidAppwriteId(item.id || item.$id),
                      cleanData
                    );
                    totalSynced++;
@@ -1026,7 +1324,7 @@ export const dataService = {
     try {
       console.log('📊 Getting storage stats...');
       const keys = await storage.getAllKeys();
-             const collections = ['employees', 'cases', 'expenses', 'attendance', 'holidays', 'leaves'];
+             const collections = ['employees', 'cases', 'expenses', 'attendance'];
       const stats = { total: 0, invalidItems: 0, byCollection: {} };
       
       for (const collection of collections) {
@@ -1095,8 +1393,14 @@ export const dataService = {
       let cleanedCount = 0;
       for (const key of attendanceKeys) {
         const data = await storage.get(key);
-        if (data && (data.checkInTimes || data.checkOutTimes)) {
-          const { checkInTimes, checkOutTimes, ...cleanData } = data;
+        if (data) {
+          // Ensure checkInTimes and checkOutTimes are arrays
+          const cleanData = {
+            ...data,
+            checkInTimes: Array.isArray(data.checkInTimes) ? data.checkInTimes : [],
+            checkOutTimes: Array.isArray(data.checkOutTimes) ? data.checkOutTimes : [],
+            timestamp: data.timestamp || new Date().toISOString()
+          };
           await storage.save(key, cleanData);
           cleanedCount++;
         }
@@ -1340,14 +1644,12 @@ export const backgroundSyncService = {
 
   async performBackgroundSync() {
     try {
-      console.log('🔄 Performing background sync...');
-      
       if (!(await isOnline()) || !client || !databases) {
         console.log('📱 Skipping background sync - offline or Appwrite not available');
         return;
       }
 
-             const collections = ['employees', 'cases', 'expenses', 'attendance', 'holidays', 'leaves'];
+             const collections = ['employees', 'cases', 'expenses', 'attendance'];
        let totalSynced = 0;
 
       for (const collectionId of collections) {
@@ -1364,8 +1666,6 @@ export const backgroundSyncService = {
              cases: config.casesCollectionId,
              expenses: config.expensesCollectionId,
              attendance: config.attendanceCollectionId,
-             holidays: config.holidaysCollectionId,
-             leaves: config.leavesCollectionId
            };
 
           // Get all existing documents from Appwrite for this collection
@@ -1384,11 +1684,11 @@ export const backgroundSyncService = {
             if (!existingDocIds.includes(itemId)) {
               try {
                 console.log(`📝 Creating missing document ${itemId} in Appwrite for ${collectionId}`);
-                const cleanData = cleanDataForAppwrite(item, collectionId);
+                const cleanData = await cleanDataForAppwrite(item, collectionId);
                 await databases.createDocument(
                   config.databaseId,
                   collectionMap[collectionId],
-                  itemId,
+                  generateValidAppwriteId(itemId),
                   cleanData
                 );
                 totalSynced++;

@@ -1,13 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import {
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { getItems, saveData } from '../services/unifiedDataService';
 import StatCard from './StatCard';
@@ -28,28 +28,124 @@ const AttendanceTab = ({ employees = [] }) => {
     setTimeout(() => setCustomToast(null), 3000);
   };
 
-  // Load attendance data
-  useEffect(() => {
-    loadAttendanceData();
-  }, []);
+  const refreshAttendanceData = async () => {
+    console.log('🔄 Manual refresh requested...');
+    await loadAttendanceData();
+    showCustomToast('success', 'Refreshed', 'Attendance data refreshed from storage');
+  };
 
-  // Initialize today's attendance
-  useEffect(() => {
-    initializeTodayAttendance();
-  }, [employees, selectedDate]);
-
-  // Save when data changes
-  useEffect(() => {
-    saveAttendanceData();
-  }, [attendanceData]);
-
-  const initializeTodayAttendance = () => {
+  const markAllAttendance = async () => {
+    const currentDateKey = formatDate(selectedDate);
     const today = formatDate(new Date());
+    
+    // Prevent marking attendance for future dates
+    if (currentDateKey > today) {
+      showCustomToast('error', 'Future Date', 'Cannot mark attendance for future dates');
+      return;
+    }
+    
+    console.log('🎯 MARK ATTENDANCE: Starting to save all employee attendance...');
+    console.log(`🎯 MARK ATTENDANCE: Total employees to process: ${employees.length}`);
+    
+    // Get employees that have attendance data for this date
+    const currentDateData = attendanceData[currentDateKey] || {};
+    const employeesWithAttendance = Object.keys(currentDateData);
+    
+    console.log(`🎯 MARK ATTENDANCE: Found ${employeesWithAttendance.length} employees with attendance data`);
+    
+    let savedCount = 0;
+    let errorCount = 0;
+    
+    for (const employeeId of employeesWithAttendance) {
+      const employee = employees.find(emp => emp.id === employeeId);
+      if (!employee) continue;
+      
+      const currentAttendance = currentDateData[employeeId];
+      
+      // Use existing status
+      const status = currentAttendance?.status || 'absent';
+      const checkInTimes = currentAttendance?.checkInTimes || [];
+      const checkOutTimes = currentAttendance?.checkOutTimes || [];
+      const totalWorkingHours = currentAttendance?.totalWorkingHours || "0h 0m";
+      
+      // Debug: Log Farhan's status specifically
+      if (employee.fullName.toLowerCase().includes('farhan')) {
+        console.log(`🎯 MARK ATTENDANCE: Farhan's status before save: ${status}`);
+        console.log(`🎯 MARK ATTENDANCE: Farhan's attendance data:`, currentAttendance);
+      }
+      
+      const dateOnly = currentDateKey.replace(/-/g, '');
+      const validId = `${dateOnly}_${employeeId}`;
+      
+      const attendanceRecord = {
+        id: validId,
+        employeeId: employeeId,
+        employeeName: employee.fullName,
+        date: currentDateKey,
+        status: status,
+        checkInTimes: checkInTimes,
+        checkOutTimes: checkOutTimes,
+        totalWorkingHours: totalWorkingHours,
+        timestamp: new Date().toISOString(),
+        deviceId: null
+      };
+      
+      try {
+        await saveData(attendanceRecord, 'attendance');
+        savedCount++;
+        console.log(`✅ MARK ATTENDANCE: Saved ${employee.fullName} as ${status}`);
+      } catch (error) {
+        errorCount++;
+        console.error(`❌ MARK ATTENDANCE: Failed to save ${employee.fullName}:`, error);
+      }
+    }
+    
+    console.log(`🎯 MARK ATTENDANCE: Completed! Saved ${savedCount} employees, ${errorCount} errors`);
+    
+    if (savedCount > 0) {
+      showCustomToast('success', 'Attendance Marked', `Saved attendance for ${savedCount} employees`);
+    }
+    
+    if (errorCount > 0) {
+      showCustomToast('error', 'Some Errors', `${errorCount} employees failed to save`);
+    }
+    
+    // Don't reload data - let the state updates handle UI
+    console.log('🎯 MARK ATTENDANCE: All attendance saved successfully!');
+  };
+
+  // Load attendance data when component mounts and when date changes
+  useEffect(() => {
+    const loadData = async () => {
+      await loadAttendanceData();
+    };
+    loadData();
+  }, [selectedDate]); // Reload when date changes
+
+  // Initialize attendance for selected date when employees change
+  useEffect(() => {
+    if (employees.length > 0) {
+      // Only initialize if we don't have any data for this date yet
+    const selectedDateKey = formatDate(selectedDate);
+      const currentAttendance = attendanceData[selectedDateKey] || {};
+      const hasDataForThisDate = Object.keys(currentAttendance).length > 0;
+      
+      if (!hasDataForThisDate) {
+        console.log(`📅 Initializing attendance for date: ${selectedDateKey}`);
+        initializeAttendanceForDate();
+      }
+    }
+  }, [employees]); // Only when employees change, not when date changes
+
+
+
+  // Remove automatic saving to prevent infinite loops
+  // Data will be saved manually when user makes changes
+
+  const initializeAttendanceForDate = () => {
     const selectedDateKey = formatDate(selectedDate);
     
-    if (selectedDateKey !== today) return;
-    
-    const currentAttendance = attendanceData[today] || {};
+    const currentAttendance = attendanceData[selectedDateKey] || {};
     const activeEmployees = employees.filter(emp => emp.status === 'active');
     let needsInit = false;
     
@@ -59,106 +155,98 @@ const AttendanceTab = ({ employees = [] }) => {
     });
     
     if (needsInit) {
-    //   showCustomToast('info', 'Initializing', 'Setting up attendance for today...');
-      
       const newData = { ...attendanceData };
-      if (!newData[today]) newData[today] = {};
+      if (!newData[selectedDateKey]) newData[selectedDateKey] = {};
       
       activeEmployees.forEach(employee => {
         const employeeId = employee.id || employee.$id;
-        if (!newData[today][employeeId]) {
-          newData[today][employeeId] = {
+        // Only initialize if no attendance data exists for this employee on this date
+        if (!newData[selectedDateKey][employeeId]) {
+          newData[selectedDateKey][employeeId] = {
             status: 'absent',
             checkInTimes: [],
             checkOutTimes: [],
-            totalWorkingHours: 0,
+            totalWorkingHours: "0h 0m",
           };
         }
       });
       
       setAttendanceData(newData);
-    //   showCustomToast('success', 'Initialized', `Attendance initialized for ${activeEmployees.length} employees`);
     }
   };
 
   const loadAttendanceData = async () => {
     try {
+      const selectedDateKey = formatDate(selectedDate);
+      console.log(`📥 Loading attendance data for date: ${selectedDateKey}`);
+      
       const savedData = await getItems('attendance');
+      console.log(`📥 Loaded ${savedData.length} total attendance records from storage`);
+      
       const attendanceObject = {};
       
       savedData.forEach(record => {
-        const dateKey = record.date;
+        console.log("record ",record)
+        const dateKey = record.date.split('T')[0];
+        // const dateKeyForLoad = dateKey.split('T')[0];
         if (!attendanceObject[dateKey]) attendanceObject[dateKey] = {};
-        
+       
         attendanceObject[dateKey][record.employeeId] = {
-          status: record.status,
+          status: record.status || 'absent',
           checkInTimes: record.checkInTimes || [],
           checkOutTimes: record.checkOutTimes || [],
-          totalWorkingHours: record.totalWorkingHours || 0,
+          totalWorkingHours: record.totalWorkingHours || "0h 0m",
+          timestamp: record.timestamp,
         };
+       console.log("selectedDateKeyForLoad ",selectedDateKey)
+     console.log("dateKey ",dateKey)
+     
+        // Debug: Log data for current date
+        if (dateKey===selectedDateKey) {
+           const employee = employees.find(emp => emp.id === record.employeeId);
+          if (employee) {
+            console.log(`📥 Loaded ${employee.fullName}: status=${record.status}, hours=${record.totalWorkingHours}`);
+          }
+        }
       });
       
+      console.log(`📥 Setting attendance data to state for ${Object.keys(attendanceObject).length} dates`);
       setAttendanceData(attendanceObject);
+      console.log("attendanceObject ",attendanceObject)
+      // Check if we have data for current date
+
+      const currentDateData = attendanceObject[selectedDateKey] || {};
+      console.log("currentDateData ",currentDateData)
+      const currentDateRecords = Object.keys(currentDateData).length;
+      console.log("currentDateRecords ",currentDateRecords)
+      console.log(`📥 Current date (${selectedDateKey}) has ${currentDateRecords} attendance records`);
+      
+      if (currentDateRecords === 0) {
+        console.log(`📥 No data found for ${selectedDateKey}, will initialize if needed`);
+      }
+      
+      console.log('📥 Attendance data loaded successfully!');
     } catch (error) {
-      console.error('Error loading attendance:', error);
+      console.error('❌ Error loading attendance:', error);
+      // Initialize empty attendance data if loading fails
+      setAttendanceData({});
     }
   };
 
-  const saveAttendanceData = async () => {
-    try {
-      console.log('💾 Saving attendance data...');
-      const attendanceArray = [];
-      Object.keys(attendanceData).forEach(dateKey => {
-        Object.keys(attendanceData[dateKey]).forEach(employeeId => {
-          const record = attendanceData[dateKey][employeeId];
-          const employee = employees.find(emp => emp.id === employeeId);
-          
-          if (employee) {
-                        const attendanceRecord = {
-              id: `${dateKey}_${employeeId}`,
-              employeeId: employeeId,
-              employeeName: employee.fullName,
-              date: dateKey,
-              status: record.status,
-             
-              totalWorkingHours: record.totalWorkingHours || 0,
-              timestamp: record.timestamp,
-              deviceId: null // Add deviceId to prevent sync error
-            };
-            attendanceArray.push(attendanceRecord);
-            console.log('📝 Prepared attendance record:', attendanceRecord);
-          }
-        });
-      });
-      
-      console.log(`💾 Saving ${attendanceArray.length} attendance records...`);
-      for (const record of attendanceArray) {
-        try {
-          await saveData(record, 'attendance');
-          console.log('✅ Saved attendance record:', record.id);
-        } catch (saveError) {
-          console.error('❌ Failed to save attendance record:', record.id, saveError);
-        }
-      }
-      console.log('✅ Attendance data save completed');
-    } catch (error) {
-      console.error('❌ Error saving attendance:', error);
-    }
-  };
+
 
   const formatDate = (date) => {
-    return date.toISOString().split('T')[0];
+    // Use local timezone to avoid date shifting issues
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   const getAttendanceStatus = (employeeId) => {
     const dateKey = formatDate(selectedDate);
-    const today = formatDate(new Date());
-   
-    // 🚫 Block marking if it's not today
-    if (dateKey !== today) {
-      showCustomToast('error', 'Not Allowed', 'You can only mark attendance for today.');
-      return;
-    }
+    
+    // Always return a valid attendance object
     return attendanceData[dateKey]?.[employeeId] || {
       status: 'absent',
       checkInTimes: [],
@@ -167,106 +255,135 @@ const AttendanceTab = ({ employees = [] }) => {
     };
   };
 
-  const markAttendance = (employeeId, status) => {
+  const markAttendance = async (employeeId, status) => {
     const dateKey = formatDate(selectedDate);
+    const today = formatDate(new Date());
+    
+    // Prevent marking attendance for future dates
+    if (dateKey > today) {
+      showCustomToast('error', 'Future Date', 'Cannot mark attendance for future dates');
+      return;
+    }
+    
     const employee = employees.find(emp => emp.id === employeeId);
     const employeeName = employee?.fullName || 'Unknown';
     
-    const existingAttendance = attendanceData[dateKey]?.[employeeId] || {};
-    const checkInTimes = existingAttendance.checkInTimes || [];
-    const checkOutTimes = existingAttendance.checkOutTimes || [];
+    // Check if attendance already exists for this employee on this date
+    const existingAttendance = attendanceData[dateKey]?.[employeeId];
     
-    let finalStatus = status;
-    if (status === 'present' && checkInTimes.length > 0 && checkOutTimes.length > 0) {
-      finalStatus = 'present';
-    } else if (status === 'present') {
-      finalStatus = 'absent';
-    }
-    
-    // showCustomToast('info', 'Marking', `Marking ${employeeName} as ${finalStatus}`);
-    
+    // Only update if status is different or no attendance exists
+    if (!existingAttendance || existingAttendance.status !== status) {
     setAttendanceData(prev => ({
       ...prev,
       [dateKey]: {
         ...prev[dateKey],
         [employeeId]: {
-          ...existingAttendance,
-          status: finalStatus,
-          checkInTimes: status === 'leave' || status === 'absent' ? [] : checkInTimes,
-          checkOutTimes: status === 'leave' || status === 'absent' ? [] : checkOutTimes,
-          totalWorkingHours: status === 'leave' || status === 'absent' ? 0 : existingAttendance.totalWorkingHours,
+            ...existingAttendance, // Preserve existing data
+            status: status,
+            checkInTimes: status === 'absent' || status === 'leave' ? [] : (existingAttendance?.checkInTimes || []),
+            checkOutTimes: status === 'absent' || status === 'leave' ? [] : (existingAttendance?.checkOutTimes || []),
+            totalWorkingHours: status === 'absent' || status === 'leave' ? "0h 0m" : (existingAttendance?.totalWorkingHours || "0h 0m"),
+            timestamp: new Date().toISOString(),
         }
       }
     }));
     
-    // showCustomToast('success', 'Marked', `${employeeName} marked as ${finalStatus}`);
+      showCustomToast('success', 'Marked', `${employeeName} marked as ${status}`);
+      
+      // Debug: Log when marking leave for Farhan
+      if (employeeName.toLowerCase().includes('farhan') && status === 'leave') {
+        console.log(`🎯 MARK ATTENDANCE: Marked Farhan as LEAVE`);
+        console.log(`🎯 MARK ATTENDANCE: Current attendance data:`, attendanceData[dateKey]);
+      }
+      
+      // Immediately save this individual attendance record
+      const dateOnly = dateKey.replace(/-/g, '');
+      const validId = `${dateOnly}_${employeeId}`;
+      
+      const attendanceRecord = {
+        id: validId,
+        employeeId: employeeId,
+        employeeName: employeeName,
+        date: dateKey,
+        status: status,
+        checkInTimes: status === 'absent' || status === 'leave' ? [] : (existingAttendance?.checkInTimes || []),
+        checkOutTimes: status === 'absent' || status === 'leave' ? [] : (existingAttendance?.checkOutTimes || []),
+        totalWorkingHours: status === 'absent' || status === 'leave' ? "0h 0m" : (existingAttendance?.totalWorkingHours || "0h 0m"),
+        timestamp: new Date().toISOString(),
+        deviceId: null
+      };
+      
+      try {
+        console.log(`💾 Immediately saving ${employeeName} as ${status}...`);
+        await saveData(attendanceRecord, 'attendance');
+        console.log(`✅ Successfully saved ${employeeName} as ${status}`);
+      } catch (error) {
+        console.error(`❌ Failed to save ${employeeName}:`, error);
+      }
+      
+      // Force a small delay to ensure state updates, then refresh
+      // setTimeout(async () => {
+      //   console.log(`🔄 Refreshing UI after marking ${employeeName} as ${status}`);
+      //   await loadAttendanceData();
+      // }, 100);
+    } else {
+      showCustomToast('info', 'Already Marked', `${employeeName} is already marked as ${status}`);
+    }
   };
 
   const calculateTotalHours = (checkInTimes, checkOutTimes) => {
-    let totalMinutes = 0;
-    for (let i = 0; i < Math.min(checkInTimes.length, checkOutTimes.length); i++) {
-      const checkIn = checkInTimes[i];
-      const checkOut = checkOutTimes[i];
-      
-      if (checkIn && checkOut) {
-        const [checkInHour, checkInMinute] = checkIn.split(':').map(Number);
-        const [checkOutHour, checkOutMinute] = checkOut.split(':').map(Number);
-        
-        const checkInMinutes = checkInHour * 60 + checkInMinute;
-        const checkOutMinutes = checkOutHour * 60 + checkOutMinute;
-        const workingMinutes = checkOutMinutes - checkInMinutes;
-        
-        if (workingMinutes > 0) totalMinutes += workingMinutes;
-      }
-    }
+    if (!checkInTimes?.[0] || !checkOutTimes?.[0]) return "0h 0m";
+    
+    const [inHour, inMin] = checkInTimes[0].split(':').map(Number);
+    const [outHour, outMin] = checkOutTimes[0].split(':').map(Number);
+    const totalMinutes = (outHour * 60 + outMin) - (inHour * 60 + inMin);
+    
+    if (totalMinutes <= 0) return "0h 0m";
     
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
-    
-    if (hours === 0) return `${minutes}m`;
-    if (minutes === 0) return `${hours}h`;
     return `${hours}h ${minutes}m`;
   };
 
   const openManualTimeModal = (employee) => {
     setSelectedEmployee(employee);
     const employeeId = employee.id || employee.$id;
-    const attendance = getAttendanceStatus(employeeId);
+    const dateKey = formatDate(selectedDate);
+    const attendance = attendanceData[dateKey]?.[employeeId];
     
-    const lastCheckIn = attendance.checkInTimes?.length > 0 ? attendance.checkInTimes[attendance.checkInTimes.length - 1] : '';
-    const lastCheckOut = attendance.checkOutTimes?.length > 0 ? attendance.checkOutTimes[attendance.checkOutTimes.length - 1] : '';
-    
-    // Convert 24-hour format to 12-hour format if needed
+    // Convert 24-hour to 12-hour format
     const formatTo12Hour = (time) => {
       if (!time) return '';
-      if (time.includes('AM') || time.includes('PM')) return time;
-      
       const [hours, minutes] = time.split(':').map(Number);
       const period = hours >= 12 ? 'PM' : 'AM';
       const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
       return `${displayHours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${period}`;
     };
     
-    setManualCheckInTime(formatTo12Hour(lastCheckIn));
-    setManualCheckOutTime(formatTo12Hour(lastCheckOut));
+    // Show previous times if they exist
+    const prevCheckIn = attendance?.checkInTimes?.[0] || '';
+    const prevCheckOut = attendance?.checkOutTimes?.[0] || '';
+    
+    setManualCheckInTime(formatTo12Hour(prevCheckIn));
+    setManualCheckOutTime(formatTo12Hour(prevCheckOut));
     setShowManualTimeModal(true);
   };
 
   const saveManualTime = () => {
     if (!selectedEmployee) return;
   
-    // Regex for HH:MM AM/PM (12-hour format)
+    // Regex for HH:MM AM/PM (12-hour format) - more flexible
     const timeRegex = /^(0?[1-9]|1[0-2]):[0-5][0-9]\s?(AM|PM)$/i;
   
     // Validate check-in time
-    if (manualCheckInTime && !timeRegex.test(manualCheckInTime)) {
-    //   showCustomToast('error', 'Invalid Time', 'Check-in time must be in HH:MM AM/PM format (e.g. 09:30 AM)');
+    if (manualCheckInTime && !timeRegex.test(manualCheckInTime.trim())) {
+      showCustomToast('error', 'Invalid Time', 'Check-in time must be in HH:MM AM/PM format (e.g. 12:07 AM)');
       return;
     }
   
     // Validate check-out time
-    if (manualCheckOutTime && !timeRegex.test(manualCheckOutTime)) {
-    //   showCustomToast('error', 'Invalid Time', 'Check-out time must be in HH:MM AM/PM format (e.g. 06:45 PM)');
+    if (manualCheckOutTime && !timeRegex.test(manualCheckOutTime.trim())) {
+      showCustomToast('error', 'Invalid Time', 'Check-out time must be in HH:MM AM/PM format (e.g. 06:07 PM)');
       return;
     }
   
@@ -299,90 +416,71 @@ const AttendanceTab = ({ employees = [] }) => {
     saveManualAttendanceData();
   };
   
-  const saveManualAttendanceData = () => {
-    // Validate time format
-    const timeFormatRegex = /^(0?[1-9]|1[0-2]):[0-5][0-9]\s?(AM|PM)$/i;
+  const saveManualAttendanceData = async () => {
+    const currentDateKey = formatDate(selectedDate);
+    const today = formatDate(new Date());
     
-    if (manualCheckInTime && !timeFormatRegex.test(manualCheckInTime.trim())) {
-      showCustomToast('error', 'Invalid Format', 'Check-in time must be in HH:MM AM/PM format (e.g., 09:30 AM)');
+    // Prevent saving time for future dates
+    if (currentDateKey > today) {
+      showCustomToast('error', 'Future Date', 'Cannot save time for future dates');
       return;
     }
     
-    if (manualCheckOutTime && !timeFormatRegex.test(manualCheckOutTime.trim())) {
-      showCustomToast('error', 'Invalid Format', 'Check-out time must be in HH:MM AM/PM format (e.g., 05:30 PM)');
-      return;
-    }
+    const currentEmployeeId = selectedEmployee.id || selectedEmployee.$id;
+    const existingAttendance = attendanceData[currentDateKey]?.[currentEmployeeId];
     
-    // Convert to 24-hour format for comparison
+    // Convert 12-hour to 24-hour format
     const convertTo24Hour = (timeStr) => {
       if (!timeStr) return '';
-      if (!timeStr.includes('AM') && !timeStr.includes('PM')) return timeStr;
-      
       let [time, modifier] = timeStr.trim().toUpperCase().split(/\s+/);
       let [hours, minutes] = time.split(':').map(Number);
       
-      if (modifier === "PM" && hours !== 12) {
-        hours += 12;
-      }
-      if (modifier === "AM" && hours === 12) {
-        hours = 0;
-      }
+      if (modifier === "PM" && hours !== 12) hours += 12;
+      if (modifier === "AM" && hours === 12) hours = 0;
       
       return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
     };
     
-    // Validate check-out is after check-in
-    if (manualCheckInTime && manualCheckOutTime) {
-      const checkIn24 = convertTo24Hour(manualCheckInTime);
-      const checkOut24 = convertTo24Hour(manualCheckOutTime);
+    const checkInTime = manualCheckInTime ? convertTo24Hour(manualCheckInTime) : '';
+    const checkOutTime = manualCheckOutTime ? convertTo24Hour(manualCheckOutTime) : '';
+    
+    // Calculate total hours
+    let totalHours = "0h 0m";
+    if (checkInTime && checkOutTime) {
+      const [inHour, inMin] = checkInTime.split(':').map(Number);
+      const [outHour, outMin] = checkOutTime.split(':').map(Number);
+      const totalMinutes = (outHour * 60 + outMin) - (inHour * 60 + inMin);
       
-      const checkInMinutes = parseInt(checkIn24.split(':')[0]) * 60 + parseInt(checkIn24.split(':')[1]);
-      const checkOutMinutes = parseInt(checkOut24.split(':')[0]) * 60 + parseInt(checkOut24.split(':')[1]);
-      
-      if (checkOutMinutes <= checkInMinutes) {
-        showCustomToast('error', 'Invalid Time', 'Check-out time must be after check-in time');
-        return;
+      if (totalMinutes > 0) {
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        totalHours = `${hours}h ${minutes}m`;
       }
     }
     
-    const dateKey = formatDate(selectedDate);
-    const employeeId = selectedEmployee.id || selectedEmployee.$id;
-    const existingAttendance = attendanceData[dateKey]?.[employeeId] || {};
+    // Check if times are the same as existing
+    const existingCheckIn = existingAttendance?.checkInTimes?.[0] || '';
+    const existingCheckOut = existingAttendance?.checkOutTimes?.[0] || '';
     
-    let newCheckInTimes = [...(existingAttendance.checkInTimes || [])];
-    let newCheckOutTimes = [...(existingAttendance.checkOutTimes || [])];
-    
-    if (manualCheckInTime) {
-      const convertedCheckIn = convertTo24Hour(manualCheckInTime);
-      if (newCheckInTimes.length > 0) {
-        newCheckInTimes[newCheckInTimes.length - 1] = convertedCheckIn;
-      } else {
-        newCheckInTimes.push(convertedCheckIn);
-      }
+    if (checkInTime === existingCheckIn && checkOutTime === existingCheckOut && existingAttendance?.status === 'present') {
+      showCustomToast('info', 'No Changes', 'Times are already saved for this employee');
+      setShowManualTimeModal(false);
+      setSelectedEmployee(null);
+      setManualCheckInTime('');
+      setManualCheckOutTime('');
+      return;
     }
-    
-    if (manualCheckOutTime) {
-      const convertedCheckOut = convertTo24Hour(manualCheckOutTime);
-      if (newCheckOutTimes.length > 0) {
-        newCheckOutTimes[newCheckOutTimes.length - 1] = convertedCheckOut;
-      } else {
-        newCheckOutTimes.push(convertedCheckOut);
-      }
-    }
-    
-    const totalHours = calculateTotalHours(newCheckInTimes, newCheckOutTimes);
-    const newStatus = newCheckInTimes.length > 0 && newCheckOutTimes.length > 0 ? 'present' : 'absent';
     
     setAttendanceData(prev => ({
       ...prev,
-      [dateKey]: {
-        ...prev[dateKey],
-        [employeeId]: {
-          ...existingAttendance,
-          checkInTimes: newCheckInTimes,
-          checkOutTimes: newCheckOutTimes,
+      [currentDateKey]: {
+        ...prev[currentDateKey],
+        [currentEmployeeId]: {
+          ...existingAttendance, // Preserve any existing data
+          status: 'present',
+          checkInTimes: checkInTime ? [checkInTime] : [],
+          checkOutTimes: checkOutTime ? [checkOutTime] : [],
           totalWorkingHours: totalHours,
-          status: newStatus,
           timestamp: new Date().toISOString()
         }
       }
@@ -393,7 +491,35 @@ const AttendanceTab = ({ employees = [] }) => {
     setManualCheckInTime('');
     setManualCheckOutTime('');
     
-    showCustomToast('success', 'Saved', `Time saved for ${selectedEmployee?.fullName}`);
+    // Immediately save the manual time entry
+    const dateOnly = currentDateKey.replace(/-/g, '');
+    const validId = `${dateOnly}_${currentEmployeeId}`;
+    
+    const attendanceRecord = {
+      id: validId,
+      employeeId: currentEmployeeId,
+      employeeName: selectedEmployee.fullName,
+      date: currentDateKey,
+      status: 'present',
+      checkInTimes: checkInTime ? [checkInTime] : [],
+      checkOutTimes: checkOutTime ? [checkOutTime] : [],
+      totalWorkingHours: totalHours,
+      timestamp: new Date().toISOString(),
+      deviceId: null
+    };
+    
+    try {
+      console.log(`💾 Immediately saving manual time for ${selectedEmployee.fullName}...`);
+      await saveData(attendanceRecord, 'attendance');
+      console.log(`✅ Successfully saved manual time for ${selectedEmployee.fullName}`);
+      showCustomToast('success', 'Time Saved', `Time saved for ${selectedEmployee?.fullName}`);
+    } catch (error) {
+      console.error(`❌ Failed to save manual time for ${selectedEmployee.fullName}:`, error);
+      showCustomToast('error', 'Save Failed', `Failed to save time for ${selectedEmployee?.fullName}`);
+    }
+    
+    // Don't refresh UI - let the state update handle it
+    console.log(`✅ UI updated for manual time entry for ${selectedEmployee.fullName}`);
   };
 
   const getAttendanceStats = () => {
@@ -407,12 +533,12 @@ const AttendanceTab = ({ employees = [] }) => {
       const attendance = dayData[employeeId];
       
       if (attendance) {
-        if (attendance.status === 'present') {
+        if (attendance?.status === 'present') {
           present++;
-          if (attendance.checkInTimes?.length > 0 || attendance.checkOutTimes?.length > 0) {
+          if (attendance?.checkInTimes?.length > 0 || attendance?.checkOutTimes?.length > 0) {
             working++;
           }
-        } else if (attendance.status === 'leave') {
+        } else if (attendance?.status === 'leave') {
           onLeave++;
         } else {
           absent++;
@@ -474,6 +600,12 @@ const AttendanceTab = ({ employees = [] }) => {
     return date && date.toDateString() === selectedDate.toDateString();
   };
 
+  const isFutureDate = (date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset time to midnight for accurate comparison
+    return date && date > today;
+  };
+
   const handleYearSelect = () => {
     setTempYear(selectedDate.getFullYear().toString());
     setShowYearPicker(true);
@@ -506,12 +638,14 @@ const AttendanceTab = ({ employees = [] }) => {
           styles.toast,
           customToast.type === 'error' && styles.errorToast,
           customToast.type === 'success' && styles.successToast,
+          customToast.type === 'warning' && styles.warningToast,
           customToast.type === 'info' && styles.infoToast
         ]}>
           <Ionicons 
             name={
               customToast.type === 'error' ? 'close-circle' :
               customToast.type === 'success' ? 'checkmark-circle' :
+              customToast.type === 'warning' ? 'warning' :
               'information-circle'
             } 
             size={20} 
@@ -540,6 +674,15 @@ const AttendanceTab = ({ employees = [] }) => {
 
              {/* Date Navigation */}
        <View style={styles.dateSection}>
+         <View style={styles.dateHeader}>
+           <Text style={styles.sectionTitle}>Date Selection</Text>
+           <TouchableOpacity
+             style={styles.refreshButton}
+             onPress={refreshAttendanceData}
+           >
+             <Ionicons name="refresh" size={20} color="#667eea" />
+           </TouchableOpacity>
+         </View>
          <View style={styles.dateNavigation}>
            <TouchableOpacity
              style={styles.navButton}
@@ -573,6 +716,15 @@ const AttendanceTab = ({ employees = [] }) => {
              onPress={() => {
                const newDate = new Date(selectedDate);
                newDate.setMonth(newDate.getMonth() + 1);
+               
+               // Prevent navigating to future months
+               const today = new Date();
+               if (newDate.getFullYear() > today.getFullYear() || 
+                   (newDate.getFullYear() === today.getFullYear() && newDate.getMonth() > today.getMonth())) {
+                 showCustomToast('error', 'Future Date', 'Cannot navigate to future months');
+                 return;
+               }
+               
                setSelectedDate(newDate);
             //    showCustomToast('info', 'Month Changed', `Navigated to ${newDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`);
              }}
@@ -597,8 +749,17 @@ const AttendanceTab = ({ employees = [] }) => {
                    styles.dayButton,
                    isToday(date) && styles.todayButton,
                    isSelectedDate(date) && styles.selectedDayButton,
+                   isFutureDate(date) && styles.futureDayButton,
                  ]}
                  onPress={() => {
+                   // Prevent selecting future dates
+                   const today = new Date();
+                   today.setHours(0, 0, 0, 0);
+                   if (date > today) {
+                     showCustomToast('error', 'Future Date', 'Cannot select future dates');
+                     return;
+                   }
+                   
                    setSelectedDate(date);
                 //    showCustomToast('info', 'Date Selected', `Selected ${date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`);
                  }}
@@ -607,6 +768,7 @@ const AttendanceTab = ({ employees = [] }) => {
                    styles.dayText,
                    isToday(date) && styles.todayText,
                    isSelectedDate(date) && styles.selectedDayText,
+                   isFutureDate(date) && styles.futureDayText,
                  ]}>
                    {date.getDate()}
                  </Text>
@@ -614,6 +776,7 @@ const AttendanceTab = ({ employees = [] }) => {
                    styles.dayLabel,
                    isToday(date) && styles.todayLabel,
                    isSelectedDate(date) && styles.selectedDayLabel,
+                   isFutureDate(date) && styles.futureDayLabel,
                  ]}>
                    {date.toLocaleDateString('en-US', { weekday: 'short' })}
                  </Text>
@@ -630,11 +793,9 @@ const AttendanceTab = ({ employees = [] }) => {
       {/* Employee List */}
       <View style={styles.employeeList}>
         {employees
-          .filter(employee => employee.status === 'active')
           .map((employee, index) => {
             const employeeId = employee.id || employee.$id;
             const attendance = getAttendanceStatus(employeeId);
-            const totalHours = calculateTotalHours(attendance.checkInTimes, attendance.checkOutTimes);
             
             return (
               <View key={`${employeeId}-${index}`} style={styles.employeeCard}>
@@ -643,17 +804,22 @@ const AttendanceTab = ({ employees = [] }) => {
                   <Text style={styles.employeeRank}>{employee.rank || 'N/A'}</Text>
                   
                   <View style={styles.attendanceStatus}>
-                    <View style={[styles.statusDot, { backgroundColor: getStatusColor(attendance.status) }]} />
-                    <Text style={styles.statusText}>{getStatusText(attendance.status)}</Text>
+                    <View style={[styles.statusDot, { backgroundColor: getStatusColor(attendance?.status || 'absent') }]} />
+                    <Text style={styles.statusText}>{getStatusText(attendance?.status || 'absent')}</Text>
                   </View>
                   
-                  {totalHours !== '0m' && attendance.status !== 'leave' && (
-                    <Text style={styles.hoursText}>Total Hours: {totalHours}</Text>
+                  {attendance?.totalWorkingHours && attendance.totalWorkingHours !== "0h 0m" && (
+                    <Text style={styles.hoursText}>Total Hours: {attendance.totalWorkingHours}</Text>
                   )}
                 </View>
                 
                 <View style={styles.actions}>
-                 
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.presentButton]}
+                    onPress={() => markAttendance(employeeId, 'present')}
+                  >
+                    <Ionicons name="checkmark" size={12} color="#fff" />
+                  </TouchableOpacity>
                   
                   <TouchableOpacity
                     style={[styles.actionButton, styles.absentButton]}
@@ -828,6 +994,11 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: '#16a34a',
   },
+  warningToast: {
+    backgroundColor: '#f59e0b',
+    borderLeftWidth: 4,
+    borderLeftColor: '#d97706',
+  },
   infoToast: {
     backgroundColor: '#3b82f6',
     borderLeftWidth: 4,
@@ -894,6 +1065,63 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
+  },
+  dateHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  markAttendanceButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#22c55e',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 4,
+  },
+  markAttendanceButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  bigMarkAttendanceButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#22c55e',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderRadius: 12,
+    marginTop: 16,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  bigMarkAttendanceButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  },
+  refreshButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f8fafc',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
      dateNavigation: {
      flexDirection: 'row',
@@ -978,6 +1206,18 @@ const styles = StyleSheet.create({
    selectedDayLabel: {
      color: '#fff',
      fontWeight: '600',
+   },
+  futureDayButton: {
+    backgroundColor: '#e5e7eb',
+    opacity: 0.7,
+  },
+  futureDayText: {
+    color: '#9ca3af',
+    fontWeight: '500',
+  },
+  futureDayLabel: {
+    color: '#9ca3af',
+    fontWeight: '400',
    },
    selectedDateText: {
      fontSize: 14,

@@ -198,8 +198,7 @@ const AttendanceTab = ({ employees = [] }) => {
           totalWorkingHours: record.totalWorkingHours || "0h 0m",
           timestamp: record.timestamp,
         };
-       console.log("selectedDateKeyForLoad ",selectedDateKey)
-     console.log("dateKey ",dateKey)
+      
      
         // Debug: Log data for current date
         if (dateKey===selectedDateKey) {

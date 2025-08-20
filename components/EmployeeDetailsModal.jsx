@@ -1,11 +1,81 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Dimensions, Modal, Image as RNImage, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { getItems } from '../services/unifiedDataService';
 
 const { width: screenWidth } = Dimensions.get('window');
 
 const EmployeeDetailsModal = ({ visible, employee, onClose }) => {
+  const [attendanceData, setAttendanceData] = useState({});
+  const [currentMonthStats, setCurrentMonthStats] = useState({
+    present: 0,
+    absent: 0,
+    onLeave: 0,
+    totalWorkingHours: '0h 0m'
+  });
+
+  useEffect(() => {
+    if (visible && employee) {
+      loadAttendanceData();
+    }
+  }, [visible, employee]);
+
+  const loadAttendanceData = async () => {
+    try {
+      const savedData = await getItems('attendance');
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+      
+      // Filter attendance data for current employee and current month
+      const employeeAttendance = savedData.filter(record => 
+        record.employeeId === employee.id || record.employeeId === employee.$id
+      );
+
+      const currentMonthAttendance = employeeAttendance.filter(record => {
+        const recordDate = new Date(record.date);
+        return recordDate.getMonth() === currentMonth && recordDate.getFullYear() === currentYear;
+      });
+
+      // Calculate stats
+      let present = 0, absent = 0, onLeave = 0, totalHours = 0;
+      
+      currentMonthAttendance.forEach(record => {
+        switch (record.status) {
+          case 'present':
+            present++;
+            break;
+          case 'absent':
+            absent++;
+            break;
+          case 'onLeave':
+            onLeave++;
+            break;
+        }
+        
+        // Calculate total working hours
+        if (record.totalWorkingHours) {
+          const hoursMatch = record.totalWorkingHours.match(/(\d+)h\s*(\d+)m/);
+          if (hoursMatch) {
+            totalHours += parseInt(hoursMatch[1]) + (parseInt(hoursMatch[2]) / 60);
+          }
+        }
+      });
+
+      const totalHoursInt = Math.floor(totalHours);
+      const totalMinutes = Math.round((totalHours - totalHoursInt) * 60);
+      
+      setCurrentMonthStats({
+        present,
+        absent,
+        onLeave,
+        totalWorkingHours: `${totalHoursInt}h ${totalMinutes}m`
+      });
+    } catch (error) {
+      console.error('Error loading attendance data:', error);
+    }
+  };
+
   if (!employee) return null;
 
   const formatDate = (dateString) => {
@@ -176,7 +246,7 @@ const EmployeeDetailsModal = ({ visible, employee, onClose }) => {
         >
           {/* Employee Photo & Basic Info */}
           <View style={styles.heroSection}>
-            <View style={styles.photoContainer}>
+            {/* <View style={styles.photoContainer}>
               {employee.photoUrl ? (
                 <RNImage
                   source={{ uri: employee.photoUrl }}
@@ -190,12 +260,12 @@ const EmployeeDetailsModal = ({ visible, employee, onClose }) => {
               <View style={styles.photoOverlay}>
                 <Ionicons name="camera" size={20} color="#fff" />
               </View>
-            </View>
+            </View> */}
             
             <View style={styles.heroInfo}>
-              <Text style={styles.employeeName}>{employee.fullName || 'Unknown Officer'}</Text>
-              <Text style={styles.employeeBadge}>Badge: {employee.badgeNumber || employee.employeeId || 'N/A'}</Text>
-              <Text style={styles.employeeRank}>{employee.rank || 'N/A'}</Text>
+              <Text style={styles.employeeName}>{String(employee.fullName || 'Unknown Officer')}</Text>
+              <Text style={styles.employeeBadge}>Badge: {String(employee.badgeNumber || employee.employeeId || 'N/A')}</Text>
+              <Text style={styles.employeeRank}>{String(employee.rank || 'N/A')}</Text>
               {renderStatusBadge(employee.status)}
             </View>
           </View>
@@ -203,12 +273,36 @@ const EmployeeDetailsModal = ({ visible, employee, onClose }) => {
           {/* Payroll Card */}
           {renderPayrollCard()}
 
+          {/* Attendance Information */}
+          {renderSection('Current Month Attendance', (
+            <View style={styles.attendanceGrid}>
+              <View style={styles.attendanceItem}>
+                <Ionicons name="checkmark-circle" size={24} color="#22c55e" />
+                <Text style={styles.attendanceLabel}>Present</Text>
+                <Text style={styles.attendanceValue}>{currentMonthStats.present}</Text>
+              </View>
+              <View style={styles.attendanceItem}>
+                <Ionicons name="close-circle" size={24} color="#ef4444" />
+                <Text style={styles.attendanceLabel}>Absent</Text>
+                <Text style={styles.attendanceValue}>{currentMonthStats.absent}</Text>
+              </View>
+              <View style={styles.attendanceItem}>
+                <Ionicons name="calendar" size={24} color="#8b5cf6" />
+                <Text style={styles.attendanceLabel}>Leave</Text>
+                <Text style={styles.attendanceValue}>{currentMonthStats.onLeave}</Text>
+              </View>
+              <View style={styles.attendanceItem}>
+                <Ionicons name="time" size={24} color="#f59e0b" />
+                <Text style={styles.attendanceLabel}>Total Hours</Text>
+                <Text style={styles.attendanceValue}>{currentMonthStats.totalWorkingHours}</Text>
+              </View>
+            </View>
+          ), 'time')}
+
           {/* Basic Information */}
           {renderSection('Basic Information', (
             <>
-              {renderField('Badge Number', employee.badgeNumber || employee.employeeId, 'id-card')}
-              {renderField('Full Name', employee.fullName, 'person', true)}
-              {renderField("Father's Name", employee.fatherName, 'person')}
+               {renderField("Father's Name", employee.fatherName, 'person')}
               {renderField('CNIC', employee.cnic, 'card')}
               {renderField('Date of Birth', formatDate(employee.dateOfBirth), 'calendar')}
               {renderField('Gender', employee.gender, 'male-female')}
@@ -229,8 +323,7 @@ const EmployeeDetailsModal = ({ visible, employee, onClose }) => {
             <>
               {renderField('Joining Date', formatDate(employee.joiningDate), 'calendar')}
               {renderField('Department', employee.department, 'business')}
-              {renderField('Rank', employee.rank, 'ribbon')}
-              {renderField('Posting Station', employee.postingStation, 'location')}
+             {renderField('Posting Station', employee.postingStation, 'location')}
               {renderField('Shift', employee.shift || employee.dutyShift, 'time')}
               {renderField('Service Years', employee.serviceYears, 'time')}
               {renderField('Last Promotion Date', formatDate(employee.lastPromotionDate), 'trending-up')}
@@ -244,7 +337,6 @@ const EmployeeDetailsModal = ({ visible, employee, onClose }) => {
               {renderField('Working Days', employee.workingDays?.join(', ') || 'Mon-Fri', 'calendar')}
               {renderField('Check-in Time', employee.checkInTime || '09:00', 'time')}
               {renderField('Check-out Time', employee.checkOutTime || '17:00', 'time')}
-              {renderField('Leaves Allowed/Month', employee.leavesAllowedPerMonth || '2', 'calendar')}
               {renderField('Overtime Rate', employee.overtimeRate ? `${employee.overtimeRate}x` : '1.5x', 'time')}
             </>
           ), 'cash')}
@@ -255,7 +347,7 @@ const EmployeeDetailsModal = ({ visible, employee, onClose }) => {
               {renderField('Weapon License Number', employee.weaponLicenseNumber, 'shield')}
               {renderField('Driving License Number', employee.drivingLicenseNumber, 'car')}
               {renderField('Training Certifications', employee.trainingCertifications, 'library')}
-              {renderField('Performance Rating', employee.performanceRating, 'star')}
+         
               {renderField('Supervisor', employee.supervisor, 'person')}
               {renderField('Work Location', employee.workLocation, 'location')}
               {renderField('Vehicle Assigned', employee.vehicleAssigned, 'car')}
@@ -280,7 +372,7 @@ const EmployeeDetailsModal = ({ visible, employee, onClose }) => {
 
           {/* Notes */}
           {employee.notes && renderSection('Notes', (
-            <Text style={styles.notesText}>{employee.notes}</Text>
+            <Text style={styles.notesText}>{String(employee.notes || 'No notes available')}</Text>
           ), 'chatbubble')}
         </ScrollView>
       </View>
@@ -294,14 +386,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   header: {
-    paddingTop: 50,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
+    padding: 15,
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+ 
   },
   closeButton: {
     padding: 12,
@@ -583,6 +674,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6b7280',
     marginLeft: 8,
+  },
+  attendanceGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  attendanceItem: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: '#f8fafc',
+    padding: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  attendanceLabel: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '500',
+    marginTop: 8,
+  },
+  attendanceValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1e293b',
   },
 });
 

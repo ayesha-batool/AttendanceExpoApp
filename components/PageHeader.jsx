@@ -59,10 +59,8 @@ const PageHeader = ({
               </View>
             )}
           <View style={styles.titleAndActionContainer}>
-            <Text style={styles.headerTitle}>{title}</Text>
-            {subtitle && (
-              <Text style={styles.headerSubtitle}>{subtitle}</Text>
-            )}
+            <Text style={styles.headerTitle}>{String(title || '')}</Text>
+            {subtitle && <Text style={styles.headerSubtitle}>{String(subtitle)}</Text>}
           </View>
           </View>
           {actionButton && (

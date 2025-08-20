@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
   Modal,
   ScrollView,
   StyleSheet,
@@ -121,19 +120,23 @@ const ExpenseForm = ({
       newErrors.amount = 'Amount must be greater than 0';
     }
 
-    if (!form.category) {
-      newErrors.category = 'Category is required';
-    }
+  
 
-    if (!form.department) {
-      newErrors.department = 'Department is required';
-    }
-
-    if (!form.date) {
-      newErrors.date = 'Date is required';
-    }
+ 
 
     setErrors(newErrors);
+    
+    // Show validation toast if there are errors
+    if (Object.keys(newErrors).length > 0) {
+      const errorMessages = Object.values(newErrors).join(', ');
+      setCustomToast({
+        type: 'error',
+        title: 'Validation Error',
+        message: errorMessages
+      });
+      setTimeout(() => setCustomToast(null), 4000);
+    }
+    
     return Object.keys(newErrors).length === 0;
   };
 
@@ -155,7 +158,12 @@ const ExpenseForm = ({
       resetForm();
       onClose();
     } catch (error) {
-      Alert.alert('Error', 'Failed to save expense');
+      setCustomToast({
+        type: 'error',
+        title: 'Save Failed',
+        message: error.message || 'Failed to save expense'
+      });
+      setTimeout(() => setCustomToast(null), 4000);
     } finally {
       setLoading(false);
     }
@@ -163,17 +171,18 @@ const ExpenseForm = ({
 
   const handleCancel = () => {
     if (isEdit) {
-      Alert.alert(
-        'Cancel Edit',
-        'Are you sure you want to cancel? All changes will be lost.',
-        [
-          { text: 'Continue Editing', style: 'cancel' },
-          { text: 'Cancel', style: 'destructive', onPress: () => {
-            resetForm();
-            onClose();
-          }}
-        ]
-      );
+      setCustomToast({
+        type: 'warning',
+        title: 'Cancel Edit',
+        message: 'Are you sure you want to cancel? All changes will be lost.'
+      });
+      setTimeout(() => setCustomToast(null), 3000);
+      
+      // Reset form and close after showing warning
+      setTimeout(() => {
+        resetForm();
+        onClose();
+      }, 3000);
     } else {
       resetForm();
       onClose();
@@ -188,7 +197,7 @@ const ExpenseForm = ({
       onRequestClose={handleCancel}
     >
       <View style={styles.modalOverlay}>
-        {/* Custom Toast Container */}
+        {/* Custom Toast Container - Absolutely positioned */}
         {customToast && (
           <View style={[
             styles.customToastContainer,
@@ -224,7 +233,7 @@ const ExpenseForm = ({
           contentContainerStyle={styles.scrollViewContent}
         >
           <InputField
-            label="Title *"
+            label="Title"
             value={form.title}
             onChangeText={(text) => updateForm('title', text)}
             placeholder="Enter expense title"
@@ -233,7 +242,7 @@ const ExpenseForm = ({
           />
 
           <InputField
-            label="Amount *"
+            label="Amount"
             value={form.amount}
             onChangeText={(text) => updateForm('amount', text)}
             placeholder="Enter amount"
@@ -243,7 +252,7 @@ const ExpenseForm = ({
           />
 
           <SelectDropdown
-            label="Category *"
+            label="Category"
             selectedValue={form.category}
             onValueChange={(value) => updateForm('category', value)}
             options={categoryOptions}
@@ -258,7 +267,7 @@ const ExpenseForm = ({
           />
 
           <SelectDropdown
-            label="Department *"
+            label="Department"
             selectedValue={form.department}
             onValueChange={(value) => updateForm('department', value)}
             options={departmentOptions}
@@ -273,7 +282,7 @@ const ExpenseForm = ({
           />
 
           <DatePickerField
-            label="Date *"
+            label="Date"
             value={form.date}
             onChange={(date) => updateForm('date', date)}
             placeholder="Select date"
@@ -439,18 +448,20 @@ const styles = StyleSheet.create({
   },
   // Custom toast styles
   customToastContainer: {
+    position: 'absolute',
+    top: 60, // Position below status bar
+    left: 20,
+    right: 20,
+    zIndex: 9999, // Very high z-index to appear above everything
+    elevation: 9999,
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    marginBottom: 12,
     borderRadius: 12,
-    marginHorizontal: 20,
-    marginTop: 20,
     boxShadowColor: '#000',
     boxShadowOffset: { width: 0, height: 4 },
     boxShadowOpacity: 0.15,
     boxShadowRadius: 8,
-    elevation: 4,
   },
   errorToast: {
     backgroundColor: '#ef4444',

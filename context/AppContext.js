@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { dataService, useNetworkStatus } from "../services/unifiedDataService";
 
@@ -26,6 +27,11 @@ export const AppProvider = ({ children }) => {
                 setCurrentCollection(collectionId);
             }
         } catch (err) {
+            if (err.code === 'AUTH_REQUIRED') {
+                console.log('🔐 Authentication required, redirecting to auth page');
+                router.replace('/auth');
+                return;
+            }
             console.error("Fetch failed:", err);
         } finally {
             setIsLoading(false);
@@ -50,6 +56,11 @@ export const AppProvider = ({ children }) => {
             await dataService.deleteData(`Items_${docId}`, docId, currentCollection);
             await fetchItems(currentCollection);
         } catch (err) {
+            if (err.code === 'AUTH_REQUIRED') {
+                console.log('🔐 Authentication required, redirecting to auth page');
+                router.replace('/auth');
+                return;
+            }
             console.error("Delete failed:", err);
         }
     };

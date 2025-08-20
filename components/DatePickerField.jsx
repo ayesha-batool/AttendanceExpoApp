@@ -39,7 +39,7 @@ const DatePickerField = ({ label, mode = 'date', value, onChange, optional = fal
       <TouchableOpacity onPress={() => setShowPicker(true)} style={[styles.button, error && styles.buttonError]}>
         <Text style={styles.buttonText}>{formatDate(value)}</Text>
       </TouchableOpacity>
-      {error && <Text style={styles.errorText}>{error}</Text>}
+      {error && <Text style={styles.errorText}>{String(error)}</Text>}
       {showPicker && (
         <DateTimePicker
           value={getPickerValue()}

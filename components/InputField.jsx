@@ -14,6 +14,7 @@ const InputField = ({
   numberOfLines = 1,
   textAlignVertical = 'center',
   style,
+  disabled = false,
   isAmount = false,
 }) => {
   const handleAmountChange = (text) => {
@@ -53,6 +54,7 @@ const InputField = ({
         multiline={multiline}
         numberOfLines={numberOfLines}
         textAlignVertical={textAlignVertical}
+        editable={!disabled}
         style={[
           styles.input,
           multiline && styles.textarea,
@@ -62,7 +64,7 @@ const InputField = ({
       />
       {error && (
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={styles.errorText}>{String(error)}</Text>
         </View>
       )}
     </View>

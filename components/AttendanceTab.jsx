@@ -1,13 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import {
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { getItems, saveData } from '../services/unifiedDataService';
 import StatCard from './StatCard';
@@ -28,98 +28,20 @@ const AttendanceTab = ({ employees = [] }) => {
     setTimeout(() => setCustomToast(null), 3000);
   };
 
-  const refreshAttendanceData = async () => {
-    console.log('🔄 Manual refresh requested...');
-    await loadAttendanceData();
-    showCustomToast('success', 'Refreshed', 'Attendance data refreshed from storage');
-  };
 
-  const markAllAttendance = async () => {
-    const currentDateKey = formatDate(selectedDate);
-    const today = formatDate(new Date());
-    
-    // Prevent marking attendance for future dates
-    if (currentDateKey > today) {
-      showCustomToast('error', 'Future Date', 'Cannot mark attendance for future dates');
-      return;
-    }
-    
-    console.log('🎯 MARK ATTENDANCE: Starting to save all employee attendance...');
-    console.log(`🎯 MARK ATTENDANCE: Total employees to process: ${employees.length}`);
-    
-    // Get employees that have attendance data for this date
-    const currentDateData = attendanceData[currentDateKey] || {};
-    const employeesWithAttendance = Object.keys(currentDateData);
-    
-    console.log(`🎯 MARK ATTENDANCE: Found ${employeesWithAttendance.length} employees with attendance data`);
-    
-    let savedCount = 0;
-    let errorCount = 0;
-    
-    for (const employeeId of employeesWithAttendance) {
-      const employee = employees.find(emp => emp.id === employeeId);
-      if (!employee) continue;
-      
-      const currentAttendance = currentDateData[employeeId];
-      
-      // Use existing status
-      const status = currentAttendance?.status || 'absent';
-      const checkInTimes = currentAttendance?.checkInTimes || [];
-      const checkOutTimes = currentAttendance?.checkOutTimes || [];
-      const totalWorkingHours = currentAttendance?.totalWorkingHours || "0h 0m";
-      
-      // Debug: Log Farhan's status specifically
-      if (employee.fullName.toLowerCase().includes('farhan')) {
-        console.log(`🎯 MARK ATTENDANCE: Farhan's status before save: ${status}`);
-        console.log(`🎯 MARK ATTENDANCE: Farhan's attendance data:`, currentAttendance);
-      }
-      
-      const dateOnly = currentDateKey.replace(/-/g, '');
-      const validId = `${dateOnly}_${employeeId}`;
-      
-      const attendanceRecord = {
-        id: validId,
-        employeeId: employeeId,
-        employeeName: employee.fullName,
-        date: currentDateKey,
-        status: status,
-        checkInTimes: checkInTimes,
-        checkOutTimes: checkOutTimes,
-        totalWorkingHours: totalWorkingHours,
-        timestamp: new Date().toISOString(),
-        deviceId: null
-      };
-      
-      try {
-        await saveData(attendanceRecord, 'attendance');
-        savedCount++;
-        console.log(`✅ MARK ATTENDANCE: Saved ${employee.fullName} as ${status}`);
-      } catch (error) {
-        errorCount++;
-        console.error(`❌ MARK ATTENDANCE: Failed to save ${employee.fullName}:`, error);
-      }
-    }
-    
-    console.log(`🎯 MARK ATTENDANCE: Completed! Saved ${savedCount} employees, ${errorCount} errors`);
-    
-    if (savedCount > 0) {
-      showCustomToast('success', 'Attendance Marked', `Saved attendance for ${savedCount} employees`);
-    }
-    
-    if (errorCount > 0) {
-      showCustomToast('error', 'Some Errors', `${errorCount} employees failed to save`);
-    }
-    
-    // Don't reload data - let the state updates handle UI
-    console.log('🎯 MARK ATTENDANCE: All attendance saved successfully!');
-  };
+
 
   // Load attendance data when component mounts and when date changes
   useEffect(() => {
+    try{
+
     const loadData = async () => {
       await loadAttendanceData();
     };
     loadData();
+  } catch (error) {
+    console.error('❌ Error loading attendance:', error);
+  }
   }, [selectedDate]); // Reload when date changes
 
   // Initialize attendance for selected date when employees change
@@ -186,11 +108,11 @@ const AttendanceTab = ({ employees = [] }) => {
       const attendanceObject = {};
       
       savedData.forEach(record => {
-        console.log("record ",record)
+        console.log("record:", record);
         const dateKey = record.date.split('T')[0];
         // const dateKeyForLoad = dateKey.split('T')[0];
         if (!attendanceObject[dateKey]) attendanceObject[dateKey] = {};
-       
+        
         attendanceObject[dateKey][record.employeeId] = {
           status: record.status || 'absent',
           checkInTimes: record.checkInTimes || [],
@@ -211,13 +133,13 @@ const AttendanceTab = ({ employees = [] }) => {
       
       console.log(`📥 Setting attendance data to state for ${Object.keys(attendanceObject).length} dates`);
       setAttendanceData(attendanceObject);
-      console.log("attendanceObject ",attendanceObject)
+      console.log("attendanceObject:", attendanceObject);
       // Check if we have data for current date
 
       const currentDateData = attendanceObject[selectedDateKey] || {};
-      console.log("currentDateData ",currentDateData)
+      console.log("currentDateData:", currentDateData);
       const currentDateRecords = Object.keys(currentDateData).length;
-      console.log("currentDateRecords ",currentDateRecords)
+      console.log("currentDateRecords:", currentDateRecords);
       console.log(`📥 Current date (${selectedDateKey}) has ${currentDateRecords} attendance records`);
       
       if (currentDateRecords === 0) {
@@ -320,11 +242,7 @@ const AttendanceTab = ({ employees = [] }) => {
         console.error(`❌ Failed to save ${employeeName}:`, error);
       }
       
-      // Force a small delay to ensure state updates, then refresh
-      // setTimeout(async () => {
-      //   console.log(`🔄 Refreshing UI after marking ${employeeName} as ${status}`);
-      //   await loadAttendanceData();
-      // }, 100);
+   
     } else {
       showCustomToast('info', 'Already Marked', `${employeeName} is already marked as ${status}`);
     }
@@ -511,10 +429,10 @@ const AttendanceTab = ({ employees = [] }) => {
       console.log(`💾 Immediately saving manual time for ${selectedEmployee.fullName}...`);
       await saveData(attendanceRecord, 'attendance');
       console.log(`✅ Successfully saved manual time for ${selectedEmployee.fullName}`);
-      showCustomToast('success', 'Time Saved', `Time saved for ${selectedEmployee?.fullName}`);
+      showCustomToast('success', 'Time Saved', `Time saved for ${selectedEmployee?.fullName || 'Employee'}`);
     } catch (error) {
-      console.error(`❌ Failed to save manual time for ${selectedEmployee.fullName}:`, error);
-      showCustomToast('error', 'Save Failed', `Failed to save time for ${selectedEmployee?.fullName}`);
+      console.error(`❌ Failed to save manual time for ${selectedEmployee?.fullName}:`, error);
+      showCustomToast('error', 'Save Failed', `Failed to save time for ${selectedEmployee?.fullName || 'Employee'}`);
     }
     
     // Don't refresh UI - let the state update handle it
@@ -673,15 +591,7 @@ const AttendanceTab = ({ employees = [] }) => {
 
              {/* Date Navigation */}
        <View style={styles.dateSection}>
-         <View style={styles.dateHeader}>
-           <Text style={styles.sectionTitle}>Date Selection</Text>
-           <TouchableOpacity
-             style={styles.refreshButton}
-             onPress={refreshAttendanceData}
-           >
-             <Ionicons name="refresh" size={20} color="#667eea" />
-           </TouchableOpacity>
-         </View>
+        
          <View style={styles.dateNavigation}>
            <TouchableOpacity
              style={styles.navButton}
@@ -689,16 +599,15 @@ const AttendanceTab = ({ employees = [] }) => {
                const newDate = new Date(selectedDate);
                newDate.setMonth(newDate.getMonth() - 1);
                setSelectedDate(newDate);
-            //    showCustomToast('info', 'Month Changed', `Navigated to ${newDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`);
              }}
            >
              <Ionicons name="chevron-back" size={16} color="#667eea" />
            </TouchableOpacity>
            
            <View style={styles.monthYearContainer}>
-             <Text style={styles.monthText}>
-               {selectedDate.toLocaleDateString('en-US', { month: 'long' })}
-             </Text>
+                              <Text style={styles.monthText}>
+                   {selectedDate.toLocaleDateString('en-US', { month: 'long' })}
+                 </Text>
              <TouchableOpacity
                style={styles.yearButton}
                onPress={handleYearSelect}
@@ -725,7 +634,6 @@ const AttendanceTab = ({ employees = [] }) => {
                }
                
                setSelectedDate(newDate);
-            //    showCustomToast('info', 'Month Changed', `Navigated to ${newDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`);
              }}
            >
              <Ionicons name="chevron-forward" size={16} color="#667eea" />
@@ -743,7 +651,7 @@ const AttendanceTab = ({ employees = [] }) => {
              if (!date) return null;
              return (
                <TouchableOpacity
-                 key={date ? `day-${date.getTime()}` : `empty-${index}`}
+                 key={date ? `day-${String(date.getTime())}` : `empty-${index}`}
                  style={[
                    styles.dayButton,
                    isToday(date) && styles.todayButton,
@@ -797,19 +705,21 @@ const AttendanceTab = ({ employees = [] }) => {
             const attendance = getAttendanceStatus(employeeId);
             
             return (
-              <View key={`${employeeId}-${index}`} style={styles.employeeCard}>
+              <View key={`${String(employeeId)}-${index}`} style={styles.employeeCard}>
                 <View style={styles.employeeInfo}>
-                  <Text style={styles.employeeName}>{employee.fullName}</Text>
+                  <Text style={styles.employeeName}>{employee.fullName || 'Unknown'}</Text>
                   <Text style={styles.employeeRank}>{employee.rank || 'N/A'}</Text>
                   
                   <View style={styles.attendanceStatus}>
                     <View style={[styles.statusDot, { backgroundColor: getStatusColor(attendance?.status || 'absent') }]} />
                     <Text style={styles.statusText}>{getStatusText(attendance?.status || 'absent')}</Text>
                   </View>
+                  <View>
                   
                   {attendance?.totalWorkingHours && attendance.totalWorkingHours !== "0h 0m" && (
                     <Text style={styles.hoursText}>Total Hours: {attendance.totalWorkingHours}</Text>
                   )}
+                  </View>
                 </View>
                 
                 <View style={styles.actions}>
@@ -864,7 +774,7 @@ const AttendanceTab = ({ employees = [] }) => {
             
             <View style={styles.modalBody}>
               <Text style={styles.modalSubtitle}>
-                {selectedEmployee?.fullName} - {selectedDate.toLocaleDateString()}
+                {selectedEmployee?.fullName ? `${selectedEmployee.fullName} - ${selectedDate.toLocaleDateString()}` : selectedDate.toLocaleDateString()}
               </Text>
               
               <Text style={styles.helperText}>
@@ -968,20 +878,25 @@ const AttendanceTab = ({ employees = [] }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    // backgroundColor: '#f8fafc',
     padding: 16,
+  paddingBottom:100
   },
   toast: {
+    position: 'absolute',
+    top: 60,
+    left: 20,
+    right: 20,
+    zIndex: 9999,
+    elevation: 9999,
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    marginBottom: 16,
     borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
-    elevation: 4,
   },
   errorToast: {
     backgroundColor: '#ef4444',

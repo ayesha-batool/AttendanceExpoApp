@@ -9,7 +9,6 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import Toast from 'react-native-toast-message';
 import { customOptionsService } from '../services/unifiedDataService';
 
 const AddNewOptionModal = ({ 
@@ -22,14 +21,16 @@ const AddNewOptionModal = ({
 }) => {
   const [newOption, setNewOption] = useState('');
   const [loading, setLoading] = useState(false);
+  const [customToast, setCustomToast] = useState(null);
+
+  const showCustomToast = (type, title, message) => {
+    setCustomToast({ type, title, message });
+    setTimeout(() => setCustomToast(null), 3000);
+  };
 
   const handleSubmit = async () => {
     if (!newOption.trim()) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Please enter a valid option name',
-      });
+      showCustomToast('error', 'Error', 'Please enter a valid option name');
       return;
     }
 
@@ -38,11 +39,7 @@ const AddNewOptionModal = ({
       const optionValue = typeof option === 'string' ? option : (option?.label || option?.value || '');
       return optionValue.toLowerCase() === newOption.toLowerCase();
     })) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'This option already exists',
-      });
+      showCustomToast('error', 'Error', 'This option already exists');
       return;
     }
 
@@ -50,24 +47,23 @@ const AddNewOptionModal = ({
     try {
       const result = await customOptionsService.addOption(fieldName, newOption.trim());
       if (result.success) {
-        // Removed success toast
+        // Call onSuccess to update parent component
         onSuccess(newOption.trim());
+        
+        // Clear the input field for next entry
         setNewOption('');
-        onClose();
+        
+        // Don't close the modal - allow multiple additions
+        // onClose();
+        
+        // Show success toast
+        showCustomToast('success', 'Success', `${newOption.trim()} added successfully`);
       } else {
-        Toast.show({
-          type: 'error',
-          text1: 'Error',
-          text2: result.message || 'Failed to add new option',
-        });
+        showCustomToast('error', 'Error', result.message || 'Failed to add new option');
       }
     } catch (error) {
       console.error('Error adding new option:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Failed to add new option',
-      });
+      showCustomToast('error', 'Error', 'Failed to add new option');
     } finally {
       setLoading(false);
     }
@@ -135,6 +131,14 @@ const AddNewOptionModal = ({
           </View>
         </View>
       </View>
+      {customToast && (
+        <View style={styles.toastContainer}>
+          <View style={[styles.toast, { backgroundColor: customToast.type === 'success' ? '#4CAF50' : '#F44336' }]}>
+            <Text style={styles.toastText}>{customToast.title}</Text>
+            <Text style={styles.toastMessage}>{customToast.message}</Text>
+          </View>
+        </View>
+      )}
     </Modal>
   );
 };
@@ -234,6 +238,34 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  toastContainer: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+    zIndex: 9999,
+    elevation: 9999,
+  },
+  toast: {
+    padding: 15,
+    borderRadius: 8,
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  toastText: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  toastMessage: {
+    fontSize: 14,
   },
 });
 

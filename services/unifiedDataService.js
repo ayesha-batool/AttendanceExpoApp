@@ -85,32 +85,54 @@ const isOnline = async () => {
 // Get device identifier
 const getDeviceId = async () => {
   try {
+    // Check if we have a stored device ID first
+    const storedDeviceId = await storage.get('device_id');
+    console.log("storedDeviceId",storedDeviceId)
+    if (storedDeviceId) {
+      return storedDeviceId;
+    }
+
+    let deviceId = 'unknown_device';
+    
     // Try to get device name from Constants
     if (Constants.expoConfig?.name) {
-      return Constants.expoConfig.name;
+      deviceId = Constants.expoConfig.name;
     }
     
-    // Try to get device name from platform
+    // Try to get device name from platform with more specific info
     if (Constants.platform) {
       const platform = Constants.platform;
       if (platform.ios) {
-        return `iOS_${platform.ios.systemVersion || 'unknown'}`;
+        const deviceName = platform.ios.deviceName || 'iPhone';
+        const systemVersion = platform.ios.systemVersion || 'unknown';
+        deviceId = `${deviceName}_iOS_${systemVersion}`;
       }
       if (platform.android) {
-        return `Android_${platform.android.versionCode || 'unknown'}`;
+        const deviceName = platform.android.deviceName || 'Android';
+        const versionCode = platform.android.versionCode || 'unknown';
+        const model = platform.android.model || 'unknown';
+        deviceId = `${deviceName}_${model}_Android_${versionCode}`;
       }
       if (platform.web) {
-        return `Web_${platform.web.userAgent || 'unknown'}`;
+        const userAgent = platform.web.userAgent || 'unknown';
+        // Extract browser and OS info from user agent
+        const browserMatch = userAgent.match(/(Chrome|Firefox|Safari|Edge)\/[\d.]+/);
+        const osMatch = userAgent.match(/\((.*?)\)/);
+        const browser = browserMatch ? browserMatch[1] : 'Browser';
+        const os = osMatch ? osMatch[1].split(';')[0].trim() : 'OS';
+        deviceId = `Desktop_${os}_${browser}`;
       }
     }
     
-    // Fallback to app name
-    if (Constants.expoConfig?.slug) {
-      return Constants.expoConfig.slug;
-    }
+    // Add timestamp to make it more unique
+    const timestamp = Date.now().toString().slice(-6); // Last 6 digits
+    deviceId = `${deviceId}_${timestamp}`;
     
-    // Final fallback
-    return 'unknown_device';
+    // Store the device ID for future use
+    await storage.save('device_id', deviceId);
+    
+    console.log(`🔧 Generated device ID: ${deviceId}`);
+    return deviceId;
   } catch (error) {
     console.error('Error getting device info:', error);
     return 'unknown_device';
@@ -618,53 +640,23 @@ export const dataService = {
             user = await account.get();
           } catch (authError) {
             if (authError.message.includes('missing scope (account)') || authError.message.includes('User (role: guests)')) {
-              console.log(`👤 User not authenticated, using local data only for ${collectionId}`);
-              // Fall back to local storage only
-              const keys = await storage.getAllKeys();
-              const collectionKeys = keys.filter(key => key.startsWith(`${collectionId}_`));
-              
-              if (collectionKeys.length === 0) {
-                console.log(`📭 No local data found for ${collectionId}`);
-                return [];
-              }
-              
-              const items = await Promise.all(
-                collectionKeys.map(async key => {
-                  const data = await storage.get(key);
-                  if (!data) return null;
-                  return { ...data, id: data.id || key.split('_')[1], $id: data.$id || key.split('_')[1] };
-                })
-              );
-              
-              const validItems = items.filter(item => item !== null);
-              console.log(`📊 Returning ${validItems.length} local items for ${collectionId}`);
-              return validItems;
+              console.log(`👤 User not authenticated, redirecting to auth page`);
+              // Throw a specific error that can be caught by the UI to redirect to auth
+              const authError = new Error('AUTHENTICATION_REQUIRED');
+              authError.code = 'AUTH_REQUIRED';
+              authError.message = 'User not authenticated. Please log in to continue.';
+              throw authError;
             }
             throw authError;
           }
           
           if (!user) {
-            console.log(`👤 No authenticated user, using local data only for ${collectionId}`);
-            // Fall back to local storage only
-            const keys = await storage.getAllKeys();
-            const collectionKeys = keys.filter(key => key.startsWith(`${collectionId}_`));
-            
-            if (collectionKeys.length === 0) {
-              console.log(`📭 No local data found for ${collectionId}`);
-              return [];
-            }
-            
-            const items = await Promise.all(
-              collectionKeys.map(async key => {
-                const data = await storage.get(key);
-                if (!data) return null;
-                return { ...data, id: data.id || key.split('_')[1], $id: data.$id || key.split('_')[1] };
-              })
-            );
-            
-            const validItems = items.filter(item => item !== null);
-            console.log(`📊 Returning ${validItems.length} local items for ${collectionId}`);
-            return validItems;
+            console.log(`👤 No authenticated user, redirecting to auth page`);
+            // Throw a specific error that can be caught by the UI to redirect to auth
+            const authError = new Error('AUTHENTICATION_REQUIRED');
+            authError.code = 'AUTH_REQUIRED';
+            authError.message = 'User not authenticated. Please log in to continue.';
+            throw authError;
           }
           
           console.log(`🌐 Fetching ${collectionId} from Appwrite...`);
@@ -720,10 +712,11 @@ export const dataService = {
                 id: doc.$id,
                 $id: doc.$id,
                 $createdAt: doc.$createdAt,
-                $updatedAt: doc.$updatedAt
+                $updatedAt: doc.$updatedAt,
+                deviceId: doc.deviceId || 'unknown'
               };
               await storage.save(localKey, localData);
-              console.log(`💾 Synced document ${doc.$id} to local storage`);
+              console.log(`💾 Synced document ${doc.$id} (device: ${doc.deviceId || 'unknown'}) to local storage`);
             }
           }
           
@@ -735,7 +728,7 @@ export const dataService = {
         console.log(`📱 Offline mode: using local storage for ${collectionId}`);
       }
       
-      // Get data from local storage
+      // Get data from local storage (combines local and synced data)
       const keys = await storage.getAllKeys();
       const collectionKeys = keys.filter(key => key.startsWith(`${collectionId}_`));
       
@@ -749,12 +742,17 @@ export const dataService = {
           const data = await storage.get(key);
           if (!data) return null;
           
-          return { ...data, id: data.id || key.split('_')[1], $id: data.$id || key.split('_')[1] };
+          return { 
+            ...data, 
+            id: data.id || key.split('_')[1], 
+            $id: data.$id || key.split('_')[1],
+            deviceId: data.deviceId || 'unknown'
+          };
         })
       );
       
       const validItems = items.filter(item => item !== null);
-      console.log(`📊 Returning ${validItems.length} items for ${collectionId}`);
+      console.log(`📊 Returning ${validItems.length} items for ${collectionId} (mix of local and synced data)`);
       return validItems;
       
     } catch (error) {
@@ -766,26 +764,30 @@ export const dataService = {
   async saveData(data, collectionId) {
     try {
       console.log(data)
+      const deviceId = await getDeviceId();
       const uniqueId = generateValidAppwriteId(data.id || data.$id);
-      const cleanData = { ...data, id: uniqueId, $id: uniqueId, deviceId: data.deviceId || await getDeviceId() };
-      console.log("id",uniqueId)
-      // Check for duplicates
+      const cleanData = { ...data, id: uniqueId, $id: uniqueId, deviceId: deviceId };
+      console.log("id",uniqueId, "deviceId", deviceId)
+      
+      // Check for duplicates only within same device
       const existing = await dataService.getItems(collectionId);
       const duplicate = existing.find(item => {
-        if (collectionId === 'employees' && data.badgeNumber) {
-          return item.badgeNumber === data.badgeNumber;
-        }
-        if (collectionId === 'cases' && data.title) {
-          return item.title === data.title;
-        }
-        if (collectionId === 'expenses' && data.title) {
-          return item.title === data.title;
+        if (item.deviceId === deviceId) {
+          if (collectionId === 'employees' && data.badgeNumber && item.badgeNumber) {
+            return item.badgeNumber === data.badgeNumber;
+          }
+          if (collectionId === 'cases' && data.title && item.title) {
+            return item.title === data.title;
+          }
+          if (collectionId === 'expenses' && data.title && item.title) {
+            return item.title === data.title;
+          }
         }
         return false;
       });
       
       if (duplicate) {
-        throw new Error(`${collectionId === 'employees' ? 'Badge number' : 'Title'} already exists.`);
+        throw new Error(`${collectionId === 'employees' ? 'Badge number' : 'Title'} already exists on this device.`);
       }
       
       const key = `${collectionId}_${uniqueId}`;
@@ -800,14 +802,16 @@ export const dataService = {
             user = await account.get();
           } catch (authError) {
             if (authError.message.includes('missing scope (account)') || authError.message.includes('User (role: guests)')) {
-              console.log(`👤 User not authenticated, skipping Appwrite save for ${collectionId}`);
+              console.log(`👤 User not authenticated, adding to pending sync for ${collectionId}`);
+              await pendingSyncQueue.addPendingSync('create', collectionId, cleanData, uniqueId);
               return cleanData;
             }
             throw authError;
           }
           
           if (!user) {
-            console.log(`👤 No authenticated user, skipping Appwrite save for ${collectionId}`);
+            console.log(`👤 No authenticated user, adding to pending sync for ${collectionId}`);
+            await pendingSyncQueue.addPendingSync('create', collectionId, cleanData, uniqueId);
             return cleanData;
           }
           const collectionMap = {
@@ -834,33 +838,27 @@ export const dataService = {
           }
           console.log("appwriteData documentId",uniqueId)
           
-          // Check if document already exists and update it, otherwise create new
+          // Try to create document first, if it exists then update it
           try {
-            await databases.getDocument(
-              config.databaseId,
-              appwriteCollectionId,
-              uniqueId
-            );
-            // Document exists, update it
-            await databases.updateDocument(
+            const response = await databases.createDocument(
               config.databaseId,
               appwriteCollectionId,
               uniqueId,
               appwriteData
             );
-            console.log(`✅ Successfully updated in Appwrite: ${uniqueId}`);
-          } catch (getError) {
-            if (getError.message.includes('Document with the requested ID could not be found')) {
-              // Document doesn't exist, create it
-            const response=  await databases.createDocument(
+            console.log(`✅ Successfully created in Appwrite: ${uniqueId}`);
+          } catch (createError) {
+            if (createError.message.includes('Document with the requested ID already exists')) {
+              // Document exists, update it
+              await databases.updateDocument(
                 config.databaseId,
                 appwriteCollectionId,
                 uniqueId,
                 appwriteData
               );
-              console.log(`✅ Successfully created in Appwrite: ${response}`);
+              console.log(`✅ Successfully updated in Appwrite: ${uniqueId}`);
             } else {
-              throw getError;
+              throw createError;
             }
           }
           
@@ -873,11 +871,13 @@ export const dataService = {
             console.error('Current project ID:', process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID);
           }
           
-          // Continue with local storage only
-          console.log(`📱 Continuing with local storage only for ${collectionId}`);
+          // Add to pending sync queue for later retry
+          console.log(`📝 Adding to pending sync queue for later retry`);
+          await pendingSyncQueue.addPendingSync('create', collectionId, cleanData, uniqueId);
         }
       } else {
-        console.log(`📱 Offline mode: saving to local storage only for ${collectionId}`);
+        console.log(`📱 Offline mode: saving to local storage and adding to pending sync for ${collectionId}`);
+        await pendingSyncQueue.addPendingSync('create', collectionId, cleanData, uniqueId);
       }
       
       return cleanData;
@@ -889,26 +889,31 @@ export const dataService = {
 
   async updateData(key, documentId, data, collectionId) {
     try {
-      const cleanData = { ...data, id: documentId, $id: documentId, deviceId: data.deviceId || await getDeviceId() };
+      const deviceId = await getDeviceId();
+      const cleanData = { ...data, id: documentId, $id: documentId, deviceId: deviceId };
       
-      // Check for duplicates (excluding current item)
+      // Check for duplicates only within same device (excluding current item)
       const existing = await dataService.getItems(collectionId);
       const duplicate = existing.find(item => {
-        if (item.id === documentId) return false;
-        if (collectionId === 'employees' && data.badgeNumber) {
-          return item.badgeNumber === data.badgeNumber;
-        }
-        if (collectionId === 'cases' && data.title) {
-          return item.title === data.title;
-        }
-        if (collectionId === 'expenses' && data.title) {
-          return item.title === data.title;
+        // Skip the current item being updated
+        if (item.id === documentId || item.$id === documentId) return false;
+        
+        if (item.deviceId === deviceId) {
+          if (collectionId === 'employees' && data.badgeNumber && item.badgeNumber) {
+            return item.badgeNumber === data.badgeNumber;
+          }
+          if (collectionId === 'cases' && data.title && item.title) {
+            return item.title === data.title;
+          }
+          if (collectionId === 'expenses' && data.title && item.title) {
+            return item.title === data.title;
+          }
         }
         return false;
       });
       
       if (duplicate) {
-        throw new Error(`${collectionId === 'employees' ? 'Badge number' : 'Title'} already exists.`);
+        throw new Error(`${collectionId === 'employees' ? 'Badge number' : 'Title'} already exists on this device.`);
       }
       
       await storage.save(key, cleanData);
@@ -922,14 +927,16 @@ export const dataService = {
             user = await account.get();
           } catch (authError) {
             if (authError.message.includes('missing scope (account)') || authError.message.includes('User (role: guests)')) {
-              console.log(`👤 User not authenticated, skipping Appwrite update for ${collectionId}`);
+              console.log(`👤 User not authenticated, adding to pending sync for ${collectionId}`);
+              await pendingSyncQueue.addPendingSync('update', collectionId, cleanData, documentId);
               return cleanData;
             }
             throw authError;
           }
           
           if (!user) {
-            console.log(`👤 No authenticated user, skipping Appwrite update for ${collectionId}`);
+            console.log(`👤 No authenticated user, adding to pending sync for ${collectionId}`);
+            await pendingSyncQueue.addPendingSync('update', collectionId, cleanData, documentId);
             return cleanData;
           }
           const collectionMap = {
@@ -949,24 +956,19 @@ export const dataService = {
             return cleanData;
           }
           
-          // Check if document exists first
+          // Try to update document first, if it doesn't exist then create it
           try {
             const validDocumentId = generateValidAppwriteId(documentId);
-            await databases.getDocument(
-              config.databaseId,
-              collectionMap[collectionId],
-              validDocumentId
-            );
-            // Document exists, update it
             await databases.updateDocument(
               config.databaseId,
               collectionMap[collectionId],
               validDocumentId,
               appwriteData
             );
-          } catch (getError) {
-            if (getError.message.includes('Document with the requested ID could not be found')) {
+          } catch (updateError) {
+            if (updateError.message.includes('Document with the requested ID could not be found')) {
               // Document doesn't exist, create it
+              const validDocumentId = generateValidAppwriteId(documentId);
               await databases.createDocument(
                 config.databaseId,
                 collectionMap[collectionId],
@@ -974,14 +976,17 @@ export const dataService = {
                 appwriteData
               );
             } else {
-              throw getError;
+              throw updateError;
             }
           }
         } catch (error) {
           console.log('❌ Could not update/create in Appwrite:', error.message);
+          // Add to pending sync queue for later retry
+          await pendingSyncQueue.addPendingSync('update', collectionId, cleanData, documentId);
         }
       } else {
-        console.log('📱 Offline mode - updated local storage only');
+        console.log('📱 Offline mode - updated local storage and added to pending sync');
+        await pendingSyncQueue.addPendingSync('update', collectionId, cleanData, documentId);
       }
       
       return cleanData;
@@ -1005,14 +1010,16 @@ export const dataService = {
             user = await account.get();
           } catch (authError) {
             if (authError.message.includes('missing scope (account)') || authError.message.includes('User (role: guests)')) {
-              console.log(`👤 User not authenticated, skipping Appwrite delete for ${collectionId}`);
+              console.log(`👤 User not authenticated, adding to pending sync for ${collectionId}`);
+              await pendingSyncQueue.addPendingSync('delete', collectionId, null, documentId);
               return { success: true, id: documentId };
             }
             throw authError;
           }
           
           if (!user) {
-            console.log(`👤 No authenticated user, skipping Appwrite delete for ${collectionId}`);
+            console.log(`👤 No authenticated user, adding to pending sync for ${collectionId}`);
+            await pendingSyncQueue.addPendingSync('delete', collectionId, null, documentId);
             return { success: true, id: documentId };
           }
           const collectionMap = {
@@ -1033,9 +1040,12 @@ export const dataService = {
           console.log(`✅ Successfully deleted from Appwrite`);
         } catch (error) {
           console.log('❌ Could not delete from Appwrite:', error.message);
+          // Add to pending sync queue for later retry
+          await pendingSyncQueue.addPendingSync('delete', collectionId, null, documentId);
         }
       } else {
-        console.log('📱 Offline mode - deleted from local storage only');
+        console.log('📱 Offline mode - deleted from local storage and added to pending sync');
+        await pendingSyncQueue.addPendingSync('delete', collectionId, null, documentId);
       }
       
       return { success: true, id: documentId };
@@ -1433,13 +1443,56 @@ export const authService = {
   async register(email, password, name) {
     try {
       console.log('📝 Attempting registration...');
+      console.log('📧 Email:', email);
+      console.log('👤 Name:', name);
+      
+      // Validate client configuration
+      if (!client.config.endpoint || !client.config.project) {
+        throw new Error('Appwrite client not properly configured. Please check your environment variables.');
+      }
+      
+      console.log('🔧 Client endpoint:', client.config.endpoint);
+      console.log('🔧 Client project:', client.config.project);
+      
+      // Create the user account first
+      console.log('🔄 Creating account...');
       await account.create(ID.unique(), email, password);
-      await account.updateName(name);
+      console.log('✅ Account created successfully');
+      
+      // Automatically log in the user after registration
+      console.log('🔐 Auto-logging in after registration...');
+      await account.createEmailPasswordSession(email, password);
+      console.log('✅ Login successful');
+      
+      // Wait a moment for session to be established
+      console.log('⏳ Waiting for session to establish...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Now update the user's name (only after successful login)
+      try {
+        console.log('🔄 Updating user name...');
+        await account.updateName(name);
+        console.log('✅ Name updated successfully');
+      } catch (nameError) {
+        console.warn('⚠️ Could not update name:', nameError.message);
+        console.warn('⚠️ Name error details:', nameError);
+        // Don't fail registration if name update fails
+      }
+      
+      // Get the user data to confirm authentication
+      console.log('🔄 Getting user data...');
       const user = await account.get();
-      console.log('✅ Registration successful');
+      console.log('✅ Registration and auto-login successful');
+      console.log('👤 User authenticated:', user.email, 'Verified:', user.emailVerification);
+      
       return user;
     } catch (error) {
       console.error('❌ Registration failed:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        code: error.code,
+        type: error.constructor.name
+      });
       throw error;
     }
   },
@@ -1467,12 +1520,82 @@ export const authService = {
   }
 };
 
+// Pending sync queue
+const pendingSyncQueue = {
+  async addPendingSync(operation, collectionId, data, documentId = null) {
+    try {
+      const pendingItem = {
+        id: ID.unique(),
+        operation, // 'create', 'update', 'delete'
+        collectionId,
+        data,
+        documentId,
+        timestamp: new Date().toISOString(),
+        retryCount: 0
+      };
+      
+      const pendingKey = `pending_sync_${pendingItem.id}`;
+      await storage.save(pendingKey, pendingItem);
+      console.log(`📝 Added to pending sync queue: ${operation} ${collectionId} ${documentId || 'new'}`);
+      return pendingItem;
+    } catch (error) {
+      console.error('❌ Error adding to pending sync:', error);
+    }
+  },
+
+  async getPendingSyncItems() {
+    try {
+      const keys = await storage.getAllKeys();
+      const pendingKeys = keys.filter(key => key.startsWith('pending_sync_'));
+      
+      const pendingItems = await Promise.all(
+        pendingKeys.map(async key => {
+          const item = await storage.get(key);
+          return item;
+        })
+      );
+      
+      return pendingItems.filter(item => item !== null);
+    } catch (error) {
+      console.error('❌ Error getting pending sync items:', error);
+      return [];
+    }
+  },
+
+  async removePendingSync(pendingId) {
+    try {
+      const pendingKey = `pending_sync_${pendingId}`;
+      await storage.delete(pendingKey);
+      console.log(`✅ Removed from pending sync queue: ${pendingId}`);
+    } catch (error) {
+      console.error('❌ Error removing pending sync:', error);
+    }
+  },
+
+  async clearPendingSync() {
+    try {
+      const keys = await storage.getAllKeys();
+      const pendingKeys = keys.filter(key => key.startsWith('pending_sync_'));
+      
+      await Promise.all(
+        pendingKeys.map(key => storage.delete(key))
+      );
+      
+      console.log(`🧹 Cleared ${pendingKeys.length} pending sync items`);
+    } catch (error) {
+      console.error('❌ Error clearing pending sync:', error);
+    }
+  }
+};
+
+
+
 // Sync monitor service
 export const syncMonitor = {
   async getStatus() {
     try {
-      const pendingCount = 0; // Simplified for now
-      const pendingItems = [];
+      const pendingItems = await pendingSyncQueue.getPendingSyncItems();
+      const pendingCount = pendingItems.length;
       
       return {
         pendingCount,
@@ -1633,6 +1756,179 @@ export const backgroundSyncService = {
     }, 120000); // 2 minutes
   },
 
+  async syncPendingChanges(currentUserFromContext = null) {
+    try {
+      console.log('🔄 Starting pending sync...');
+      
+      if (!(await isOnline()) || !client || !databases) {
+        console.log('📱 Offline or Appwrite not available, skipping sync');
+        return { success: false, message: 'Offline or Appwrite not available' };
+      }
+
+      // Check if user is authenticated - try multiple methods
+      let user = null;
+      let authMethod = 'none';
+      
+      // First, try to use user from context if provided
+      if (currentUserFromContext) {
+        user = currentUserFromContext;
+        authMethod = 'context';
+        console.log('👤 Using user from context');
+      } else {
+        // Try Appwrite session
+        try {
+          user = await account.get();
+          authMethod = 'appwrite_session';
+        } catch (authError) {
+          console.log('📱 Appwrite session not available, but continuing with sync...');
+          // Continue with sync even if Appwrite session is not available
+          // The sync will work with the data we have
+        }
+      }
+
+      if (!user) {
+        console.log('👤 No authenticated user found, but continuing with sync for offline data...');
+        // Continue with sync even without user - this allows syncing offline data
+      } else {
+        console.log(`👤 User authenticated via: ${authMethod}`);
+      }
+
+      const pendingItems = await pendingSyncQueue.getPendingSyncItems();
+      console.log(`📋 Found ${pendingItems.length} pending sync items`);
+
+      if (pendingItems.length === 0) {
+        return { success: true, message: 'No pending items to sync' };
+      }
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const item of pendingItems) {
+        try {
+          const collectionMap = {
+            employees: config.employeesCollectionId,
+            cases: config.casesCollectionId,
+            expenses: config.expensesCollectionId,
+            attendance: config.attendanceCollectionId,
+          };
+
+          const appwriteCollectionId = collectionMap[item.collectionId];
+          if (!appwriteCollectionId) {
+            console.warn(`⚠️ No Appwrite collection mapping for ${item.collectionId}`);
+            continue;
+          }
+
+          switch (item.operation) {
+            case 'create':
+              const createData = await cleanDataForAppwrite(item.data, item.collectionId);
+              // Use the documentId from the pending sync item, fallback to data.id or data.$id
+              const createDocumentId = generateValidAppwriteId(item.documentId || item.data.id || item.data.$id);
+
+              try {
+                await databases.createDocument(
+                  config.databaseId,
+                  appwriteCollectionId,
+                  createDocumentId,
+                  createData
+                );
+                console.log(`✅ Synced create: ${createDocumentId} (device: ${item.data.deviceId})`);
+              } catch (createError) {
+                if (createError.message.includes('Document with the requested ID already exists')) {
+                  // Document already exists, update it instead
+                  try {
+                    await databases.updateDocument(
+                      config.databaseId,
+                      appwriteCollectionId,
+                      createDocumentId,
+                      createData
+                    );
+                    console.log(`✅ Synced create->update: ${createDocumentId} (device: ${item.data.deviceId})`);
+                  } catch (updateError) {
+                    console.error(`❌ Failed to update existing document: ${updateError.message}`);
+                    throw updateError;
+                  }
+                } else {
+                  console.error(`❌ Failed to create document: ${createError.message}`);
+                  throw createError;
+                }
+              }
+              break;
+
+            case 'update':
+              const updateData = await cleanDataForAppwrite(item.data, item.collectionId);
+              // Use the documentId from the pending sync item, fallback to data.id or data.$id
+              const updateDocumentId = generateValidAppwriteId(item.documentId || item.data.id || item.data.$id);
+
+              try {
+                await databases.updateDocument(
+                  config.databaseId,
+                  appwriteCollectionId,
+                  updateDocumentId,
+                  updateData
+                );
+                console.log(`✅ Synced update: ${updateDocumentId} (device: ${item.data.deviceId})`);
+              } catch (updateError) {
+                if (updateError.message.includes('Document with the requested ID could not be found')) {
+                  // Document doesn't exist, create it
+                  try {
+                    await databases.createDocument(
+                      config.databaseId,
+                      appwriteCollectionId,
+                      updateDocumentId,
+                      updateData
+                    );
+                    console.log(`✅ Synced update->create: ${updateDocumentId} (device: ${item.data.deviceId})`);
+                  } catch (createError) {
+                    throw createError;
+                  }
+                } else {
+                  throw updateError;
+                }
+              }
+              break;
+
+            case 'delete':
+              const deleteDocumentId = generateValidAppwriteId(item.documentId);
+              await databases.deleteDocument(
+                config.databaseId,
+                appwriteCollectionId,
+                deleteDocumentId
+              );
+              console.log(`✅ Synced delete: ${deleteDocumentId}`);
+              break;
+          }
+
+          // Remove from pending queue on success
+          await pendingSyncQueue.removePendingSync(item.id);
+          successCount++;
+
+        } catch (error) {
+          console.error(`❌ Failed to sync ${item.operation} ${item.collectionId}:`, error);
+          errorCount++;
+          
+          // Increment retry count
+          item.retryCount = (item.retryCount || 0) + 1;
+          if (item.retryCount >= 3) {
+            console.log(`🗑️ Removing failed sync item after 3 retries: ${item.id}`);
+            await pendingSyncQueue.removePendingSync(item.id);
+          }
+        }
+      }
+
+      console.log(`🔄 Pending sync completed: ${successCount} success, ${errorCount} errors`);
+      return { 
+        success: true, 
+        message: `Synced ${successCount} items, ${errorCount} errors`,
+        successCount,
+        errorCount
+      };
+
+    } catch (error) {
+      console.error('❌ Pending sync failed:', error);
+      return { success: false, message: error.message };
+    }
+  },
+
   stopBackgroundSync() {
     if (this.syncInterval) {
       clearInterval(this.syncInterval);
@@ -1648,6 +1944,9 @@ export const backgroundSyncService = {
         console.log('📱 Skipping background sync - offline or Appwrite not available');
         return;
       }
+
+      // First, sync any pending changes
+      await this.syncPendingChanges();
 
              const collections = ['employees', 'cases', 'expenses', 'attendance'];
        let totalSynced = 0;

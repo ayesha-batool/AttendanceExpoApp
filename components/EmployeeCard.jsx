@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
-import { Image as RNImage, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const EmployeeCard = ({ 
   employee, 
@@ -57,7 +57,7 @@ const EmployeeCard = ({
 
         <View style={styles.employeeInfo}>
           {/* Avatar */}
-          {employee.photoUrl ? (
+          {/* {employee.photoUrl ? (
             <RNImage 
               source={{ uri: employee.photoUrl }} 
               style={styles.employeeAvatar}
@@ -69,7 +69,7 @@ const EmployeeCard = ({
             >
               <Ionicons name="person" size={16} color="#fff" />
             </LinearGradient>
-          )}
+          )} */}
 
           {/* Employee Details */}
           <View style={styles.employeeDetails}>
@@ -165,9 +165,9 @@ const EmployeeCard = ({
               </View>
             </View>
 
-             {employee.department && (
+             {/* {employee.department && (
               <View style={[styles.departmentIndicator, { backgroundColor: getDepartmentColor(employee.department) }]} />
-            )}
+            )} */}
           </View>
         </View>
 

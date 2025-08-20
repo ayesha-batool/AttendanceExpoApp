@@ -77,7 +77,7 @@ const PhoneNumberField = ({
         />
       </View>
 
-      {error && <Text style={styles.errorText}>{error}</Text>}
+      {error && <Text style={styles.errorText}>{String(error)}</Text>}
     </View>
 
   );

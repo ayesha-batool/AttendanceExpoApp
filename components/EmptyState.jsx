@@ -10,17 +10,12 @@ import {
 const EmptyState = ({ icon, title, message, actionText, onAction }) => {
   return (
     <View style={styles.container}>
-      <View style={styles.iconContainer}>
-        <Ionicons name={icon} size={64} color="#9ca3af" />
-      </View>
-      
-      <Text style={styles.title}>{title}</Text>
-      
-      <Text style={styles.message}>{message}</Text>
-      
+      <Ionicons name={icon} size={64} color="#9ca3af" />
+      <Text style={styles.title}>{String(title || 'No Data')}</Text>
+      <Text style={styles.message}>{String(message || 'No data available')}</Text>
       {actionText && onAction && (
         <TouchableOpacity style={styles.actionButton} onPress={onAction}>
-          <Text style={styles.actionButtonText}>{actionText}</Text>
+          <Text style={styles.actionButtonText}>{String(actionText)}</Text>
         </TouchableOpacity>
       )}
     </View>

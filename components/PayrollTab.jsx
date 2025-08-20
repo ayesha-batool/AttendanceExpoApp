@@ -2,14 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from 'react';
 import {
-  FlatList,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    FlatList,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
-import Toast from 'react-native-toast-message';
 import { dataService } from '../services/unifiedDataService';
 
 const PayrollTab = ({ employees }) => {
@@ -18,6 +17,12 @@ const PayrollTab = ({ employees }) => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [showSampleDataButton, setShowSampleDataButton] = useState(true);
+  const [customToast, setCustomToast] = useState(null);
+
+  const showCustomToast = (type, title, message) => {
+    setCustomToast({ type, title, message });
+    setTimeout(() => setCustomToast(null), 3000);
+  };
 
   useEffect(() => {
     calculatePayrollData();
@@ -100,11 +105,7 @@ const PayrollTab = ({ employees }) => {
       setPayrollData(calculatedPayroll);
     } catch (error) {
       console.error('Error calculating payroll:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Failed to calculate payroll data',
-      });
+      showCustomToast('error', 'Error', 'Failed to calculate payroll data');
     } finally {
       setLoading(false);
     }
@@ -146,11 +147,7 @@ const PayrollTab = ({ employees }) => {
       calculatePayrollData(); // Refresh the data
     } catch (error) {
       console.error('Error adding sample payroll data:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Failed to add sample payroll data',
-      });
+      showCustomToast('error', 'Error', 'Failed to add sample payroll data');
     }
   };
 
@@ -161,55 +158,55 @@ const PayrollTab = ({ employees }) => {
       <View style={styles.payrollCard}>
         <View style={styles.cardHeader}>
           <View style={styles.employeeInfo}>
-            <Text style={styles.employeeName}>{employee.fullName || employee.employeeName}</Text>
-            <Text style={styles.employeeRank}>{employee.rank || employee.department}</Text>
+            <Text style={styles.employeeName}>{String(employee.fullName || employee.employeeName || 'Unknown')}</Text>
+            <Text style={styles.employeeRank}>{String(employee.rank || employee.department || 'N/A')}</Text>
           </View>
           <View style={styles.totalPayContainer}>
             <Text style={styles.totalPayLabel}>Total Pay</Text>
-            <Text style={styles.totalPayAmount}>{formatCurrency(calculations.totalPay)}</Text>
+            <Text style={styles.totalPayAmount}>{String(formatCurrency(calculations.totalPay))}</Text>
           </View>
         </View>
 
         <View style={styles.payrollDetails}>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Base Salary:</Text>
-            <Text style={styles.detailValue}>{formatCurrency(calculations.baseSalary)}</Text>
+            <Text style={styles.detailValue}>{String(formatCurrency(calculations.baseSalary))}</Text>
           </View>
           
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Regular Hours:</Text>
-            <Text style={styles.detailValue}>{calculations.regularHours}h</Text>
+            <Text style={styles.detailValue}>{String(calculations.regularHours)}h</Text>
           </View>
           
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Regular Pay:</Text>
-            <Text style={styles.detailValue}>{formatCurrency(calculations.regularPay)}</Text>
+            <Text style={styles.detailValue}>{String(formatCurrency(calculations.regularPay))}</Text>
           </View>
           
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Overtime Hours:</Text>
-            <Text style={styles.detailValue}>{calculations.overtimeHours}h</Text>
+            <Text style={styles.detailValue}>{String(calculations.overtimeHours)}h</Text>
           </View>
           
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Overtime Pay:</Text>
-            <Text style={styles.detailValue}>{formatCurrency(calculations.overtimePay)}</Text>
+            <Text style={styles.detailValue}>{String(formatCurrency(calculations.overtimePay))}</Text>
           </View>
           
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Advances This Month:</Text>
-            <Text style={styles.detailValue}>{formatCurrency(calculations.totalAdvancesThisMonth)}</Text>
+            <Text style={styles.detailValue}>{String(formatCurrency(calculations.totalAdvancesThisMonth))}</Text>
           </View>
           
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Total Advances:</Text>
-            <Text style={styles.detailValue}>{formatCurrency(calculations.totalAdvances)}</Text>
+            <Text style={styles.detailValue}>{String(formatCurrency(calculations.totalAdvances))}</Text>
           </View>
         </View>
 
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>Net Pay This Month:</Text>
-          <Text style={styles.summaryAmount}>{formatCurrency(calculations.totalPay)}</Text>
+          <Text style={styles.summaryAmount}>{String(formatCurrency(calculations.totalPay))}</Text>
         </View>
       </View>
     );
@@ -225,19 +222,19 @@ const PayrollTab = ({ employees }) => {
         <View style={styles.summaryCard}>
           <Ionicons name="cash-outline" size={24} color="#10b981" />
           <Text style={styles.summaryLabel}>Total Payroll</Text>
-          <Text style={styles.summaryValue}>{formatCurrency(totalPayroll)}</Text>
+          <Text style={styles.summaryValue}>{String(formatCurrency(totalPayroll))}</Text>
         </View>
         
         <View style={styles.summaryCard}>
           <Ionicons name="time-outline" size={24} color="#f59e0b" />
           <Text style={styles.summaryLabel}>Total Overtime</Text>
-          <Text style={styles.summaryValue}>{formatCurrency(totalOvertime)}</Text>
+          <Text style={styles.summaryValue}>{String(formatCurrency(totalOvertime))}</Text>
         </View>
         
         <View style={styles.summaryCard}>
           <Ionicons name="card-outline" size={24} color="#ef4444" />
           <Text style={styles.summaryLabel}>Total Advances</Text>
-          <Text style={styles.summaryValue}>{formatCurrency(totalAdvances)}</Text>
+          <Text style={styles.summaryValue}>{String(formatCurrency(totalAdvances))}</Text>
         </View>
       </View>
     );
@@ -253,6 +250,32 @@ const PayrollTab = ({ employees }) => {
 
   return (
     <View style={styles.container}>
+      {/* Custom Toast */}
+      {customToast && (
+        <View style={[
+          styles.customToastContainer,
+          customToast.type === 'error' ? styles.errorToast : 
+          customToast.type === 'success' ? styles.successToast :
+          customToast.type === 'warning' ? styles.warningToast :
+          styles.infoToast
+        ]}>
+          <Ionicons 
+            name={
+              customToast.type === 'error' ? 'close-circle' :
+              customToast.type === 'success' ? 'checkmark-circle' :
+              customToast.type === 'warning' ? 'warning' :
+              'information-circle'
+            }
+            size={20}
+            color="#fff"
+          />
+          <View style={styles.toastContent}>
+            <Text style={styles.toastTitle}>{customToast.title}</Text>
+            <Text style={styles.toastMessage}>{customToast.message}</Text>
+          </View>
+        </View>
+      )}
+
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Month/Year Selector */}
         <View style={styles.periodSelector}>
@@ -331,7 +354,27 @@ const styles = StyleSheet.create({
   sampleDataContainer: { padding: 20 },
   sampleDataButton: { borderRadius: 12, boxShadowColor: '#10b981', boxShadowOffset: { width: 0, height: 4 }, boxShadowOpacity: 0.3, boxShadowRadius: 8, elevation: 4 },
   sampleDataGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, paddingHorizontal: 24, borderRadius: 12 },
-  sampleDataButtonText: { color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 8 }
+  sampleDataButtonText: { color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 8 },
+  customToastContainer: {
+    position: 'absolute',
+    top: 60,
+    left: 20,
+    right: 20,
+    backgroundColor: '#333',
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    zIndex: 9999,
+    elevation: 9999,
+  },
+  errorToast: { backgroundColor: '#ef4444' },
+  successToast: { backgroundColor: '#10b981' },
+  warningToast: { backgroundColor: '#f59e0b' },
+  infoToast: { backgroundColor: '#3b82f6' },
+  toastContent: { marginLeft: 12 },
+  toastTitle: { fontSize: 16, fontWeight: '600', color: '#fff' },
+  toastMessage: { fontSize: 14, color: '#fff', marginTop: 4 }
 });
 
 export default PayrollTab; 

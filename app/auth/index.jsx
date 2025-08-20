@@ -12,7 +12,6 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
-import Toast from 'react-native-toast-message';
 import Icon from "react-native-vector-icons/Ionicons";
 
 const { width, height } = Dimensions.get('window');
@@ -26,8 +25,22 @@ const AuthScreen = () => {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [customToast, setCustomToast] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  const { login, register, currentUser } = useAuth();
+  const { 
+    login, 
+    register, 
+    currentUser, 
+    verificationSent,
+    sendVerificationEmail,
+    checkVerificationStatus
+  } = useAuth();
+
+  const showCustomToast = (type, title, message) => {
+    setCustomToast({ type, title, message });
+    setTimeout(() => setCustomToast(null), 3000);
+  };
   
   const toggleMode = () => {
     setIsRegister(!isRegister);
@@ -35,6 +48,7 @@ const AuthScreen = () => {
     setEmail("");
     setPassword("");
     setConfirmPassword("");
+    setUsername("");
   };
 
   const handleAuth = async () => {
@@ -48,44 +62,76 @@ const AuthScreen = () => {
       return;
     }
 
+    setIsLoading(true);
+    setError("");
+
     try {
       if (isRegister) {
-        await register(email, password, username);
-        Toast.show({
-          type: 'success',
-          text1: 'Registration Successful!',
-          text2: 'Please login with your credentials.',
-          position: 'top',
-          visibilityTime: 3000,
-        });
-        setIsRegister(false);
+        console.log('🔐 Starting registration process...');
+        const result = await register(email, password, username);
+        
+        if (result.success) {
+          if (result.requiresVerification) {
+            showCustomToast('success', 'Registration Successful!', 'Please check your email for verification link. You can now log in.');
+            // Clear form after successful registration
+            setEmail("");
+            setPassword("");
+            setConfirmPassword("");
+            setUsername("");
+            setIsRegister(false); // Switch to login mode
+          } else {
+            showCustomToast('success', 'Registration Successful!', 'Welcome to Police Department Management System.');
+            router.replace("/Dashboard");
+          }
+        } else {
+          throw new Error(result.message || 'Registration failed');
+        }
       } else {
+        console.log('🔐 Starting login process...');
         await login(email, password);
-        Toast.show({
-          type: 'success',
-          text1: 'Login Successful!',
-          text2: 'Welcome to Police Department Management System.',
-          position: 'top',
-          visibilityTime: 2000,
-        });
+        
+        // Check if user needs email verification
+        const verificationStatus = await checkVerificationStatus();
+        if (verificationStatus.success && !verificationStatus.isVerified) {
+          showCustomToast('warning', 'Email Not Verified', 'Please verify your email address to access all features.');
+        } else {
+          showCustomToast('success', 'Login Successful!', 'Welcome to Police Department Management System.');
+        }
+        
         router.replace("/Dashboard");
       }
-      setError("");
     } catch (err) {
+      console.error('❌ Authentication error:', err);
       setError(err?.message || "Authentication failed.");
-      Toast.show({
-        type: 'error',
-        text1: 'Authentication Failed',
-        text2: err?.message || "Please check your credentials and try again.",
-        position: 'top',
-        visibilityTime: 4000,
-      });
+      showCustomToast('error', 'Authentication Failed', err?.message || "Please check your credentials and try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    try {
+      setIsLoading(true);
+      console.log('📧 Attempting to resend verification email...');
+      await sendVerificationEmail();
+      showCustomToast('success', 'Verification Email Sent!', 'Please check your inbox for the verification link.');
+    } catch (error) {
+      console.error('❌ Failed to resend verification:', error);
+      showCustomToast('error', 'Failed to Send', error.message || 'Please try again later.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   useEffect(() => {
     if (currentUser) {
-      router.replace("/Dashboard");
+      // Check if user needs email verification
+      if (currentUser.emailVerification === false) {
+        // Redirect to verification required page instead of showing error
+        router.replace("/verification-required");
+      } else {
+        router.replace("/Dashboard");
+      }
     }
   }, [currentUser, router]);
 
@@ -94,6 +140,32 @@ const AuthScreen = () => {
       colors={['#1e40af', '#1e3a8a', '#1e293b']}
       style={styles.container}
     >
+      {/* Custom Toast */}
+      {customToast && (
+        <View style={[
+          styles.customToastContainer,
+          customToast.type === 'error' ? styles.errorToast : 
+          customToast.type === 'success' ? styles.successToast :
+          customToast.type === 'warning' ? styles.warningToast :
+          styles.infoToast
+        ]}>
+          <Icon 
+            name={
+              customToast.type === 'error' ? 'close-circle' :
+              customToast.type === 'success' ? 'checkmark-circle' :
+              customToast.type === 'warning' ? 'warning' :
+              'information-circle'
+            }
+            size={20}
+            color="#fff"
+          />
+          <View style={styles.toastContent}>
+            <Text style={styles.toastTitle}>{customToast.title}</Text>
+            <Text style={styles.toastMessage}>{customToast.message}</Text>
+          </View>
+        </View>
+      )}
+
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.keyboardContainer}
@@ -130,6 +202,7 @@ const AuthScreen = () => {
                   style={styles.input}
                   autoCapitalize="words"
                   placeholderTextColor="#9ca3af"
+                  editable={!isLoading}
                 />
               </View>
             )}
@@ -144,6 +217,7 @@ const AuthScreen = () => {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 placeholderTextColor="#9ca3af"
+                editable={!isLoading}
               />
             </View>
 
@@ -156,10 +230,12 @@ const AuthScreen = () => {
                 secureTextEntry={!showPassword}
                 style={styles.passwordInput}
                 placeholderTextColor="#9ca3af"
+                editable={!isLoading}
               />
               <TouchableOpacity 
                 onPress={() => setShowPassword(!showPassword)}
                 style={styles.eyeButton}
+                disabled={isLoading}
               >
                 <Icon name={showPassword ? "eye-off" : "eye"} size={22} color="#64748b" />
               </TouchableOpacity>
@@ -175,10 +251,12 @@ const AuthScreen = () => {
                   secureTextEntry={!showConfirm}
                   style={styles.passwordInput}
                   placeholderTextColor="#9ca3af"
+                  editable={!isLoading}
                 />
                 <TouchableOpacity 
                   onPress={() => setShowConfirm(!showConfirm)}
                   style={styles.eyeButton}
+                  disabled={isLoading}
                 >
                   <Icon name={showConfirm ? "eye-off" : "eye"} size={22} color="#64748b" />
                 </TouchableOpacity>
@@ -188,26 +266,55 @@ const AuthScreen = () => {
             {error !== "" && (
               <View style={styles.errorContainer}>
                 <Icon name="alert-circle" size={16} color="#ef4444" />
-                <Text style={styles.errorText}>{error}</Text>
+                <Text style={styles.errorText}>{String(error)}</Text>
               </View>
             )}
 
-            <TouchableOpacity style={styles.authButton} onPress={handleAuth}>
+            <TouchableOpacity 
+              style={[styles.authButton, isLoading && styles.authButtonDisabled]} 
+              onPress={handleAuth}
+              disabled={isLoading}
+            >
               <LinearGradient
                 colors={['#1e40af', '#1e3a8a']}
                 style={styles.buttonGradient}
               >
-                <Text style={styles.buttonText}>
-                  {isRegister ? "Create Account" : "Sign In"}
-                </Text>
-                <Icon 
-                  name={isRegister ? "person-add" : "log-in"} 
-                  size={20} 
-                  color="#fff" 
-                  style={styles.buttonIcon}
-                />
+                {isLoading ? (
+                  <View style={styles.loadingContainer}>
+                    <Icon name="refresh" size={20} color="#fff" style={styles.spinning} />
+                    <Text style={styles.buttonText}>
+                      {isRegister ? "Creating Account..." : "Signing In..."}
+                    </Text>
+                  </View>
+                ) : (
+                  <>
+                    <Text style={styles.buttonText}>
+                      {isRegister ? "Create Account" : "Sign In"}
+                    </Text>
+                    <Icon 
+                      name={isRegister ? "person-add" : "log-in"} 
+                      size={20} 
+                      color="#fff" 
+                      style={styles.buttonIcon}
+                    />
+                  </>
+                )}
               </LinearGradient>
             </TouchableOpacity>
+
+            {/* Resend Verification Button */}
+            {verificationSent && (
+              <TouchableOpacity 
+                style={[styles.resendButton, isLoading && styles.resendButtonDisabled]} 
+                onPress={handleResendVerification}
+                disabled={isLoading}
+              >
+                <Text style={styles.resendButtonText}>
+                  Resend Verification Email
+                </Text>
+                <Icon name="mail" size={16} color="#1e40af" />
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity onPress={toggleMode} style={styles.toggleContainer}>
               <Text style={styles.toggleText}>
@@ -358,6 +465,9 @@ const styles = StyleSheet.create({
     boxboxShadowRadius: 8,
     elevation: 6,
   },
+  authButtonDisabled: {
+    opacity: 0.7,
+  },
   buttonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -374,6 +484,34 @@ const styles = StyleSheet.create({
   },
   buttonIcon: {
     marginLeft: 4,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  spinning: {
+    transform: [{ rotate: '360deg' }],
+  },
+  resendButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(30, 64, 175, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(30, 64, 175, 0.2)',
+  },
+  resendButtonDisabled: {
+    opacity: 0.5,
+  },
+  resendButtonText: {
+    color: '#1e40af',
+    fontSize: 14,
+    fontWeight: '600',
+    marginRight: 8,
   },
   toggleContainer: {
     alignItems: 'center',
@@ -396,5 +534,44 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.7)',
     textAlign: 'center',
+  },
+  customToastContainer: {
+    position: 'absolute',
+    top: 60,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+    zIndex: 9999,
+    elevation: 9999,
+  },
+  errorToast: {
+    backgroundColor: '#f44336',
+  },
+  successToast: {
+    backgroundColor: '#4CAF50',
+  },
+  warningToast: {
+    backgroundColor: '#FFC107',
+  },
+  infoToast: {
+    backgroundColor: '#2196F3',
+  },
+  toastContent: {
+    marginLeft: 12,
+  },
+  toastTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  toastMessage: {
+    fontSize: 14,
+    color: '#fff',
+    marginTop: 4,
   },
 });

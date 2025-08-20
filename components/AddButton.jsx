@@ -15,7 +15,7 @@ const AddButton = ({ onPress, text, icon = "add-circle", colors = ['#667eea', '#
         style={styles.addButtonGradient}
       >
         <Icon name={icon} size={24} color="#fff" />
-        <Text style={styles.addButtonText}>{text}</Text>
+        <Text style={styles.addButtonText}>{String(text)}</Text>
       </LinearGradient>
     </TouchableOpacity>
   );

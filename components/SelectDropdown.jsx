@@ -1,8 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
-import React, { useState } from 'react';
-import { FlatList, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import Toast from 'react-native-toast-message';
+import { LinearGradient } from 'expo-linear-gradient';
+import React, { useCallback, useState } from 'react';
+import {
+    FlatList,
+    Modal,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 import { customOptionsService } from '../services/unifiedDataService';
 import AddNewOptionModal from './AddNewOptionModal';
 
@@ -25,6 +33,12 @@ const SelectDropdown = ({
   const [showAddModal, setShowAddModal] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [removeSearchQuery, setRemoveSearchQuery] = useState('');
+  const [customToast, setCustomToast] = useState(null);
+
+  const showCustomToast = (type, title, message) => {
+    setCustomToast({ type, title, message });
+    setTimeout(() => setCustomToast(null), 3000);
+  };
 
   const handleAddNewOption = () => {
     if (fieldName && fieldLabel) {
@@ -38,6 +52,11 @@ const SelectDropdown = ({
     }
   };
 
+  const handleCloseRemoveModal = useCallback(() => {
+    setShowRemoveModal(false);
+    setRemoveSearchQuery('');
+  }, []);
+
   const handleOptionAdded = (newOption) => {
     if (onOptionAdded) {
       onOptionAdded(newOption, fieldName);
@@ -46,50 +65,48 @@ const SelectDropdown = ({
 
   const handleOptionRemoved = async (optionToRemove) => {
     try {
-      const result = await customOptionsService.removeOption(fieldName, optionToRemove);
-      
+      const result = await customOptionsService.removeOption(
+        fieldName,
+        optionToRemove
+      );
+
       if (result.success) {
-        // If the removed option was selected, clear the selection
+        // Clear the form field if the removed option was selected
         if (selectedValue === optionToRemove) {
           onValueChange('');
         }
         
-        // Call the callback to refresh options
+        // Call the callback to update parent component
         if (onOptionRemoved) {
           onOptionRemoved(optionToRemove, fieldName);
         }
         
-        // Close the modal after successful removal
-        setShowRemoveModal(false);
-        
-        // Clear search query
+        // Clear search query for next operation
         setRemoveSearchQuery('');
+        
+        // Show success toast
+        showCustomToast('success', 'Success', `${optionToRemove} removed successfully`);
       } else {
-        Toast.show({
-          type: 'error',
-          text1: 'Error',
-          text2: result.message || 'Failed to remove option',
-        });
+        showCustomToast('error', 'Error', result.message || 'Failed to remove option');
       }
     } catch (error) {
       console.error('Error removing option:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Failed to remove option: ' + error.message,
-      });
+      showCustomToast('error', 'Error', 'Failed to remove option: ' + error.message);
     }
   };
 
-  // Add "Add New Option" and "Remove Option" to the options list if enabled
   const displayOptions = [...options];
-  
   if (showAddNewOption && fieldName && fieldLabel) {
-    displayOptions.push({ label: `+ Add New ${fieldLabel}`, value: 'add_new_option' });
+    displayOptions.push({
+      label: `+ Add New ${fieldLabel}`,
+      value: 'add_new_option',
+    });
   }
-  
   if (showRemoveOption && fieldName && fieldLabel) {
-    displayOptions.push({ label: `- Remove ${fieldLabel}`, value: 'remove_option' });
+    displayOptions.push({
+      label: `- Remove ${fieldLabel}`,
+      value: 'remove_option',
+    });
   }
 
   const handleValueChange = (value) => {
@@ -102,25 +119,34 @@ const SelectDropdown = ({
     }
   };
 
-  // Filter options for removal based on search query
-  const filteredRemoveOptions = options.filter(option => {
-    const optionLabel = typeof option === 'string' ? option : option.label || option.value;
-    return optionLabel && optionLabel.toLowerCase().includes(removeSearchQuery.toLowerCase());
+  const filteredRemoveOptions = options.filter((option) => {
+    const optionLabel =
+      typeof option === 'string' ? option : option.label || option.value;
+    return (
+      optionLabel &&
+      optionLabel.toLowerCase().includes(removeSearchQuery.toLowerCase())
+    );
   });
 
-  // Create a key based on options to force re-render when options change
-  const optionsKey = options.map(opt => {
-    if (typeof opt === 'string') return opt;
-    return opt?.value || '';
-  }).join('|');
-  
+  const optionsKey = options
+    .map((opt) => (typeof opt === 'string' ? opt : opt?.value || ''))
+    .join('|');
+
   return (
-    <View style={[styles.container, style]} key={optionsKey}>
+    <View style={[styles.container, style]}>
       {label && (
         <View style={styles.labelContainer}>
-          {icon && <Ionicons name={icon} size={16} color="#667eea" style={styles.labelIcon} />}
+          {icon && (
+            <Ionicons
+              name={icon}
+              size={16}
+              color="#667eea"
+              style={styles.labelIcon}
+            />
+          )}
           <Text style={styles.label}>
-            {label} {optional && <Text style={styles.optionalText}>(optional)</Text>}
+            {label}{' '}
+            {optional && <Text style={styles.optionalText}>(optional)</Text>}
           </Text>
         </View>
       )}
@@ -133,30 +159,37 @@ const SelectDropdown = ({
         >
           <Picker.Item label="Select" value="" />
           {displayOptions.map((item, index) => {
-            const key = typeof item === 'string' ? item : (item.value || `option_${index}`);
+            const key =
+              typeof item === 'string'
+                ? item
+                : item.value || `option_${index}`;
             const isAddNewOption = item.value === 'add_new_option';
             const isRemoveOption = item.value === 'remove_option';
-            
+
             return typeof item === 'string' ? (
-              <Picker.Item 
-                key={key} 
-                label={item} 
+              <Picker.Item
+                key={key}
+                label={item}
                 value={item}
-                color={isAddNewOption ? '#3b82f6' : isRemoveOption ? '#ef4444' : '#000'}
+                color={
+                  isAddNewOption ? '#3b82f6' : isRemoveOption ? '#ef4444' : '#000'
+                }
               />
             ) : (
-              <Picker.Item 
-                key={key} 
-                label={item.label} 
+              <Picker.Item
+                key={key}
+                label={item.label}
                 value={item.value}
-                color={isAddNewOption ? '#3b82f6' : isRemoveOption ? '#ef4444' : '#000'}
+                color={
+                  isAddNewOption ? '#3b82f6' : isRemoveOption ? '#ef4444' : '#000'
+                }
               />
             );
           })}
         </Picker>
       </View>
 
-      {error && <Text style={styles.errorText}>{error}</Text>}
+      {error && <Text style={styles.errorText}>{String(error)}</Text>}
 
       {/* Add New Option Modal */}
       {fieldName && fieldLabel && (
@@ -172,62 +205,63 @@ const SelectDropdown = ({
 
       {/* Remove Option Modal */}
       <Modal
+        key={`remove-modal-${fieldName}`}
         visible={showRemoveModal}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={() => setShowRemoveModal(false)}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={handleCloseRemoveModal}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Remove {fieldLabel}</Text>
-              <TouchableOpacity onPress={() => setShowRemoveModal(false)} style={styles.closeButton}>
-                <Ionicons name="close" size={24} color="#666" />
+        <View style={styles.fullPageModalOverlay}>
+          <LinearGradient colors={['#007AFF', '#0056CC']} style={styles.fullPageModalHeader}>
+            <View style={styles.fullPageModalHeaderContent}>
+              <TouchableOpacity onPress={handleCloseRemoveModal} style={styles.fullPageModalBackButton}>
+                <Ionicons name="arrow-back" size={24} color="#fff" />
               </TouchableOpacity>
+              <Text style={styles.fullPageModalHeaderTitle}>Remove {fieldLabel}</Text>
+              <View style={styles.fullPageModalHeaderSpacer} />
             </View>
+          </LinearGradient>
 
-            <View style={styles.modalBody}>
-              <Text style={styles.modalSubtitle}>Select an option to remove:</Text>
-              
-              <TextInput
-                style={styles.searchInput}
-                value={removeSearchQuery}
-                onChangeText={setRemoveSearchQuery}
-                placeholder={`Search ${fieldLabel?.toLowerCase() || 'option'}...`}
-                placeholderTextColor="#9ca3af"
-              />
+          <View style={styles.fullPageModalBody}>
+            <Text style={styles.fullPageModalSubtitle}>Select an option to remove:</Text>
+            
+            <TextInput
+              style={styles.fullPageModalSearchInput}
+              value={removeSearchQuery}
+              onChangeText={setRemoveSearchQuery}
+              placeholder={`Search ${fieldLabel?.toLowerCase() || 'option'}...`}
+              placeholderTextColor="#9ca3af"
+            />
 
-              <FlatList
-                data={filteredRemoveOptions}
-                keyExtractor={(item, index) => index.toString()}
-                renderItem={({ item }) => {
-                  const optionLabel = typeof item === 'string' ? item : item.label || item.value;
-                  return (
-                    <TouchableOpacity
-                      style={styles.removeOptionItem}
-                      onPress={() => handleOptionRemoved(optionLabel)}
-                    >
-                      <Text style={styles.removeOptionText}>{optionLabel}</Text>
-                      <Ionicons name="trash-outline" size={20} color="#ef4444" />
-                    </TouchableOpacity>
-                  );
-                }}
-                style={styles.removeOptionsList}
-                showsVerticalScrollIndicator={false}
-              />
-            </View>
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity 
-                style={styles.cancelButton} 
-                onPress={() => setShowRemoveModal(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
+            <FlatList
+              data={filteredRemoveOptions}
+              keyExtractor={(item, index) => index.toString()}
+              renderItem={({ item }) => {
+                const optionLabel =
+                  typeof item === 'string' ? item : item.label || item.value;
+                return (
+                  <TouchableOpacity
+                    style={styles.fullPageModalRemoveOptionItem}
+                    onPress={() => handleOptionRemoved(optionLabel)}
+                  >
+                    <Text style={styles.fullPageModalRemoveOptionText}>{String(optionLabel)}</Text>
+                    <Ionicons name="trash-outline" size={20} color="#ef4444" />
+                  </TouchableOpacity>
+                );
+              }}
+              style={styles.fullPageModalRemoveOptionsList}
+              showsVerticalScrollIndicator={false}
+            />
           </View>
         </View>
       </Modal>
+
+      {customToast && (
+        <View style={[styles.toastContainer, customToast.type === 'success' ? styles.successToast : styles.errorToast]}>
+          <Text style={styles.toastText}>{customToast.title}</Text>
+          <Text style={styles.toastMessage}>{customToast.message}</Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -286,10 +320,10 @@ const styles = StyleSheet.create({
     width: '90%',
     maxWidth: 400,
     maxHeight: '80%',
-    boxShadowColor: '#000',
-    boxShadowOffset: { width: 0, height: 10 },
-    boxShadowOpacity: 0.25,
-    boxShadowRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
     elevation: 10,
   },
   modalHeader: {
@@ -361,6 +395,111 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#64748b',
+  },
+  // New styles for full-page modal
+  fullPageModalOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "#f8f9fa",
+    zIndex: 1000,
+  },
+  fullPageModalHeader: {
+    paddingTop: 20,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+  },
+  fullPageModalHeaderContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  fullPageModalBackButton: {
+    padding: 8,
+  },
+  fullPageModalHeaderTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#fff",
+    flex: 1,
+    textAlign: "center",
+  },
+  fullPageModalHeaderSpacer: {
+    width: 40,
+  },
+  fullPageModalBody: {
+    flex: 1,
+    backgroundColor: "#f8f9fa",
+    padding: 20,
+  },
+  fullPageModalSubtitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#374151",
+    marginBottom: 16,
+  },
+  fullPageModalSearchInput: {
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 16,
+    color: "#1e293b",
+    backgroundColor: "#fff",
+    marginBottom: 16,
+  },
+  fullPageModalRemoveOptionsList: {
+    flex: 1,
+  },
+  fullPageModalRemoveOptionItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    marginBottom: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  fullPageModalRemoveOptionText: {
+    fontSize: 16,
+    color: "#1e293b",
+    flex: 1,
+  },
+  // Custom Toast Styles
+  toastContainer: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+    backgroundColor: '#333',
+    borderRadius: 8,
+    padding: 15,
+    alignItems: 'center',
+    zIndex: 9999,
+    elevation: 9999,
+  },
+  successToast: {
+    backgroundColor: '#4CAF50',
+  },
+  errorToast: {
+    backgroundColor: '#F44336',
+  },
+  toastText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  toastMessage: {
+    fontSize: 14,
+    color: '#fff',
   },
 });
 

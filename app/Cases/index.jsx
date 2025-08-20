@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { FlatList, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Toast from 'react-native-toast-message';
 import DatePickerField from '../../components/DatePickerField';
 import DeleteConfirmationModal from '../../components/DeleteConfirmationModal';
 import InputField from '../../components/InputField';
@@ -11,12 +11,14 @@ import LoadingOverlay from '../../components/LoadingOverlay';
 import LoadingState from '../../components/LoadingState';
 import SearchBar from '../../components/SearchBar';
 import SelectDropdown from '../../components/SelectDropdown';
+import { useAuth } from '../../context/AuthContext';
 import { useCasesContext } from '../../context/CasesContext';
-import { customOptionsService, dataService } from '../../services/unifiedDataService';
+import { backgroundSyncService, customOptionsService, dataService, syncMonitor } from '../../services/unifiedDataService';
 import { validateForm, VALIDATION_SCHEMAS } from '../../utils/validation';
 
 const CasesScreen = () => {
   const { setHeaderActionButton, clearHeaderAction } = useCasesContext();
+  const { currentUser } = useAuth();
   const [cases, setCases] = useState([]);
   const [filteredCases, setFilteredCases] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -37,6 +39,12 @@ const CasesScreen = () => {
   const [priorityOptions, setPriorityOptions] = useState([]);
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [customToast, setCustomToast] = useState(null);
+  const [syncStatus, setSyncStatus] = useState({ hasPendingItems: false, pendingCount: 0 });
+
+  const showCustomToast = (type, title, message) => {
+    setCustomToast({ type, title, message });
+    setTimeout(() => setCustomToast(null), 3000);
+  };
 
   const updateModal = (key, value) => {
     setModals(prev => {
@@ -48,38 +56,78 @@ const CasesScreen = () => {
   const updateFormData = (key, value) => setFormData(prev => ({ ...prev, [key]: value }));
 
   // Load dropdown options from custom options service
+  const checkSyncStatus = async () => {
+    try {
+      const status = await syncMonitor.getStatus();
+      setSyncStatus({
+        hasPendingItems: status.hasPendingItems,
+        pendingCount: status.pendingCount
+      });
+    } catch (error) {
+      console.error('Error checking sync status:', error);
+    }
+  };
+
   const loadDropdownOptions = async () => {
     try {
+      // First, try to initialize default options if they don't exist
+      const status = await customOptionsService.checkDefaultOptionsStatus();
+      const needsInitialization = Object.values(status).some(item => !item.hasLocal);
+      if (needsInitialization) {
+        console.log('Initializing default options...');
+        await customOptionsService.initializeDefaultOptions();
+      }
+
       const [statusData, priorityData, categoryData] = await Promise.all([
         customOptionsService.getOptions('case_status'),
         customOptionsService.getOptions('case_priority'),
         customOptionsService.getOptions('case_categories')
       ]);
 
-      setStatusOptions(statusData.map(status => ({ label: status, value: status.toLowerCase().replace(/\s+/g, '_') })));
-      setPriorityOptions(priorityData.map(priority => ({ label: priority, value: priority.toLowerCase() })));
-      setCategoryOptions(categoryData);
+      console.log('Loaded options:', { statusData, priorityData, categoryData });
+
+      // Check if arrays are valid
+      const validStatusData = Array.isArray(statusData) ? statusData : [];
+      const validPriorityData = Array.isArray(priorityData) ? priorityData : [];
+      const validCategoryData = Array.isArray(categoryData) ? categoryData : [];
+
+      console.log('Valid options:', { validStatusData, validPriorityData, validCategoryData });
+
+      setStatusOptions(validStatusData.map(status => ({ label: status, value: status.toLowerCase().replace(/\s+/g, '_') })));
+      setPriorityOptions(validPriorityData.map(priority => ({ label: priority, value: priority.toLowerCase() })));
+      setCategoryOptions(validCategoryData.map(category => ({ label: category, value: category })));
     } catch (error) {
       console.error('Error loading dropdown options:', error);
+      // Set default options if loading fails
+      setStatusOptions([
+        { label: 'Active', value: 'active' },
+        { label: 'Under Investigation', value: 'under_investigation' },
+        { label: 'Pending Review', value: 'pending_review' },
+        { label: 'Closed', value: 'closed' }
+      ]);
+      setPriorityOptions([
+        { label: 'Low', value: 'low' },
+        { label: 'Medium', value: 'medium' },
+        { label: 'High', value: 'high' },
+        { label: 'Critical', value: 'critical' }
+      ]);
+      setCategoryOptions([
+        { label: 'Theft', value: 'theft' },
+        { label: 'Assault', value: 'assault' },
+        { label: 'Fraud', value: 'fraud' },
+        { label: 'Other', value: 'other' }
+      ]);
     }
   };
 
   const handleOptionAdded = (newOption, fieldName) => {
-    setCustomToast({
-      type: 'success',
-      title: 'Success',
-      message: `New ${fieldName.replace('_', ' ')} added successfully`
-    });
+    showCustomToast('success', 'Success', `New ${fieldName.replace('_', ' ')} added successfully`);
     setTimeout(() => setCustomToast(null), 3000);
     loadDropdownOptions(); // Refresh options
   };
 
   const handleOptionRemoved = (removedOption, fieldName) => {
-    setCustomToast({
-      type: 'success',
-      title: 'Success',
-      message: `${fieldName.replace('_', ' ')} removed successfully`
-    });
+    showCustomToast('success', 'Success', `${fieldName.replace('_', ' ')} removed successfully`);
     setTimeout(() => setCustomToast(null), 3000);
     loadDropdownOptions(); // Refresh options
   };
@@ -145,12 +193,14 @@ const CasesScreen = () => {
       setEmployees(validEmployees);
       
     } catch (error) {
+      if (error.code === 'AUTH_REQUIRED') {
+        console.log('🔐 Authentication required, redirecting to auth page');
+        // Redirect to auth page
+        router.replace('/auth');
+        return;
+      }
       console.error('❌ Failed to load cases data:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Failed to load data. Please try again.',
-      });
+      showCustomToast('error', 'Error', 'Failed to load data. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -199,7 +249,7 @@ const CasesScreen = () => {
 
   const saveCase = async () => {
     if (isSaving) {
-      Toast.show({ type: 'error', text1: 'Error', text2: 'Please wait, saving in progress...' });
+      showCustomToast('error', 'Error', 'Please wait, saving in progress...');
       return;
     }
 
@@ -210,11 +260,7 @@ const CasesScreen = () => {
       const errorMessages = Object.values(errors).filter(error => error && error.trim() !== '');
       const firstError = errorMessages.length > 0 ? errorMessages[0] : 'Please check the form and try again';
       
-      setCustomToast({
-        type: 'error',
-        title: 'Validation Error',
-        message: firstError
-      });
+      showCustomToast('error', 'Validation Error', firstError);
       setTimeout(() => setCustomToast(null), 4000);
       return;
     }
@@ -236,11 +282,7 @@ const CasesScreen = () => {
         const updatedCase = { ...caseData, id: caseId, $id: caseId };
         setCases(prev => prev.map(c => (c.id || c.$id) === caseId ? updatedCase : c));
         setFilteredCases(prev => prev.map(c => (c.id || c.$id) === caseId ? updatedCase : c));
-        setCustomToast({
-          type: 'success',
-          title: 'Success',
-          message: 'Case updated successfully'
-        });
+        showCustomToast('success', 'Success', 'Case updated successfully');
         setTimeout(() => setCustomToast(null), 3000);
       } else {
         const newCase = await dataService.saveData(caseData, 'cases');
@@ -248,11 +290,7 @@ const CasesScreen = () => {
         const caseWithId = { ...newCase, id: newCase.$id || newCase.id, $id: newCase.$id || newCase.id };
         setCases(prev => [...prev, caseWithId]);
         setFilteredCases(prev => [...prev, caseWithId]);
-        setCustomToast({
-          type: 'success',
-          title: 'Success',
-          message: 'Case added successfully'
-        });
+        showCustomToast('success', 'Success', 'Case added successfully');
         setTimeout(() => setCustomToast(null), 3000);
       }
       
@@ -263,8 +301,13 @@ const CasesScreen = () => {
       setFormData({ title: '', description: '', status: 'active', priority: 'medium', assignedOfficer: '', location: '', category: '', evidence: '', notes: '', startDate: '', endDate: '' });
       
     } catch (error) {
+      if (error.code === 'AUTH_REQUIRED') {
+        console.log('🔐 Authentication required, redirecting to auth page');
+        router.replace('/auth');
+        return;
+      }
       console.error('Failed to save case:', error);
-      Toast.show({ type: 'error', text1: 'Error', text2: error.message || 'Failed to save case' });
+      showCustomToast('error', 'Error', error.message || 'Failed to save case');
     } finally {
       setIsSaving(false);
     }
@@ -283,10 +326,15 @@ const CasesScreen = () => {
       
       setCases(prev => prev.filter(c => (c.id || c.$id) !== caseId));
       setFilteredCases(prev => prev.filter(c => (c.id || c.$id) !== caseId));
-      Toast.show({ type: 'success', text1: 'Success', text2: 'Case deleted successfully' });
+      showCustomToast('success', 'Success', 'Case deleted successfully');
     } catch (error) {
+      if (error.code === 'AUTH_REQUIRED') {
+        console.log('🔐 Authentication required, redirecting to auth page');
+        router.replace('/auth');
+        return;
+      }
       console.error('Failed to delete case:', error);
-      Toast.show({ type: 'error', text1: 'Error', text2: error.message || 'Failed to delete case' });
+      showCustomToast('error', 'Error', error.message || 'Failed to delete case');
     } finally {
       updateModal('delete', false);
       updateSelected('deleteCase', null);
@@ -299,15 +347,15 @@ const CasesScreen = () => {
       setIsSyncing(true);
       const result = await dataService.manualSync();
       if (result.success) {
-        Toast.show({ type: 'success', text1: 'Success', text2: 'Sync completed successfully' });
+        showCustomToast('success', 'Success', 'Sync completed successfully');
         // Refresh data after sync
         await fetchData();
       } else {
-        Toast.show({ type: 'error', text1: 'Error', text2: result.message });
+        showCustomToast('error', 'Error', result.message);
       }
     } catch (error) {
       console.error('❌ Sync failed:', error);
-      Toast.show({ type: 'error', text1: 'Error', text2: 'Sync failed: ' + error.message });
+      showCustomToast('error', 'Error', 'Sync failed: ' + error.message);
     } finally {
       setIsSyncing(false);
     }
@@ -324,6 +372,7 @@ const CasesScreen = () => {
   useFocusEffect(useCallback(() => { 
     fetchData(); 
     loadDropdownOptions();
+    checkSyncStatus();
   }, []));
   useEffect(() => { applySearch(); }, [searchQuery, cases]);
 
@@ -346,15 +395,54 @@ const CasesScreen = () => {
 
       <View style={styles.searchContainer}>
         <SearchBar value={searchQuery} onChangeText={setSearchQuery} placeholder="Search cases..." onClear={() => setSearchQuery('')} />
-       
+        <TouchableOpacity 
+          style={styles.initButton} 
+          onPress={async () => {
+            try {
+              await customOptionsService.initializeDefaultOptions();
+              await loadDropdownOptions();
+              showCustomToast('success', 'Success', 'Options initialized successfully');
+            } catch (error) {
+              showCustomToast('error', 'Error', 'Failed to initialize options');
+            }
+          }}
+        >
+          <Text style={styles.initButtonText}>Init Options</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.syncButton, syncStatus.hasPendingItems && styles.syncButtonPending]} 
+          onPress={async () => {
+            try {
+              const result = await backgroundSyncService.syncPendingChanges(currentUser);
+              if (result.success) {
+                showCustomToast('success', 'Sync Complete', result.message);
+                await fetchData(); // Reload cases after sync
+                await checkSyncStatus(); // Update sync status
+              } else {
+                showCustomToast('error', 'Sync Failed', result.message);
+              }
+            } catch (error) {
+              if (error.code === 'AUTH_REQUIRED') {
+                console.log('🔐 Authentication required, redirecting to auth page');
+                router.replace('/auth');
+                return;
+              }
+              showCustomToast('error', 'Sync Error', error.message);
+            }
+          }}
+        >
+          <Text style={styles.syncButtonText}>
+            {syncStatus.hasPendingItems ? `Sync (${syncStatus.pendingCount})` : 'Sync'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {filteredCases.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="folder-open-outline" size={64} color="#9ca3af" />
-          <Text style={styles.emptyTitle}>{searchQuery ? 'No Cases Found' : 'No Cases'}</Text>
-          <Text style={styles.emptyMessage}>{searchQuery ? 'Try adjusting your search criteria' : 'Start by adding your first case'}</Text>
-        </View>
+        <EmptyState
+          icon="folder-outline"
+          title={String(searchQuery ? 'No Cases Found' : 'No Cases')}
+          message={String(searchQuery ? 'Try adjusting your search criteria' : 'Start by adding your first case')}
+        />
       ) : (
         <FlatList
           data={filteredCases}
@@ -364,9 +452,11 @@ const CasesScreen = () => {
               <LinearGradient colors={['#fff', '#f8fafc']} style={styles.cardGradient}>
                 <View style={styles.cardHeader}>
                   <View style={styles.cardTitleContainer}>
-                    <Text style={styles.caseTitle}>{item.title}</Text>
-                    <View style={styles.caseCategory}>
-                      <Text style={styles.caseCategoryText}>{item.category}</Text>
+                    <View style={styles.caseInfo}>
+                      <Text style={styles.caseTitle}>{String(item.title || 'Untitled')}</Text>
+                      <View style={styles.caseMeta}>
+                        <Text style={styles.caseCategoryText}>{String(item.category || 'Uncategorized')}</Text>
+                      </View>
                     </View>
                   </View>
                   <View style={styles.cardActions}>
@@ -378,27 +468,26 @@ const CasesScreen = () => {
                     </TouchableOpacity>
                   </View>
                 </View>
-                <View style={styles.cardContent}>
+                <View style={styles.caseDetails}>
                   <View style={styles.infoRow}>
-                    <Ionicons name="person" size={16} color="#6b7280" />
-                    <Text style={styles.infoText}>{item.assignedOfficer || 'Unassigned'}</Text>
+                    <Ionicons name="person" size={16} color="#64748b" />
+                    <Text style={styles.infoText}>{String(item.assignedOfficer || 'Unassigned')}</Text>
                   </View>
+                  
                   <View style={styles.infoRow}>
-                    <Ionicons name="location" size={16} color="#6b7280" />
-                    <Text style={styles.infoText}>{item.location || 'Location not specified'}</Text>
+                    <Ionicons name="location" size={16} color="#64748b" />
+                    <Text style={styles.infoText}>{String(item.location || 'Location not specified')}</Text>
                   </View>
+                  
                   <View style={styles.infoRow}>
-                    <Ionicons name="calendar" size={16} color="#6b7280" />
-                    <Text style={styles.infoText}>{item.startDate ? new Date(item.startDate).toLocaleDateString() : 'No start date'}</Text>
+                    <Ionicons name="calendar" size={16} color="#64748b" />
+                    <Text style={styles.infoText}>{String(item.startDate ? new Date(item.startDate).toLocaleDateString() : 'No start date')}</Text>
                   </View>
                 </View>
-                <View style={styles.cardFooter}>
-                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-                    <Text style={styles.statusText}>{item.status}</Text>
-                  </View>
-                  <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(item.priority) }]}>
-                    <Text style={styles.priorityText}>{item.priority}</Text>
-                  </View>
+                
+                <View style={styles.caseStatus}>
+                  <Text style={styles.statusText}>{String(item.status || 'Unknown')}</Text>
+                  <Text style={styles.priorityText}>{String(item.priority || 'Unknown')}</Text>
                 </View>
               </LinearGradient>
             </TouchableOpacity>
@@ -410,25 +499,25 @@ const CasesScreen = () => {
 
       <Modal visible={modals.case} animationType="fade" transparent={false} onRequestClose={() => updateModal('case', false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            {/* Custom Toast Container */}
-            {customToast && (
-              <View style={[
-                styles.customToastContainer,
-                customToast.type === 'error' ? styles.errorToast : styles.successToast
-              ]}>
-                <Ionicons 
-                  name={customToast.type === 'error' ? 'alert-circle' : 'checkmark-circle'} 
-                  size={20} 
-                  color="#fff" 
-                />
-                <View style={styles.toastContent}>
-                  <Text style={styles.toastTitle}>{customToast.title}</Text>
-                  <Text style={styles.toastMessage}>{customToast.message}</Text>
-                </View>
+          {/* Custom Toast Container - Absolutely positioned */}
+          {customToast && (
+            <View style={[
+              styles.customToastContainer,
+              customToast.type === 'error' ? styles.errorToast : styles.successToast
+            ]}>
+              <Ionicons 
+                name={customToast.type === 'error' ? 'alert-circle' : 'checkmark-circle'} 
+                size={20} 
+                color="#fff" 
+              />
+              <View style={styles.toastContent}>
+                <Text style={styles.toastTitle}>{customToast.title}</Text>
+                <Text style={styles.toastMessage}>{customToast.message}</Text>
               </View>
-            )}
-            
+            </View>
+          )}
+          
+          <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{selected.isEdit ? 'Edit Case' : 'Add New Case'}</Text>
               <TouchableOpacity style={styles.closeButton} onPress={() => updateModal('case', false)}>
@@ -437,7 +526,7 @@ const CasesScreen = () => {
             </View>
             <ScrollView style={styles.modalBody}>
                               <InputField 
-                  label="Case Title *" 
+                  label="Case Title" 
                   value={formData.title} 
                   onChangeText={(text) => updateFormData('title', text)} 
                   placeholder="Enter case title" 
@@ -446,7 +535,7 @@ const CasesScreen = () => {
                 />
               <InputField label="Description" value={formData.description} onChangeText={(text) => updateFormData('description', text)} placeholder="Enter case description" multiline numberOfLines={3} />
                               <SelectDropdown 
-                  label="Status *" 
+                  label="Status" 
                   selectedValue={formData.status} 
                   onValueChange={(value) => updateFormData('status', value)} 
                   options={statusOptions}
@@ -460,7 +549,7 @@ const CasesScreen = () => {
                   showRemoveOption={true}
                 />
                               <SelectDropdown 
-                  label="Priority *" 
+                  label="Priority" 
                   selectedValue={formData.priority} 
                   onValueChange={(value) => updateFormData('priority', value)} 
                   options={priorityOptions}
@@ -474,12 +563,11 @@ const CasesScreen = () => {
                   showRemoveOption={true}
                 />
                 <SelectDropdown 
-                  label="Category *" 
+                  label="Category" 
                   selectedValue={formData.category} 
                   onValueChange={(value) => updateFormData('category', value)} 
-                  options={categoryOptions.map(cat => ({ label: cat, value: cat }))}
+                  options={categoryOptions}
                   error={errors.category}
-                  required
                   fieldName="case_categories"
                   fieldLabel="Category"
                   onOptionAdded={handleOptionAdded}
@@ -491,7 +579,7 @@ const CasesScreen = () => {
               <InputField label="Location" value={formData.location} onChangeText={(text) => updateFormData('location', text)} placeholder="Enter case location" />
               
               <DatePickerField
-                label="Start Date *"
+                label="Start Date"
                 value={formData.startDate ? new Date(formData.startDate) : new Date()}
                 onChange={(date) => {
                   updateFormData('startDate', date.toISOString().split('T')[0]);
@@ -636,18 +724,20 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
   // Custom toast styles
   customToastContainer: {
+    position: 'absolute',
+    top: 60, // Position below status bar
+    left: 20,
+    right: 20,
+    zIndex: 9999, // Very high z-index to appear above everything
+    elevation: 9999,
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    marginBottom: 12,
     borderRadius: 12,
-    marginHorizontal: 20,
-    marginTop: 20,
     boxShadowColor: '#000',
     boxShadowOffset: { width: 0, height: 4 },
     boxShadowOpacity: 0.15,
     boxShadowRadius: 8,
-    elevation: 4,
   },
   errorToast: {
     backgroundColor: '#ef4444',
@@ -683,6 +773,11 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 14, fontWeight: 'bold', color: '#1e293b', marginBottom: 1 },
   statLabel: { fontSize: 9, color: '#64748b', fontWeight: '500' },
   searchContainer: { paddingHorizontal: 20, padding: 0, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  initButton: { padding: 8, borderRadius: 8, backgroundColor: '#3b82f6' },
+  initButtonText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  syncButton: { padding: 8, borderRadius: 8, backgroundColor: '#10b981' },
+  syncButtonText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  syncButtonPending: { backgroundColor: '#f59e0b' },
   syncButton: { padding: 8, borderRadius: 8, backgroundColor: '#f1f5f9' },
   syncButtonDisabled: { opacity: 0.5 },
   casesList: { padding: 20 },
@@ -693,9 +788,27 @@ const styles = StyleSheet.create({
   cardGradient: { borderRadius: 16, padding: 20 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
   cardTitleContainer: { flex: 1, marginRight: 12 },
-  caseTitle: { fontSize: 18, fontWeight: '700', color: '#1e293b', marginBottom: 8 },
-  caseCategory: { backgroundColor: '#f1f5f9', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignSelf: 'flex-start' },
-  caseCategoryText: { fontSize: 12, fontWeight: '600', color: '#475569' },
+  caseInfo: {
+    flex: 1,
+  },
+  caseTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: 8,
+  },
+  caseMeta: {
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  caseCategoryText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+  },
   cardActions: { flexDirection: 'row', gap: 8 },
   actionButton: { padding: 8, borderRadius: 8, backgroundColor: '#f8fafc' },
   cardContent: { marginBottom: 12 },
@@ -749,7 +862,15 @@ const styles = StyleSheet.create({
     boxShadowOpacity: 0.3,
     boxShadowRadius: 8,
     elevation: 8,
-  }
+  },
+  caseDetails: {
+    marginBottom: 12,
+  },
+  caseStatus: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 12,
+  },
 });
 
 export default CasesScreen;

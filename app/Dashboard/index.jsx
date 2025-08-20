@@ -5,11 +5,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Toast from 'react-native-toast-message';
-
+import PageHeader from '../../components/PageHeader';
 import { useAuth } from '../../context/AuthContext';
+// import { useCasesContext } from '../../context/CasesContext';
 import { customOptionsService, dataService } from '../../services/unifiedDataService';
-
 const { width: screenWidth } = Dimensions.get('window');
 
 const DashboardScreen = () => {
@@ -21,6 +20,12 @@ const DashboardScreen = () => {
   const [upcomingHolidays, setUpcomingHolidays] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deviceInfo, setDeviceInfo] = useState({ local: null, appwrite: null });
+  const [customToast, setCustomToast] = useState(null);
+
+  const showCustomToast = (type, title, message) => {
+    setCustomToast({ type, title, message });
+    setTimeout(() => setCustomToast(null), 3000);
+  };
 
   useEffect(() => {
     fetchData();
@@ -83,18 +88,10 @@ const DashboardScreen = () => {
     try {
       const result = await customOptionsService.initializeDefaultOptions();
       
-      Toast.show({
-        type: result.success ? 'success' : 'error',
-        text1: 'Initialize Defaults',
-        text2: result.message || result.error,
-      });
+      showCustomToast(result.success ? 'success' : 'error', 'Initialize Defaults', result.message || result.error);
     } catch (error) {
       console.error('Initialize failed:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Initialize Failed',
-        text2: error.message,
-      });
+      showCustomToast('error', 'Initialize Failed', error.message);
     }
   };
 
@@ -102,18 +99,10 @@ const DashboardScreen = () => {
     try {
       const status = await customOptionsService.checkDefaultOptionsStatus();
       
-      Toast.show({
-        type: 'info',
-        text1: 'Default Options Status',
-        text2: 'Check console for details',
-      });
+      showCustomToast('info', 'Default Options Status', 'Check console for details');
     } catch (error) {
       console.error('Status check failed:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Status Check Failed',
-        text2: error.message,
-      });
+      showCustomToast('error', 'Status Check Failed', error.message);
     }
   };
 
@@ -213,9 +202,35 @@ const DashboardScreen = () => {
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={styles.contentContainer}>
+      {/* Custom Toast */}
+      {customToast && (
+        <View style={[
+          styles.customToastContainer,
+          customToast.type === 'error' ? styles.errorToast : 
+          customToast.type === 'success' ? styles.successToast :
+          customToast.type === 'warning' ? styles.warningToast :
+          styles.infoToast
+        ]}>
+          <Ionicons 
+            name={
+              customToast.type === 'error' ? 'close-circle' :
+              customToast.type === 'success' ? 'checkmark-circle' :
+              customToast.type === 'warning' ? 'warning' :
+              'information-circle'
+            }
+            size={20}
+            color="#fff"
+          />
+          <View style={styles.toastContent}>
+            <Text style={styles.toastTitle}>{customToast.title}</Text>
+            <Text style={styles.toastMessage}>{customToast.message}</Text>
+          </View>
+        </View>
+      )}
+
       <LinearGradient colors={['#1e40af', '#1e3a8a', '#1e293b']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
         <View style={styles.headerContent}>
-          <View style={styles.headerLeft}>
+          {/* <View style={styles.headerLeft}>
             <View style={styles.titleContainer}>
               <View style={styles.headerIconContainer}>
                 <Ionicons name="shield" size={screenWidth > 768 ? 32 : 24} color="#fff" />
@@ -225,14 +240,22 @@ const DashboardScreen = () => {
                 <Text style={styles.headerSubtitle}>Department Overview & Analytics</Text>
               </View>
             </View>
-          </View>
-          {user && (
+          </View> */}
+          <PageHeader
+        title="Police Management System"
+        subtitle="Department Overview & Analytics"
+        icon="shield"
+        gradientColors={['#1e40af', '#1e3a8a']}
+        showBackButton={true}
+        // actionButton={headerAction}
+      />
+          {/* {user && (
             <TouchableOpacity style={styles.userInitialsContainer} onPress={() => router.push('/auth')}>
               <Text style={styles.userInitials}>
                 {user.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U'}
               </Text>
             </TouchableOpacity>
-          )}
+          )} */}
         </View>
       </LinearGradient>
 
@@ -243,7 +266,7 @@ const DashboardScreen = () => {
               <Ionicons name="people" size={20} color="#1e40af" />
             </View>
             <View style={styles.kpiContent}>
-              <Text style={styles.kpiValue}>{employees.length}</Text>
+              <Text style={styles.kpiValue}>{String(employees.length)}</Text>
               <Text style={styles.kpiLabel}>Total Officers</Text>
               <Text style={styles.kpiSubtext}>Department strength</Text>
             </View>
@@ -253,7 +276,7 @@ const DashboardScreen = () => {
               <Ionicons name="folder" size={20} color="#dc2626" />
             </View>
             <View style={styles.kpiContent}>
-              <Text style={styles.kpiValue}>{getActiveCasesCount()}</Text>
+              <Text style={styles.kpiValue}>{String(getActiveCasesCount())}</Text>
               <Text style={styles.kpiLabel}>Active Cases</Text>
               <Text style={styles.kpiSubtext}>Ongoing investigations</Text>
             </View>
@@ -326,15 +349,14 @@ const styles = StyleSheet.create({
     marginTop: 16, 
     fontWeight: '600' 
   },
-  header: { 
-    paddingTop: 30, 
-    paddingBottom: 12, 
-    paddingHorizontal: 16 
-  },
+ 
   headerContent: { 
     flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center' 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+   
+  
+
   },
   userInitialsContainer: {
     width: 40,
@@ -350,15 +372,17 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#fff',
   },
-  headerLeft: { 
-    flex: 1 
-  },
-  titleContainer: { 
-    flexDirection: 'row', 
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    marginBottom: 20,
-  },
+  // headerLeft: { 
+  //   flex: 1, 
+  //   backgroundColor:"green"
+  // },
+  // titleContainer: { 
+  //   flexDirection: 'row', 
+  //   alignItems: 'center',
+  //   flexWrap: 'wrap',
+ 
+  //    backgroundColor:"purple"
+  // },
   headerIconContainer: { 
     width: screenWidth > 768 ? 64 : 48, 
     height: screenWidth > 768 ? 64 : 48, 
@@ -495,6 +519,45 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fff',
     marginLeft: 8,
+  },
+  customToastContainer: {
+    position: 'absolute',
+    top: 60,
+    left: 20,
+    right: 20,
+    backgroundColor: '#333',
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    zIndex: 9999,
+    elevation: 9999,
+  },
+  errorToast: {
+    backgroundColor: '#dc2626',
+  },
+  successToast: {
+    backgroundColor: '#10b981',
+  },
+  warningToast: {
+    backgroundColor: '#f59e0b',
+  },
+  infoToast: {
+    backgroundColor: '#3b82f6',
+  },
+  toastContent: {
+    marginLeft: 10,
+    flex: 1,
+  },
+  toastTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  toastMessage: {
+    fontSize: 14,
+    color: '#fff',
+    marginTop: 2,
   },
 });
 

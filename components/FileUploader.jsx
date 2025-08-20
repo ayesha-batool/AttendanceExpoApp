@@ -99,7 +99,7 @@ const FileUploader = ({
       ) : (
         <TouchableOpacity style={styles.uploadButton} onPress={handleUpload}>
           <Ionicons name="cloud-upload-outline" size={32} color="#007AFF" />
-          <Text style={styles.uploadText}>{placeholder}</Text>
+          <Text style={styles.uploadText}>{String(placeholder)}</Text>
           <Text style={styles.uploadSubtext}>
             Tap to select a file
           </Text>

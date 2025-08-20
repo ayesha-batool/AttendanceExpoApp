@@ -3,7 +3,6 @@ import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useEffect, useState } from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Toast from 'react-native-toast-message';
 
 import DeleteConfirmationModal from '../../components/DeleteConfirmationModal';
 import EmptyState from '../../components/EmptyState';
@@ -38,9 +37,13 @@ const ExpensesManagementScreen = () => {
 
   const [departmentOptions, setDepartmentOptions] = useState([]);
   const [activeTab, setActiveTab] = useState('all'); // 'all', 'paid', 'unpaid'
+  const [customToast, setCustomToast] = useState(null);
 
   // Utility functions - compressed
-  const showToast = (type, text1, text2) => Toast.show({ type, text1, text2 });
+  const showCustomToast = (type, title, message) => {
+    setCustomToast({ type, title, message });
+    setTimeout(() => setCustomToast(null), 3000);
+  };
   const updateModal = (key, value) => setModals(prev => ({ ...prev, [key]: value }));
   const updateSelected = (key, value) => setSelected(prev => ({ ...prev, [key]: value }));
 
@@ -119,7 +122,7 @@ const ExpensesManagementScreen = () => {
     
     } catch (error) {
       console.error('Failed to load expenses data:', error);
-      showToast('error', 'Error', 'Failed to load expenses data');
+      showCustomToast('error', 'Error', 'Failed to load expenses data');
       setExpenses([]);
       setFilteredExpenses([]);
     } finally {
@@ -215,11 +218,11 @@ const ExpensesManagementScreen = () => {
       setExpenses(prev => prev.filter(expense => getExpenseId(expense) !== expenseId));
       setFilteredExpenses(prev => prev.filter(expense => getExpenseId(expense) !== expenseId));
       
-      showToast('success', 'Success', 'Expense deleted successfully');
+      showCustomToast('success', 'Success', 'Expense deleted successfully');
       
     } catch (error) {
       console.error('Error deleting expense:', error);
-      showToast('error', 'Error', error.message || 'Failed to delete expense');
+      showCustomToast('error', 'Error', error.message || 'Failed to delete expense');
     } finally {
       updateModal('delete', false);
       updateSelected('deleteExpense', null);
@@ -229,7 +232,7 @@ const ExpensesManagementScreen = () => {
 
   const saveExpense = async (expenseData) => {
     if (isSaving) {
-      showToast('error', 'Error', 'Please wait, saving in progress...');
+      showCustomToast('error', 'Error', 'Please wait, saving in progress...');
       return;
     }
 
@@ -261,7 +264,7 @@ const ExpensesManagementScreen = () => {
           getExpenseId(expense) === expenseId ? updatedExpense : expense
         ));
         
-        showToast('success', 'Success', 'Expense updated successfully');
+        showCustomToast('success', 'Success', 'Expense updated successfully');
       } else {
         const newExpense = await dataService.saveData(expenseData, 'expenses');
         
@@ -274,7 +277,7 @@ const ExpensesManagementScreen = () => {
         setExpenses(prev => [...prev, expenseWithId]);
         setFilteredExpenses(prev => [...prev, expenseWithId]);
         
-        showToast('success', 'Success', 'Expense added successfully');
+        showCustomToast('success', 'Success', 'Expense added successfully');
       }
       
       // Close modal and reset state
@@ -284,7 +287,7 @@ const ExpensesManagementScreen = () => {
       
     } catch (error) {
       console.error('Error saving expense:', error);
-      showToast('error', 'Error', error.message || 'Failed to save expense');
+      showCustomToast('error', 'Error', error.message || 'Failed to save expense');
     } finally {
       setIsSaving(false);
     }
@@ -348,6 +351,32 @@ const ExpensesManagementScreen = () => {
 
   return (
     <View style={styles.container}>
+      {/* Custom Toast */}
+      {customToast && (
+        <View style={[
+          styles.customToastContainer,
+          customToast.type === 'error' ? styles.errorToast : 
+          customToast.type === 'success' ? styles.successToast :
+          customToast.type === 'warning' ? styles.warningToast :
+          styles.infoToast
+        ]}>
+          <Ionicons 
+            name={
+              customToast.type === 'error' ? 'close-circle' :
+              customToast.type === 'success' ? 'checkmark-circle' :
+              customToast.type === 'warning' ? 'warning' :
+              'information-circle'
+            }
+            size={20}
+            color="#fff"
+          />
+          <View style={styles.toastContent}>
+            <Text style={styles.toastTitle}>{customToast.title}</Text>
+            <Text style={styles.toastMessage}>{customToast.message}</Text>
+          </View>
+        </View>
+      )}
+
       {/* Stats and Search Section */}
       <View style={styles.stats}>
         <View style={styles.statRow}>
@@ -548,6 +577,49 @@ const styles = StyleSheet.create({
   },
   activeTabText: {
     color: '#fff',
+  },
+  customToastContainer: {
+    position: 'absolute',
+    top: 60,
+    left: 20,
+    right: 20,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 9999,
+    zIndex: 9999,
+  },
+  errorToast: {
+    backgroundColor: '#f44336',
+  },
+  successToast: {
+    backgroundColor: '#4CAF50',
+  },
+  warningToast: {
+    backgroundColor: '#FFC107',
+  },
+  infoToast: {
+    backgroundColor: '#2196F3',
+  },
+  toastContent: {
+    marginLeft: 10,
+    flex: 1,
+  },
+  toastTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  toastMessage: {
+    fontSize: 14,
+    color: '#fff',
+    marginTop: 2,
   },
 });
 

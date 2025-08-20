@@ -60,7 +60,7 @@ const LoadingOverlay = ({ visible, message = 'Loading...', type = 'default' }) =
             color={getColor()} 
             style={styles.spinner}
           />
-          <Text style={styles.message}>{message}</Text>
+          <Text style={styles.message}>{String(message)}</Text>
           <Text style={styles.subMessage}>
             Please wait while we process your request...
           </Text>

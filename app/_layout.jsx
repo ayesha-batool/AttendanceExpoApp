@@ -1,3 +1,4 @@
+import * as Linking from 'expo-linking';
 import { Stack, useRouter } from "expo-router";
 import { useEffect } from "react";
 import Toast, { BaseToast, ErrorToast } from "react-native-toast-message";
@@ -99,7 +100,7 @@ const RootLayout = () => {
 };
 
 const AuthenticatedLayout = () => {
-  const { currentUser, loading } = useAuth();
+  const { currentUser, loading, isEmailVerified } = useAuth();
   const router = useRouter();
   
   // useEffect(() => {
@@ -108,43 +109,87 @@ const AuthenticatedLayout = () => {
   // }, []);
   
   useEffect(() => {
-    if (!loading && !currentUser) {
-      if (router.canGoBack()) {
-        router.replace("/auth");
+    if (!loading) {
+      if (!currentUser) {
+        // No user logged in, redirect to auth
+        if (router.canGoBack()) {
+          router.replace("/auth");
+        }
+      } else if (!isEmailVerified && !currentUser?.isOfflineUser) {
+        // User is logged in but email is not verified (and not offline), redirect to verification required
+        router.replace("/verification-required");
       }
+      // If user is logged in and email is verified (or offline), they can access the dashboard
     }
 
-  }, [currentUser, loading, router]);
+  }, [currentUser, loading, isEmailVerified, router]);
+
+  // Handle deep linking for email verification
+  useEffect(() => {
+    const handleDeepLink = (event) => {
+      console.log('🔗 Deep link received:', event.url);
+      
+      // Parse the URL to extract userId and secret
+      const url = event.url;
+      if (url.includes('localhost:8081://verify')) {
+        console.log('📧 Verification deep link detected');
+        
+        // Extract query parameters
+        const urlObj = new URL(url);
+        const userId = urlObj.searchParams.get('userId');
+        const secret = urlObj.searchParams.get('secret');
+        
+        console.log('🆔 userId:', userId);
+        console.log('🔑 secret:', secret);
+        
+        if (userId && secret) {
+          console.log('✅ Valid verification parameters, navigating to verify page');
+          router.push(`/verify?userId=${userId}&secret=${secret}`);
+        } else {
+          console.log('❌ Missing verification parameters');
+          router.push('/verify?error=missing_params');
+        }
+      }
+    };
+
+    // Handle initial URL if app was opened via deep link
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        console.log('🔗 Initial deep link URL:', url);
+        handleDeepLink({ url });
+      }
+    });
+
+    // Listen for deep link events
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+
+    return () => {
+      subscription?.remove();
+    };
+  }, [router]);
   return (
     <Stack
-      screenOptions={{
-        headerShown: false, // Hide the root header
-        contentStyle: {
-          paddingTop: 0,
-          paddingHorizontal: 0,
-          paddingBottom: 0,
-        },
-      }}
-    >
+        screenOptions={{
+          headerShown: false, // Hide the root header
+          contentStyle: {
+            paddingTop: 0,
+            paddingHorizontal: 0,
+            paddingBottom: 0,
+          },
+        }}
+      >
       <Stack.Screen name="index" />
       <Stack.Screen name="auth" />
       <Stack.Screen name="Dashboard" />
       <Stack.Screen name="Employee" />
       <Stack.Screen name="Cases" />
       <Stack.Screen name="ExpensesManagement" />
-      {/* <Stack.Screen name="VehicleManagement" /> */}
-      {/* <Stack.Screen name="Payroll" /> */}
-      <Stack.Screen name="Attendance" />
-      {/* <Stack.Screen name="Leave" /> */}
-      {/* <Stack.Screen name="OverTime" /> */}
-      {/* <Stack.Screen name="Holidays" /> */}
-      {/* <Stack.Screen name="Fines" /> */}
-      {/* <Stack.Screen name="Advance" /> */}
-      {/* <Stack.Screen name="Remarks" /> */}
-      {/* <Stack.Screen name="InactiveEmployee" /> */}
-      {/* <Stack.Screen name="EmployeeDocuments" /> */}
      
-      {/* <Stack.Screen name="phone" /> */}
+      <Stack.Screen name="Attendance" />
+      <Stack.Screen name="verify" />
+      <Stack.Screen name="verification-required" />
+      <Stack.Screen name="test-verification" />
+    
     </Stack>
   );
 };

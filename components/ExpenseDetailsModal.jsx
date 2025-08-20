@@ -2,13 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 import React from 'react';
 import {
-    Modal,
-    Image as RNImage,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Modal,
+  Image as RNImage,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 const ExpenseDetailsModal = ({ visible, expense, onClose, onEdit, onDelete }) => {
@@ -148,7 +148,7 @@ const ExpenseDetailsModal = ({ visible, expense, onClose, onEdit, onDelete }) =>
                 <Ionicons name={getCategoryIcon(expense.category)} size={24} color="#fff" />
               </View>
               <View style={styles.expenseInfo}>
-                <Text style={styles.expenseTitle}>{expense.title || 'Untitled Expense'}</Text>
+                <Text style={styles.expenseTitle}>{String(expense.title || 'Untitled Expense')}</Text>
                 <Text style={styles.expenseCategory}>
                   {(expense.category || 'other')?.replace('_', ' ').toUpperCase()}
                 </Text>
@@ -174,7 +174,7 @@ const ExpenseDetailsModal = ({ visible, expense, onClose, onEdit, onDelete }) =>
                 <View style={styles.detailRow}>
                   <Ionicons name="business" size={16} color="#6b7280" />
                   <Text style={styles.detailLabel}>Department:</Text>
-                  <Text style={styles.detailValue}>{expense.department}</Text>
+                  <Text style={styles.detailValue}>{String(expense.department || 'N/A')}</Text>
                 </View>
               )}
 
@@ -182,7 +182,7 @@ const ExpenseDetailsModal = ({ visible, expense, onClose, onEdit, onDelete }) =>
                 <View style={styles.detailRow}>
                   <Ionicons name="document-text" size={16} color="#6b7280" />
                   <Text style={styles.detailLabel}>Description:</Text>
-                  <Text style={styles.detailValue}>{expense.description}</Text>
+                  <Text style={styles.detailValue}>{String(expense.description || 'No description')}</Text>
                 </View>
               )}
 
@@ -235,7 +235,7 @@ const ExpenseDetailsModal = ({ visible, expense, onClose, onEdit, onDelete }) =>
             {expense.notes && (
               <View style={styles.notesSection}>
                 <Text style={styles.sectionTitle}>Notes</Text>
-                <Text style={styles.notesText}>{expense.notes}</Text>
+                <Text style={styles.notesText}>{String(expense.notes || 'No notes available')}</Text>
               </View>
             )}
           </ScrollView>

@@ -3,7 +3,6 @@ import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useEffect, useState } from 'react';
 import { FlatList, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Toast from 'react-native-toast-message';
 
 import AddOfficerModal from '../../components/AddOfficerModal';
 import AttendanceTab from '../../components/AttendanceTab';
@@ -24,14 +23,18 @@ const EmployeeScreen = () => {
   const [filteredEmployees, setFilteredEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState('employees');
+  const [activeTab, setActiveTab] = useState('active');
   const [customOptions, setCustomOptions] = useState({ departments: [], ranks: [], employment_status: [] });
   const [filters, setFilters] = useState({ department: '', rank: '', status: '' });
   const [modals, setModals] = useState({ filter: false, addOfficer: false, delete: false, details: false });
   const [selected, setSelected] = useState({ employee: null, deleteEmployee: null, editEmployee: null });
+  const [customToast, setCustomToast] = useState(null);
 
   // Utility functions
-  const showToast = (type, text1, text2, duration = 2000) => Toast.show({ type, text1, text2, visibilityTime: duration });
+  const showCustomToast = (type, title, message) => {
+    setCustomToast({ type, title, message });
+    setTimeout(() => setCustomToast(null), 3000);
+  };
   const updateModal = (key, value) => setModals(prev => ({ ...prev, [key]: value }));
   const updateSelected = (key, value) => setSelected(prev => ({ ...prev, [key]: value }));
   const updateFilter = (key, value) => setFilters(prev => ({ ...prev, [key]: value }));
@@ -72,12 +75,12 @@ customOptionsService.getOptions('employment_status')
     let filtered = [...employees];
     
     // Filter by active tab
-    if (activeTab === 'employees') {
+    if (activeTab === 'active') {
       filtered = filtered.filter(emp => {
         const status = emp.status?.toLowerCase();
         return status === 'active';
       });
-    } else if (activeTab === 'inactive') {
+    } else if (activeTab === 'other') {
       filtered = filtered.filter(emp => {
         const status = emp.status?.toLowerCase();
         return status !== 'active';
@@ -166,7 +169,7 @@ customOptionsService.getOptions('employment_status')
       });
           
     } catch (error) {
-      showToast('error', 'Error', 'Failed to update employee status: ' + error.message);
+      showCustomToast('error', 'Error', 'Failed to update employee status: ' + error.message);
     }
   };
 
@@ -191,10 +194,10 @@ customOptionsService.getOptions('employment_status')
         return updated;
       });
       
-      showToast('success', 'Success', 'Employee deleted successfully');
+      showCustomToast('success', 'Success', 'Employee deleted successfully');
       
     } catch (error) {
-      showToast('error', 'Error', 'Failed to delete employee: ' + error.message);
+      showCustomToast('error', 'Error', 'Failed to delete employee: ' + error.message);
     } finally {
       updateModal('delete', false);
       updateSelected('deleteEmployee', null);
@@ -224,13 +227,39 @@ customOptionsService.getOptions('employment_status')
 
   return (
     <View style={styles.container}>
+      {/* Custom Toast */}
+      {customToast && (
+        <View style={[
+          styles.customToastContainer,
+          customToast.type === 'error' ? styles.errorToast : 
+          customToast.type === 'success' ? styles.successToast :
+          customToast.type === 'warning' ? styles.warningToast :
+          styles.infoToast
+        ]}>
+          <Ionicons 
+            name={
+              customToast.type === 'error' ? 'close-circle' :
+              customToast.type === 'success' ? 'checkmark-circle' :
+              customToast.type === 'warning' ? 'warning' :
+              'information-circle'
+            }
+            size={20}
+            color="#fff"
+          />
+          <View style={styles.toastContent}>
+            <Text style={styles.toastTitle}>{customToast.title}</Text>
+            <Text style={styles.toastMessage}>{customToast.message}</Text>
+          </View>
+        </View>
+      )}
+
       {/* Tab Navigation */}
       <View style={styles.tabContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScrollContainer}>
           <View style={styles.tabSliderContainer}>
             {[
-              { key: 'employees', icon: 'people', label: 'All Employees' },
-              { key: 'inactive', icon: 'person-remove', label: 'Inactive' },
+              { key: 'active', icon: 'people', label: 'Active Employees' },
+              { key: 'other', icon: 'person-remove', label: 'Other Employees' },
               { key: 'attendance', icon: 'calendar', label: 'Attendance' }
             ].map(tab => (
               <TouchableOpacity key={tab.key} style={[styles.tab, activeTab === tab.key && styles.activeTab]} onPress={() => setActiveTab(tab.key)}>
@@ -267,12 +296,12 @@ customOptionsService.getOptions('employment_status')
             <View style={styles.emptyContainer}>
               <Ionicons name={activeTab === 'employees' ? 'people-outline' : 'person-remove-outline'} size={64} color="#9ca3af" />
               <Text style={styles.emptyTitle}>
-                {searchQuery || Object.values(filters).some(f => f) ? `No ${activeTab} Employees Found` : `No ${activeTab} Employees`}
+                {searchQuery || Object.values(filters).some(f => f) ? `No ${activeTab} Found` : `No ${activeTab} Employees`}
               </Text>
               <Text style={styles.emptyMessage}>
                 {searchQuery || Object.values(filters).some(f => f) 
                   ? 'Try adjusting your search or filter criteria'
-                  : activeTab === 'employees' ? 'Start by adding your first employee' : 'No inactive employees found'}
+                  : activeTab === 'employees' ? 'Start by adding your first employee' : ''}
               </Text>
             </View>
           ) : (
@@ -391,7 +420,7 @@ customOptionsService.getOptions('employment_status')
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, backgroundColor: '#f8fafc',paddingBottom:20},
   tabContainer: { 
     backgroundColor: '#fff', 
     paddingVertical: 6, 
@@ -439,14 +468,14 @@ const styles = StyleSheet.create({
   },
   searchContainer: {
     flex: 1,
-    maxWidth: '50%',
+    minWidth: '40%',
   },
   filterButton: { 
     flex: 1,
     flexDirection: 'row', 
     alignItems: 'center', 
     justifyContent: 'center',
-    paddingHorizontal: 16, 
+    paddingHorizontal: 4, 
     paddingVertical: 12, 
     backgroundColor: '#f8fafc', 
     borderRadius: 10, 
@@ -457,6 +486,7 @@ const styles = StyleSheet.create({
     boxShadowOpacity: 0.05,
     boxShadowRadius: 2,
     elevation: 1,
+
   },
   filterButtonText: { 
     fontSize: 13, 
@@ -558,7 +588,49 @@ const styles = StyleSheet.create({
     boxShadowOpacity: 0.25,
     boxShadowRadius: 12,
     elevation: 10,
-  }
+  },
+  customToastContainer: {
+    position: 'absolute',
+    top: 60,
+    left: 20,
+    right: 20,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 9999,
+    zIndex: 9999,
+  },
+  errorToast: {
+    backgroundColor: '#ef4444',
+  },
+  successToast: {
+    backgroundColor: '#10b981',
+  },
+  warningToast: {
+    backgroundColor: '#f59e0b',
+  },
+  infoToast: {
+    backgroundColor: '#3b82f6',
+  },
+  toastContent: {
+    marginLeft: 10,
+  },
+  toastTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  toastMessage: {
+    fontSize: 14,
+    color: '#fff',
+    marginTop: 2,
+  },
 });
 
 export default EmployeeScreen;

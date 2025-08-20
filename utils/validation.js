@@ -112,7 +112,6 @@ export const VALIDATION_SCHEMAS = {
       (value) => VALIDATION_RULES.maxLength(value, 'Full Name', 100)
     ],
     cnic: [
-      (value) => VALIDATION_RULES.required(value, 'CNIC'),
       (value) => VALIDATION_RULES.cnic(value, 'CNIC')
     ],
     contactNumber: [
@@ -123,17 +122,16 @@ export const VALIDATION_SCHEMAS = {
       (value) => VALIDATION_RULES.email(value, 'Email')
     ],
     address: [
-      (value) => VALIDATION_RULES.required(value, 'Address'),
       (value) => VALIDATION_RULES.minLength(value, 'Address', 10)
     ],
     department: [
-      (value) => VALIDATION_RULES.required(value, 'Department')
+      // Removed required validation - now optional
     ],
     rank: [
-      (value) => VALIDATION_RULES.required(value, 'Rank')
+      // Removed required validation - now optional
     ],
     shift: [
-      (value) => VALIDATION_RULES.required(value, 'Shift')
+      // Removed required validation - now optional
     ],
     status: [
       (value) => VALIDATION_RULES.required(value, 'Employment Status')

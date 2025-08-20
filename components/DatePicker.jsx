@@ -47,7 +47,7 @@ const DatePicker = ({
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>{title}</Text>
+          <Text style={styles.modalTitle}>{String(title || 'Select Date')}</Text>
           
           <InputField
             label="Date"

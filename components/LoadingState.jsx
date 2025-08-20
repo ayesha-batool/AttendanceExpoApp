@@ -1,10 +1,11 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, ActivityIndicator } from 'react-native';
 
 const LoadingState = ({ text = "Loading..." }) => {
   return (
-    <View style={styles.loadingContainer}>
-      <Text style={styles.loadingText}>{text}</Text>
+    <View style={styles.container}>
+      <ActivityIndicator size="large" color="#667eea" />
+      <Text style={styles.loadingText}>{String(text)}</Text>
     </View>
   );
 };

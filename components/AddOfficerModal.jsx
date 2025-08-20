@@ -2,9 +2,7 @@
 import DatePickerField from "./DatePickerField";
 
 import InputField from "./InputField";
-import PhoneNumberField from "./PhoneNumberField";
 import SelectDropdown from "./SelectDropdown";
-
 // External Libraries
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -70,7 +68,6 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
     workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"], // default weekdays
     checkInTime: "09:00", // default 9 AM
     checkOutTime: "17:00", // default 5 PM
-    leavesAllowedPerMonth: "2", // default 2 leaves per month (as string for input)
     overtimeRate: "", // multiplier for overtime (e.g., 1.5x)
     bonus: "" // bonus amount to add to total pay
   });
@@ -94,8 +91,14 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
       resetForm();
     }
     loadExistingEmployees();
-    loadInitialDropdownOptions();
-  }, [editingOfficer, visible]);
+  }, [editingOfficer]);
+
+  // Separate useEffect for loading dropdown options only when modal first opens
+  useEffect(() => {
+    if (visible) {
+      loadInitialDropdownOptions();
+    }
+  }, [visible]);
 
   const loadInitialDropdownOptions = async () => {
     try {
@@ -152,7 +155,6 @@ customOptionsService.getOptions('employment_status')
       workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
       checkInTime: "09:00",
       checkOutTime: "17:00",
-      leavesAllowedPerMonth: "2",
       overtimeRate: "",
       bonus: ""
     });
@@ -195,7 +197,6 @@ customOptionsService.getOptions('employment_status')
         workingDays: editingOfficer.workingDays || ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
         checkInTime: editingOfficer.checkInTime || "09:00",
         checkOutTime: editingOfficer.checkOutTime || "17:00",
-        leavesAllowedPerMonth: editingOfficer.leavesAllowedPerMonth?.toString() || "2",
         overtimeRate: editingOfficer.overtimeRate || "",
         bonus: editingOfficer.bonus || ""
       });
@@ -229,28 +230,35 @@ customOptionsService.getOptions('employment_status')
       message: `${fieldName.replace('_', ' ')} removed successfully`
     });
     setTimeout(() => setCustomToast(null), 3000);
-    await refreshDropdownOptions(fieldName);
-    // Force re-render by updating the state
-    setDropdownOptions(prev => ({ ...prev }));
-    // Add a small delay to ensure the UI updates
-    setTimeout(() => {
-      setDropdownOptions(prev => ({ ...prev }));
-    }, 100);
+    
+    // Update dropdown options locally without triggering full refresh
+    setDropdownOptions(prev => ({
+      ...prev,
+      [fieldName]: prev[fieldName].filter(option => option.value !== removedOption)
+    }));
+    
+    // Clear the form field if the removed option was selected
+    if (form[fieldName] === removedOption) {
+      updateForm(fieldName, '');
+    }
   };
 
   const handleOptionAdded = async (newOption, fieldName) => {
     setCustomToast({
       type: 'success',
       title: 'Success',
-      message: `${fieldName.replace('_', ' ')} added successfully`
+      message: `New ${fieldName.replace('_', ' ')} added successfully`
     });
     setTimeout(() => setCustomToast(null), 3000);
     
-    // Refresh options by calling the parent component's refresh function
-    if (onSuccess) {
-      // Trigger a refresh of options
-      onSuccess({ refreshOptions: true, fieldName });
-    }
+    // Update dropdown options locally without triggering full refresh
+    setDropdownOptions(prev => ({
+      ...prev,
+      [fieldName]: [...prev[fieldName], { label: newOption, value: newOption }]
+    }));
+    
+    // Set the new option as the selected value for the current field
+    updateForm(fieldName, newOption);
   };
 
   // Test function to debug Appwrite setup (v2.0)
@@ -299,7 +307,7 @@ customOptionsService.getOptions('employment_status')
         return !isDuplicate;
       });
       setExistingEmployees(uniqueEmployees);
-      
+
       // Filter out the current employee being edited from supervisor options
       const currentEmployeeId = editingOfficer?.id || editingOfficer?.$id;
       const currentEmployeeName = editingOfficer?.fullName;
@@ -317,10 +325,10 @@ customOptionsService.getOptions('employment_status')
           return true;
         })
         .map(emp => ({
-          label: `${emp.fullName} (${emp.rank || "N/A"})`, 
-          value: emp.fullName, 
+        label: `${emp.fullName} (${emp.rank || "N/A"})`,
+        value: emp.fullName,
           id: emp.id || emp.$id
-        }));
+      }));
       
       setSupervisorOptions(supervisorOpts);
     } catch (error) {
@@ -358,9 +366,7 @@ customOptionsService.getOptions('employment_status')
 
       
 
-      if (!form.gender) { validation.errors.gender = "Gender is required"; validation.isValid = false; }
-      if (!form.postingStation?.trim()) { validation.errors.postingStation = "Posting station is required"; validation.isValid = false; }
-
+    
       if (form.badgeNumber?.trim()) {
         const badgeError = CUSTOM_VALIDATORS.uniqueBadgeNumber(
           form.badgeNumber, existingEmployees, editingOfficer?.id || editingOfficer?.$id
@@ -371,13 +377,13 @@ customOptionsService.getOptions('employment_status')
       // Validate time format (HH:MM)
       if (form.checkInTime && !/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(form.checkInTime)) {
         validation.errors.checkInTime = "Time must be in HH:MM format (e.g., 09:00)";
-        validation.isValid = false;
+          validation.isValid = false;
       }
 
       if (form.checkOutTime && !/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(form.checkOutTime)) {
         validation.errors.checkOutTime = "Time must be in HH:MM format (e.g., 17:00)";
-        validation.isValid = false;
-      }
+            validation.isValid = false;
+          }
 
       // Validate bonus amount (must be positive number)
       if (form.bonus && (isNaN(form.bonus) || parseFloat(form.bonus) < 0)) {
@@ -388,12 +394,6 @@ customOptionsService.getOptions('employment_status')
       // Validate overtime rate (must be positive number)
       if (form.overtimeRate && (isNaN(form.overtimeRate) || parseFloat(form.overtimeRate) <= 0)) {
         validation.errors.overtimeRate = "Overtime rate must be a positive number";
-        validation.isValid = false;
-      }
-
-      // Validate leaves allowed per month (must be positive integer)
-      if (form.leavesAllowedPerMonth && (isNaN(form.leavesAllowedPerMonth) || parseInt(form.leavesAllowedPerMonth) < 0)) {
-        validation.errors.leavesAllowedPerMonth = "Leaves allowed must be a positive number";
         validation.isValid = false;
       }
 
@@ -445,7 +445,7 @@ customOptionsService.getOptions('employment_status')
       setTimeout(() => {
         setCustomToast(null);
       if (onSuccess) onSuccess();
-      onClose();
+          onClose();
       }, 2000);
     } catch (error) {
       setCustomToast({
@@ -459,77 +459,145 @@ customOptionsService.getOptions('employment_status')
     }
   };
 
-  const renderBasicInfoTab = () => (
+   const renderBasicInfoTab = () => (
     <View style={styles.tabContent}>
-      <InputField label="Badge Number *" value={form.badgeNumber} onChangeText={(text) => updateForm("badgeNumber", text)} 
-        placeholder="Enter official badge number" required error={errors.badgeNumber} />
-      <InputField label="Full Name *" value={form.fullName} onChangeText={(text) => updateForm("fullName", text)} 
-        placeholder="Enter officer's full legal name" required error={errors.fullName} />
-      <InputField label="Father's Name" value={form.fatherName} onChangeText={(text) => updateForm("fatherName", text)} 
-        placeholder="Enter father's name for background checks" />
-      <InputField label="CNIC *" value={form.cnic} onChangeText={(text) => updateForm("cnic", text)} 
-        placeholder="Enter CNIC number (00000-0000000-0)" required error={errors.cnic} />
-      <DatePickerField label="Date of Birth *" value={form.dateOfBirth} onChange={(date) => updateForm("dateOfBirth", date)} 
-        placeholder="Select date of birth" required error={errors.dateOfBirth} />
-                      <SelectDropdown 
-                  label="Gender *" 
-                  selectedValue={form.gender} 
-                  onValueChange={(value) => updateForm("gender", value)}
-                  options={GENDER_OPTIONS} 
-                  showRemoveOption={false}
-                  error={errors.gender}
-                  required
-                />
-      <SelectDropdown label="Department *" selectedValue={form.department} onValueChange={(value) => updateForm("department", value)} 
-        options={dropdownOptions.departments} fieldName="departments" fieldLabel="Department" showRemoveOption={true} 
-        onOptionRemoved={(removedOption) => handleOptionRemoved(removedOption, 'departments')}
-        onOptionAdded={(newOption) => handleOptionAdded(newOption, 'departments')} />
-      <SelectDropdown label="Rank *" selectedValue={form.rank} onValueChange={(value) => updateForm("rank", value)} 
-        options={dropdownOptions.ranks} fieldName="ranks" fieldLabel="Rank" showRemoveOption={true} 
-        onOptionRemoved={(removedOption) => handleOptionRemoved(removedOption, 'ranks')}
-        onOptionAdded={(newOption) => handleOptionAdded(newOption, 'ranks')} />
-      <InputField label="Posting Station *" value={form.postingStation} onChangeText={(text) => updateForm("postingStation", text)} 
-        placeholder="Enter current police station or region" />
-                      <InputField
-                  label="Shift *"
-                  value={form.shift}
-                  onChangeText={(value) => updateForm("shift", value)}
-                  placeholder="e.g., Morning Shift (6 AM - 2 PM)"
-                  error={errors.shift}
-                  required
-                />
-                      <SelectDropdown 
-                  label="Employment Status *" 
-                  selectedValue={form.status} 
-                  onValueChange={(value) => updateForm("status", value)} 
-                  options={dropdownOptions.employment_status} 
-                  fieldName="employment_status"
-                  fieldLabel="Employment Status"
-                  onOptionAdded={handleOptionAdded}
-                  onOptionRemoved={handleOptionRemoved}
-                  showAddNewOption={true}
-                  showRemoveOption={true}
-                  error={errors.status}
-                  required
-                />
+      <InputField
+        label="Badge Number"
+        value={form.badgeNumber}
+        onChangeText={(text) => updateForm("badgeNumber", text)}
+        placeholder="Enter official badge number"
+        required
+        error={errors.badgeNumber}
+      />
 
-      
-      {/* Debug Test Button */}
-    
+      <InputField
+        label="Full Name"
+        value={form.fullName}
+        onChangeText={(text) => updateForm("fullName", text)}
+        placeholder="Enter officer's full legal name"
+        required
+        error={errors.fullName}
+      />
+
+      <InputField
+        label="Father's Name"
+        value={form.fatherName}
+        onChangeText={(text) => updateForm("fatherName", text)}
+        placeholder="Enter father's name for background checks"
+      />
+
+      <InputField
+        label="CNIC"
+        value={form.cnic}
+        onChangeText={(text) => updateForm("cnic", text)}
+        placeholder="Enter CNIC number (00000-0000000-0)"
+        error={errors.cnic}
+      />
+
+      <DatePickerField
+        label="Date of Birth"
+        value={form.dateOfBirth}
+        onChange={(date) => updateForm("dateOfBirth", date)}
+        placeholder="Select date of birth"
+        required
+        error={errors.dateOfBirth}
+      />
+
+      {/* Gender */}
+      <SelectDropdown
+        label="Gender"
+        selectedValue={form.gender}
+        onValueChange={(value) => updateForm("gender", value)}
+        options={GENDER_OPTIONS}
+        error={errors.gender}
+        required
+      />
+
+      {/* Department */}
+      <SelectDropdown
+        label="Department"
+        selectedValue={form.department}
+        onValueChange={(value) => updateForm("department", value)}
+        options={dropdownOptions.departments}
+        fieldName="departments"
+        fieldLabel="Department"
+        onOptionRemoved={(removedOption) => handleOptionRemoved(removedOption, 'departments')}
+        onOptionAdded={(newOption) => handleOptionAdded(newOption, 'departments')}
+        showAddNewOption={true}
+        showRemoveOption={true}
+        error={errors.department}
+      />
+  
+      {/* Rank */}
+      <SelectDropdown
+        label="Rank"
+        selectedValue={form.rank}
+        onValueChange={(value) => updateForm("rank", value)}
+        options={dropdownOptions.ranks}
+        fieldName="ranks"
+        fieldLabel="Rank"
+        onOptionRemoved={(removedOption) => handleOptionRemoved(removedOption, 'ranks')}
+        onOptionAdded={(newOption) => handleOptionAdded(newOption, 'ranks')}
+        showAddNewOption={true}
+        showRemoveOption={true}
+        error={errors.rank}
+      />
+
+      <InputField
+        label="Posting Station"
+        value={form.postingStation}
+        onChangeText={(text) => updateForm("postingStation", text)}
+        placeholder="Enter current police station or region"
+      />
+
+      <InputField
+        label="Shift"
+        value={form.shift}
+        onChangeText={(value) => updateForm("shift", value)}
+        placeholder="e.g., Morning Shift (6 AM - 2 PM)"
+        error={errors.shift}
+      />
+  
+      {/* Employment Status */}
+      <SelectDropdown
+        label="Employment Status"
+        selectedValue={form.status}
+        onValueChange={(value) => updateForm("status", value)}
+        options={dropdownOptions.employment_status}
+        fieldName="employment_status"
+        fieldLabel="Employment Status"
+        onOptionAdded={(newOption) =>
+          handleOptionAdded(newOption, "employment_status")
+        }
+        onOptionRemoved={(removed) =>
+          handleOptionRemoved(removed, "employment_status")
+        }
+        showAddNewOption={true}
+        showRemoveOption={true}
+        error={errors.status}
+        required
+      />
     </View>
   );
 
   const renderContactTab = () => (
     <View style={styles.tabContent}>
-      <PhoneNumberField label="Contact Number *" value={form.contactNumber} onChange={(text) => updateForm("contactNumber", text)} 
-        placeholder="Enter personal or duty number" required error={errors.contactNumber} />
+      <InputField 
+        label="Contact Number (+92)" 
+        value={form.contactNumber} 
+        onChangeText={(text) => updateForm("contactNumber", text)} 
+        placeholder="Enter phone number (e.g., 3001234567)" 
+        keyboardType="phone-pad"
+        required 
+        error={errors.contactNumber} 
+      />
       <InputField label="Email" value={form.email} onChangeText={(text) => updateForm("email", text)} 
         placeholder="Enter official/internal email" keyboardType="email-address" error={errors.email} />
-      <InputField label="Address *" value={form.address} onChangeText={(text) => updateForm("address", text)} 
-        placeholder="Enter residential address" multiline numberOfLines={3} required error={errors.address} />
-      <DatePickerField label="Joining Date *" value={form.joiningDate} onChange={(date) => updateForm("joiningDate", date)} 
+      <InputField label="Address" value={form.address} onChangeText={(text) => updateForm("address", text)} 
+        placeholder="Enter residential address" multiline numberOfLines={3} error={errors.address} />
+      <DatePickerField label="Joining Date" value={form.joiningDate} onChange={(date) => updateForm("joiningDate", date)} 
         placeholder="Select date of entry into force" required error={errors.joiningDate} />
-      <InputField label="Service Years (Auto-calculated)" value={form.serviceYears} onChangeText={(text) => updateForm("serviceYears", text)} 
+      <InputField label="Service Years (Auto-calculated)" disabled value={form.serviceYears} onChangeText={(text) => updateForm("serviceYears", text)} 
         placeholder="Automatically calculated from joining date" keyboardType="numeric" editable={false} />
       <DatePickerField label="Last Promotion Date" value={form.lastPromotionDate} onChange={(date) => updateForm("lastPromotionDate", date)} 
         placeholder="Select last promotion date" error={errors.lastPromotionDate} />
@@ -548,11 +616,11 @@ customOptionsService.getOptions('employment_status')
         placeholder="Enter assigned vehicle details" />
       <InputField label="Equipment Assigned" value={form.equipmentAssigned} onChangeText={(text) => updateForm("equipmentAssigned", text)} 
         placeholder="Enter assigned equipment" />
-      <SelectDropdown 
-        label="Supervisor" 
-        selectedValue={form.supervisor} 
-        onValueChange={(value) => updateForm("supervisor", value)} 
-        options={[{ label: "No Supervisor", value: "" }, ...supervisorOptions]} 
+      <SelectDropdown
+        label="Supervisor"
+        selectedValue={form.supervisor}
+        onValueChange={(value) => updateForm("supervisor", value)}
+        options={[{ label: "No Supervisor", value: "" }, ...supervisorOptions]}
         placeholder="Select supervisor (excludes current employee)" 
         showRemoveOption={false} 
       />
@@ -564,9 +632,9 @@ customOptionsService.getOptions('employment_status')
   const renderPayrollTab = () => {
     return (
     <View style={styles.tabContent}>
-        {/* Payment Type */}
+       
         <SelectDropdown
-          label="Payment Type *"
+          label="Payment Type"
           selectedValue={form.paymentType}
           onValueChange={(value) => updateForm("paymentType", value)}
           options={PAYMENT_TYPE_OPTIONS}
@@ -575,13 +643,13 @@ customOptionsService.getOptions('employment_status')
           showRemoveOption={false}
         />
 
-      {/* Salary Field - Dynamic label based on payment type */}
-      <InputField 
+     
+      <InputField
         label={`${form.paymentType === 'hourly' ? 'Hourly' : form.paymentType === 'daily' ? 'Daily' : 'Monthly'} Rate *`}
-        value={form.salary} 
-        onChangeText={(text) => updateForm("salary", text)} 
+        value={form.salary}
+        onChangeText={(text) => updateForm("salary", text)}
         placeholder={`Enter ${form.paymentType} rate`}
-        keyboardType="numeric" 
+        keyboardType="numeric"
         error={errors.salary}
       />
 
@@ -619,39 +687,25 @@ customOptionsService.getOptions('employment_status')
         </View>
       </View>
 
-      {/* Working Hours Configuration */}
+ 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Working Hours Configuration</Text>
       </View>
 
-      <InputField 
-        label="Check-in Time *" 
+      <InputField
+        label="Check-in Time" 
         value={form.checkInTime} 
         onChangeText={(text) => updateForm("checkInTime", text)} 
         placeholder="HH:MM (e.g., 09:00)" 
         error={errors.checkInTime}
       />
 
-      <InputField 
-        label="Check-out Time *" 
+      <InputField
+        label="Check-out Time" 
         value={form.checkOutTime} 
         onChangeText={(text) => updateForm("checkOutTime", text)} 
         placeholder="HH:MM (e.g., 17:00)" 
         error={errors.checkOutTime}
-      />
-
-      {/* Leave Configuration */}
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Leave Configuration</Text>
-      </View>
-
-      <InputField 
-        label="Leaves Allowed per Month *" 
-        value={form.leavesAllowedPerMonth || ''} 
-        onChangeText={(text) => updateForm("leavesAllowedPerMonth", text)} 
-        placeholder="Number of leaves allowed per month" 
-        keyboardType="numeric" 
-        error={errors.leavesAllowedPerMonth}
       />
 
       {/* Overtime Configuration */}
@@ -659,8 +713,8 @@ customOptionsService.getOptions('employment_status')
         <Text style={styles.sectionTitle}>Overtime Configuration</Text>
       </View>
 
-      <InputField 
-        label="Overtime Rate Multiplier *" 
+      <InputField
+        label="Overtime Rate Multiplier" 
         value={form.overtimeRate} 
         onChangeText={(text) => updateForm("overtimeRate", text)} 
         placeholder="e.g., 1.5 for 1.5x regular rate" 
@@ -673,7 +727,7 @@ customOptionsService.getOptions('employment_status')
         <Text style={styles.sectionTitle}>Bonus Configuration</Text>
       </View>
 
-      <InputField 
+      <InputField
         label="Bonus Amount" 
         value={form.bonus} 
         onChangeText={(text) => updateForm("bonus", text)} 
@@ -687,27 +741,32 @@ customOptionsService.getOptions('employment_status')
   };
 
   return (
-    <Modal visible={visible} animationType="fade" transparent={false} onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent={false}
+      onRequestClose={onClose}
+    >
       <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          {/* Custom Toast Container */}
-          {customToast && (
-            <View style={[
-              styles.customToastContainer,
-              customToast.type === 'error' ? styles.errorToast : styles.successToast
-            ]}>
-              <Ionicons 
-                name={customToast.type === 'error' ? 'alert-circle' : 'checkmark-circle'} 
-                size={20} 
-                color="#fff" 
-              />
-              <View style={styles.toastContent}>
-                <Text style={styles.toastTitle}>{customToast.title}</Text>
-                <Text style={styles.toastMessage}>{customToast.message}</Text>
-              </View>
+        {/* Custom Toast Container - Absolutely positioned */}
+        {customToast && (
+          <View style={[
+            styles.customToastContainer,
+            customToast.type === 'error' ? styles.errorToast : styles.successToast
+          ]}>
+            <Ionicons 
+              name={customToast.type === 'error' ? 'alert-circle' : 'checkmark-circle'} 
+              size={20} 
+              color="#fff" 
+            />
+            <View style={styles.toastContent}>
+              <Text style={styles.toastTitle}>{customToast.title}</Text>
+              <Text style={styles.toastMessage}>{customToast.message}</Text>
             </View>
-          )}
-          
+          </View>
+        )}
+        
+        <View style={styles.modalContent}>
           <LinearGradient colors={["#007AFF", "#0056CC"]} style={styles.header}>
             <View style={styles.headerContent}>
               <TouchableOpacity onPress={onClose} style={styles.backButton}>
@@ -731,7 +790,7 @@ customOptionsService.getOptions('employment_status')
                   onPress={() => setActiveTab(tab.key)}>
                   <Ionicons name={tab.icon} size={16} color={activeTab === tab.key ? "#007AFF" : "#8E8E93"} />
                   <Text style={[styles.tabText, activeTab === tab.key && styles.activeTabText]}>{tab.label}</Text>
-                </TouchableOpacity>
+              </TouchableOpacity>
               ))}
             </ScrollView>
           </View>
@@ -1034,18 +1093,20 @@ const styles = StyleSheet.create({
   },
   // Custom toast styles
   customToastContainer: {
+    position: 'absolute',
+    top: 60, // Position below status bar
+    left: 20,
+    right: 20,
+    zIndex: 9999, // Very high z-index to appear above everything
+    elevation: 9999,
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    marginBottom: 12,
     borderRadius: 12,
-    marginHorizontal: 20,
-    marginTop: 20,
     boxShadowColor: '#000',
     boxShadowOffset: { width: 0, height: 4 },
     boxShadowOpacity: 0.15,
     boxShadowRadius: 8,
-    elevation: 4,
   },
   errorToast: {
     backgroundColor: '#ef4444',

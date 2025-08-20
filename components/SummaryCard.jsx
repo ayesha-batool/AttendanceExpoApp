@@ -3,19 +3,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-const SummaryCard = ({ title, value, icon, color = '#667eea' }) => {
+const SummaryCard = ({ title, value, icon, color = "#667eea" }) => {
   return (
     <View style={styles.summaryCard}>
-      <LinearGradient
-        colors={[color, color + 'CC']}
-        style={styles.summaryCardGradient}
-      >
-        <View style={styles.summaryIconContainer}>
-          <Ionicons name={icon} size={18} color="#fff" />
-        </View>
-        <Text style={styles.summaryValue}>{value}</Text>
-        <Text style={styles.summaryTitle}>{title}</Text>
-      </LinearGradient>
+      <Ionicons name={icon} size={24} color={color} />
+      <Text style={styles.summaryValue}>{String(value || '0')}</Text>
+      <Text style={styles.summaryTitle}>{String(title || '')}</Text>
     </View>
   );
 };

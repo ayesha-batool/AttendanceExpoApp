@@ -6,8 +6,8 @@ const StatCard = ({ icon, label, value, iconColor = "#667eea" }) => {
   return (
     <View style={styles.statCard}>
               <Ionicons name={icon} size={16} color={iconColor} />
-      <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{String(label || '')}</Text>
+      <Text style={styles.statValue}>{String(value || '0')}</Text>
     </View>
   );
 };

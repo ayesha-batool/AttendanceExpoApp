@@ -6,6 +6,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { FlatList, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import DatePickerField from '../../components/DatePickerField';
 import DeleteConfirmationModal from '../../components/DeleteConfirmationModal';
+import EmptyState from '../../components/EmptyState';
 import InputField from '../../components/InputField';
 import LoadingOverlay from '../../components/LoadingOverlay';
 import LoadingState from '../../components/LoadingState';
@@ -138,10 +139,10 @@ const CasesScreen = () => {
         title: formData.title || "",
         status: formData.status || "",
         priority: formData.priority || "",
-        category: formData.category || "",
         description: formData.description || "",
         location: formData.location || "",
         startDate: formData.startDate || new Date().toISOString().split('T')[0]
+        // category is optional - not included in validation
       };
 
       const validation = validateForm(formToValidate, VALIDATION_SCHEMAS.case);
@@ -563,7 +564,7 @@ const CasesScreen = () => {
                   showRemoveOption={true}
                 />
                 <SelectDropdown 
-                  label="Category" 
+                  label="Category (Optional)" 
                   selectedValue={formData.category} 
                   onValueChange={(value) => updateFormData('category', value)} 
                   options={categoryOptions}
@@ -574,6 +575,7 @@ const CasesScreen = () => {
                   onOptionRemoved={handleOptionRemoved}
                   showAddNewOption={true}
                   showRemoveOption={true}
+                  required={false}
                 />
               <SelectDropdown label="Assigned Officer" selectedValue={formData.assignedOfficer} onValueChange={(value) => updateFormData('assignedOfficer', value)} options={[{ label: 'Unassigned', value: '' }, ...employeeOptions]} />
               <InputField label="Location" value={formData.location} onChangeText={(text) => updateFormData('location', text)} placeholder="Enter case location" />

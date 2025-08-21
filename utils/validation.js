@@ -289,7 +289,7 @@ export const VALIDATION_SCHEMAS = {
       (value) => VALIDATION_RULES.required(value, 'Priority')
     ],
     category: [
-      (value) => VALIDATION_RULES.required(value, 'Category')
+      // Category is optional - no required validation
     ],
     description: [
       (value) => VALIDATION_RULES.maxLength(value, 'Description', 1000)

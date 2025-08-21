@@ -20,7 +20,7 @@
     "@react-navigation/native": "^7.1.6",
     "appwrite": "^18.1.1",
     "base-64": "^1.0.0",
-    "expo": "~53.0.17",
+    "expo": "53.0.20",
     "expo-auth-session": "~6.2.1",
     "expo-blur": "~14.1.5",
     "expo-constants": "~17.1.7",

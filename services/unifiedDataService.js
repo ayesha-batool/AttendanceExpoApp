@@ -631,6 +631,8 @@ const customOptionsService = {
 export const dataService = {
   async getItems(collectionId) {
     try {
+      console.log(`🔍 Getting items for ${collectionId}...`);
+      
       // Check if online and try to sync from Appwrite first
       if (await isOnline() && client && databases) {
         try {
@@ -640,84 +642,104 @@ export const dataService = {
             user = await account.get();
           } catch (authError) {
             if (authError.message.includes('missing scope (account)') || authError.message.includes('User (role: guests)')) {
-              console.log(`👤 User not authenticated, redirecting to auth page`);
-              // Throw a specific error that can be caught by the UI to redirect to auth
-              const authError = new Error('AUTHENTICATION_REQUIRED');
-              authError.code = 'AUTH_REQUIRED';
-              authError.message = 'User not authenticated. Please log in to continue.';
+              console.log(`👤 User not authenticated, using local storage for ${collectionId}`);
+              // Don't throw error, just use local storage
+            } else {
               throw authError;
             }
-            throw authError;
           }
           
-          if (!user) {
-            console.log(`👤 No authenticated user, redirecting to auth page`);
-            // Throw a specific error that can be caught by the UI to redirect to auth
-            const authError = new Error('AUTHENTICATION_REQUIRED');
-            authError.code = 'AUTH_REQUIRED';
-            authError.message = 'User not authenticated. Please log in to continue.';
-            throw authError;
-          }
-          
-          console.log(`🌐 Fetching ${collectionId} from Appwrite...`);
-          
-          const collectionMap = {
-            employees: config.employeesCollectionId,
-            cases: config.casesCollectionId,
-            expenses: config.expensesCollectionId,
-            attendance: config.attendanceCollectionId,
-            customOptions: config.customOptionsCollectionId
-          };
-          
-          const appwriteCollectionId = collectionMap[collectionId];
-          if (!appwriteCollectionId) {
-            console.warn(`⚠️ No Appwrite collection mapping for ${collectionId}`);
-            throw new Error('No collection mapping');
-          }
-          console.log("appwriteCollec tionId",appwriteCollectionId)
-          // Fetch from Appwrite
-          const appwriteDocuments = await databases.listDocuments(
-            config.databaseId,
-            appwriteCollectionId,
-            [Query.limit(100)] // Limit to 100 documents
-          );
-          
-          console.log(`📥 Received ${appwriteDocuments.documents.length} documents from Appwrite for ${collectionId}`);
-          
-          // Get all local keys for this collection
-          const localKeys = await storage.getAllKeys();
-          const collectionLocalKeys = localKeys.filter(key => key.startsWith(`${collectionId}_`));
-          console.log("collectionLocalKeys",collectionLocalKeys)
-          // Create a set of Appwrite document IDs for fast lookup
-          const appwriteDocIds = new Set(appwriteDocuments.documents.map(doc => doc.$id));
-          
-          // Remove local items that no longer exist in Appwrite (deletions)
-          for (const localKey of collectionLocalKeys) {
-            const localDocId = localKey.split('_')[1];
-            if (!appwriteDocIds.has(localDocId)) {
-              await storage.delete(localKey);
-              console.log(`🗑️ Removed deleted document ${localDocId} from local storage`);
-            }
-          }
-          
-          // Store each document in local storage (if not duplicate or if newer)
-          for (const doc of appwriteDocuments.documents) {
-            const localKey = `${collectionId}_${doc.$id}`;
-            const existingData = await storage.get(localKey);
+          if (user) {
+            console.log(`🌐 Online mode: syncing ${collectionId} from Appwrite...`);
             
-            // Only save if it doesn't exist locally or if Appwrite version is newer
-            if (!existingData || (doc.$updatedAt && existingData.$updatedAt && doc.$updatedAt > existingData.$updatedAt)) {
-              const localData = {
-                ...doc,
-                id: doc.$id,
-                $id: doc.$id,
-                $createdAt: doc.$createdAt,
-                $updatedAt: doc.$updatedAt,
-                deviceId: doc.deviceId || 'unknown'
-              };
-              await storage.save(localKey, localData);
-              console.log(`💾 Synced document ${doc.$id} (device: ${doc.deviceId || 'unknown'}) to local storage`);
+            const collectionMap = {
+              employees: config.employeesCollectionId,
+              cases: config.casesCollectionId,
+              expenses: config.expensesCollectionId,
+              attendance: config.attendanceCollectionId,
+              customOptions: config.customOptionsCollectionId
+            };
+            
+            const appwriteCollectionId = collectionMap[collectionId];
+            if (!appwriteCollectionId) {
+              console.warn(`⚠️ No Appwrite collection mapping for ${collectionId}`);
+              throw new Error('No collection mapping');
             }
+            
+            // Fetch from Appwrite
+            const appwriteDocuments = await databases.listDocuments(
+              config.databaseId,
+              appwriteCollectionId,
+              [Query.limit(100)] // Limit to 100 documents
+            );
+            
+            console.log(`📥 Received ${appwriteDocuments.documents.length} documents from Appwrite for ${collectionId}`);
+            
+            // Get all local keys for this collection
+            const localKeys = await storage.getAllKeys();
+            const collectionLocalKeys = localKeys.filter(key => key.startsWith(`${collectionId}_`));
+            
+            // Create a set of Appwrite document IDs for fast lookup
+            const appwriteDocIds = new Set(appwriteDocuments.documents.map(doc => doc.$id));
+            
+            // Remove local items that no longer exist in Appwrite (deletions)
+            for (const localKey of collectionLocalKeys) {
+              const localDocId = localKey.split('_')[1];
+              if (!appwriteDocIds.has(localDocId)) {
+                await storage.delete(localKey);
+                console.log(`🗑️ Removed deleted document ${localDocId} from local storage`);
+              }
+            }
+            
+            // Store each document in local storage and handle duplicates
+            for (const doc of appwriteDocuments.documents) {
+              const localKey = `${collectionId}_${doc.$id}`;
+              const existingData = await storage.get(localKey);
+              
+                             // Check for duplicates based on business rules
+               let isDuplicate = false;
+               if (collectionId === 'employees' && doc.badgeNumber) {
+                 // Check for duplicate badge numbers across all devices
+                 const allLocalData = await dataService.getAllLocalData(collectionId);
+                 const duplicateBadge = allLocalData.find(item => 
+                   item.badgeNumber === doc.badgeNumber && item.id !== doc.$id
+                 );
+                 if (duplicateBadge) {
+                   console.warn(`⚠️ Duplicate badge number found: ${doc.badgeNumber} (${doc.$id} vs ${duplicateBadge.id})`);
+                   isDuplicate = true;
+                 }
+               } else if ((collectionId === 'cases' || collectionId === 'expenses') && doc.title) {
+                 // Check for duplicate titles across all devices
+                 const allLocalData = await dataService.getAllLocalData(collectionId);
+                 const duplicateTitle = allLocalData.find(item => 
+                   item.title === doc.title && item.id !== doc.$id
+                 );
+                 if (duplicateTitle) {
+                   console.warn(`⚠️ Duplicate title found: ${doc.title} (${doc.$id} vs ${duplicateTitle.id})`);
+                   isDuplicate = true;
+                 }
+               }
+              
+              // Only save if it doesn't exist locally, is newer, or is not a duplicate
+              if (!existingData || (doc.$updatedAt && existingData.$updatedAt && doc.$updatedAt > existingData.$updatedAt)) {
+                if (!isDuplicate) {
+                  const localData = {
+                    ...doc,
+                    id: doc.$id,
+                    $id: doc.$id,
+                    $createdAt: doc.$createdAt,
+                    $updatedAt: doc.$updatedAt,
+                    deviceId: doc.deviceId || 'unknown'
+                  };
+                  await storage.save(localKey, localData);
+                  console.log(`💾 Synced document ${doc.$id} (device: ${doc.deviceId || 'unknown'}) to local storage`);
+                } else {
+                  console.log(`⚠️ Skipping duplicate document ${doc.$id}`);
+                }
+              }
+            }
+          } else {
+            console.log(`👤 No authenticated user, using local storage for ${collectionId}`);
           }
           
         } catch (appwriteError) {
@@ -729,31 +751,10 @@ export const dataService = {
       }
       
       // Get data from local storage (combines local and synced data)
-      const keys = await storage.getAllKeys();
-      const collectionKeys = keys.filter(key => key.startsWith(`${collectionId}_`));
+      const items = await dataService.getAllLocalData(collectionId);
       
-      if (collectionKeys.length === 0) {
-        console.log(`📭 No local data found for ${collectionId}`);
-        return [];
-      }
-      
-      const items = await Promise.all(
-        collectionKeys.map(async key => {
-          const data = await storage.get(key);
-          if (!data) return null;
-          
-          return { 
-            ...data, 
-            id: data.id || key.split('_')[1], 
-            $id: data.$id || key.split('_')[1],
-            deviceId: data.deviceId || 'unknown'
-          };
-        })
-      );
-      
-      const validItems = items.filter(item => item !== null);
-      console.log(`📊 Returning ${validItems.length} items for ${collectionId} (mix of local and synced data)`);
-      return validItems;
+      console.log(`📊 Returning ${items.length} items for ${collectionId} (mix of local and synced data)`);
+      return items;
       
     } catch (error) {
       console.error(`❌ Error getting items for ${collectionId}:`, error);
@@ -761,33 +762,66 @@ export const dataService = {
     }
   },
 
+  // Helper method to get all local data for a collection
+  async getAllLocalData(collectionId) {
+    const keys = await storage.getAllKeys();
+    const collectionKeys = keys.filter(key => key.startsWith(`${collectionId}_`));
+    
+    if (collectionKeys.length === 0) {
+      console.log(`📭 No local data found for ${collectionId}`);
+      return [];
+    }
+    
+    const items = await Promise.all(
+      collectionKeys.map(async key => {
+        const data = await storage.get(key);
+        if (!data) return null;
+        
+        return { 
+          ...data, 
+          id: data.id || key.split('_')[1], 
+          $id: data.$id || key.split('_')[1],
+          deviceId: data.deviceId || 'unknown'
+        };
+      })
+    );
+    
+    return items.filter(item => item !== null);
+  },
+
   async saveData(data, collectionId) {
     try {
-      console.log(data)
+      console.log(`💾 Saving data to ${collectionId}:`, data);
       const deviceId = await getDeviceId();
       const uniqueId = generateValidAppwriteId(data.id || data.$id);
       const cleanData = { ...data, id: uniqueId, $id: uniqueId, deviceId: deviceId };
-      console.log("id",uniqueId, "deviceId", deviceId)
+      console.log("Generated ID:", uniqueId, "Device ID:", deviceId);
       
-      // Check for duplicates only within same device
+      // Check for duplicates across ALL devices (not just current device)
       const existing = await dataService.getItems(collectionId);
       const duplicate = existing.find(item => {
-        if (item.deviceId === deviceId) {
-          if (collectionId === 'employees' && data.badgeNumber && item.badgeNumber) {
-            return item.badgeNumber === data.badgeNumber;
-          }
-          if (collectionId === 'cases' && data.title && item.title) {
-            return item.title === data.title;
-          }
-          if (collectionId === 'expenses' && data.title && item.title) {
-            return item.title === data.title;
-          }
+        // Skip the current item if we're updating
+        if (item.id === uniqueId || item.$id === uniqueId) {
+          return false;
+        }
+        
+        // Check for duplicates based on business rules
+        if (collectionId === 'employees' && data.badgeNumber && item.badgeNumber) {
+          return item.badgeNumber === data.badgeNumber;
+        }
+        if (collectionId === 'cases' && data.title && item.title) {
+          return item.title === data.title;
+        }
+        if (collectionId === 'expenses' && data.title && item.title) {
+          return item.title === data.title;
         }
         return false;
       });
       
       if (duplicate) {
-        throw new Error(`${collectionId === 'employees' ? 'Badge number' : 'Title'} already exists on this device.`);
+        const duplicateType = collectionId === 'employees' ? 'Badge number' : 'Title';
+        const duplicateValue = collectionId === 'employees' ? data.badgeNumber : data.title;
+        throw new Error(`${duplicateType} "${duplicateValue}" already exists.`);
       }
       
       const key = `${collectionId}_${uniqueId}`;
@@ -889,31 +923,33 @@ export const dataService = {
 
   async updateData(key, documentId, data, collectionId) {
     try {
+      console.log(`🔄 Updating data in ${collectionId}:`, { documentId, data });
       const deviceId = await getDeviceId();
       const cleanData = { ...data, id: documentId, $id: documentId, deviceId: deviceId };
       
-      // Check for duplicates only within same device (excluding current item)
+      // Check for duplicates across ALL devices (excluding current item)
       const existing = await dataService.getItems(collectionId);
       const duplicate = existing.find(item => {
         // Skip the current item being updated
         if (item.id === documentId || item.$id === documentId) return false;
         
-        if (item.deviceId === deviceId) {
-          if (collectionId === 'employees' && data.badgeNumber && item.badgeNumber) {
-            return item.badgeNumber === data.badgeNumber;
-          }
-          if (collectionId === 'cases' && data.title && item.title) {
-            return item.title === data.title;
-          }
-          if (collectionId === 'expenses' && data.title && item.title) {
-            return item.title === data.title;
-          }
+        // Check for duplicates based on business rules
+        if (collectionId === 'employees' && data.badgeNumber && item.badgeNumber) {
+          return item.badgeNumber === data.badgeNumber;
+        }
+        if (collectionId === 'cases' && data.title && item.title) {
+          return item.title === data.title;
+        }
+        if (collectionId === 'expenses' && data.title && item.title) {
+          return item.title === data.title;
         }
         return false;
       });
       
       if (duplicate) {
-        throw new Error(`${collectionId === 'employees' ? 'Badge number' : 'Title'} already exists on this device.`);
+        const duplicateType = collectionId === 'employees' ? 'Badge number' : 'Title';
+        const duplicateValue = collectionId === 'employees' ? data.badgeNumber : data.title;
+        throw new Error(`${duplicateType} "${duplicateValue}" already exists.`);
       }
       
       await storage.save(key, cleanData);
@@ -1824,14 +1860,49 @@ export const backgroundSyncService = {
               // Use the documentId from the pending sync item, fallback to data.id or data.$id
               const createDocumentId = generateValidAppwriteId(item.documentId || item.data.id || item.data.$id);
 
+              // Check for duplicates in Appwrite before creating
               try {
-                await databases.createDocument(
-                  config.databaseId,
-                  appwriteCollectionId,
-                  createDocumentId,
-                  createData
-                );
-                console.log(`✅ Synced create: ${createDocumentId} (device: ${item.data.deviceId})`);
+                // Try to find existing document with same business key
+                let existingDoc = null;
+                if (item.collectionId === 'employees' && item.data.badgeNumber) {
+                  const existingDocs = await databases.listDocuments(
+                    config.databaseId,
+                    appwriteCollectionId,
+                    [Query.equal('badgeNumber', item.data.badgeNumber)]
+                  );
+                  if (existingDocs.documents.length > 0) {
+                    existingDoc = existingDocs.documents[0];
+                  }
+                } else if ((item.collectionId === 'cases' || item.collectionId === 'expenses') && item.data.title) {
+                  const existingDocs = await databases.listDocuments(
+                    config.databaseId,
+                    appwriteCollectionId,
+                    [Query.equal('title', item.data.title)]
+                  );
+                  if (existingDocs.documents.length > 0) {
+                    existingDoc = existingDocs.documents[0];
+                  }
+                }
+
+                if (existingDoc) {
+                  // Update existing document instead of creating new one
+                  await databases.updateDocument(
+                    config.databaseId,
+                    appwriteCollectionId,
+                    existingDoc.$id,
+                    createData
+                  );
+                  console.log(`✅ Synced create->update existing: ${existingDoc.$id} (device: ${item.data.deviceId})`);
+                } else {
+                  // Create new document
+                  await databases.createDocument(
+                    config.databaseId,
+                    appwriteCollectionId,
+                    createDocumentId,
+                    createData
+                  );
+                  console.log(`✅ Synced create: ${createDocumentId} (device: ${item.data.deviceId})`);
+                }
               } catch (createError) {
                 if (createError.message.includes('Document with the requested ID already exists')) {
                   // Document already exists, update it instead
@@ -1976,24 +2047,61 @@ export const backgroundSyncService = {
           const existingDocIds = existingDocs.documents.map(doc => doc.$id);
           console.log(`📋 Found ${existingDocIds.length} existing documents in Appwrite for ${collectionId}`);
 
-          // Only create documents that don't exist in Appwrite
+          // Check for duplicates and sync documents that don't exist in Appwrite
           for (const item of localData) {
             const itemId = item.id || item.$id;
             
             if (!existingDocIds.includes(itemId)) {
               try {
-                console.log(`📝 Creating missing document ${itemId} in Appwrite for ${collectionId}`);
-                const cleanData = await cleanDataForAppwrite(item, collectionId);
-                await databases.createDocument(
-                  config.databaseId,
-                  collectionMap[collectionId],
-                  generateValidAppwriteId(itemId),
-                  cleanData
-                );
-                totalSynced++;
-                console.log(`✅ Created document ${itemId} in Appwrite`);
+                // Check for duplicates based on business rules before creating
+                let existingDoc = null;
+                if (collectionId === 'employees' && item.badgeNumber) {
+                  const existingDocs = await databases.listDocuments(
+                    config.databaseId,
+                    collectionMap[collectionId],
+                    [Query.equal('badgeNumber', item.badgeNumber)]
+                  );
+                  if (existingDocs.documents.length > 0) {
+                    existingDoc = existingDocs.documents[0];
+                  }
+                } else if ((collectionId === 'cases' || collectionId === 'expenses') && item.title) {
+                  const existingDocs = await databases.listDocuments(
+                    config.databaseId,
+                    collectionMap[collectionId],
+                    [Query.equal('title', item.title)]
+                  );
+                  if (existingDocs.documents.length > 0) {
+                    existingDoc = existingDocs.documents[0];
+                  }
+                }
+
+                if (existingDoc) {
+                  // Update existing document instead of creating new one
+                  console.log(`📝 Updating existing document ${existingDoc.$id} in Appwrite for ${collectionId}`);
+                  const cleanData = await cleanDataForAppwrite(item, collectionId);
+                  await databases.updateDocument(
+                    config.databaseId,
+                    collectionMap[collectionId],
+                    existingDoc.$id,
+                    cleanData
+                  );
+                  totalSynced++;
+                  console.log(`✅ Updated existing document ${existingDoc.$id} in Appwrite`);
+                } else {
+                  // Create new document
+                  console.log(`📝 Creating missing document ${itemId} in Appwrite for ${collectionId}`);
+                  const cleanData = await cleanDataForAppwrite(item, collectionId);
+                  await databases.createDocument(
+                    config.databaseId,
+                    collectionMap[collectionId],
+                    generateValidAppwriteId(itemId),
+                    cleanData
+                  );
+                  totalSynced++;
+                  console.log(`✅ Created document ${itemId} in Appwrite`);
+                }
               } catch (error) {
-                console.log(`❌ Error creating document ${itemId} in ${collectionId}:`, error.message);
+                console.log(`❌ Error syncing document ${itemId} in ${collectionId}:`, error.message);
               }
             } else {
               console.log(`✅ Document ${itemId} already exists in Appwrite for ${collectionId}`);

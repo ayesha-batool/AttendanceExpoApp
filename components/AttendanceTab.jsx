@@ -605,9 +605,9 @@ const AttendanceTab = ({ employees = [] }) => {
            </TouchableOpacity>
            
            <View style={styles.monthYearContainer}>
-                              <Text style={styles.monthText}>
-                   {selectedDate.toLocaleDateString('en-US', { month: 'long' })}
-                 </Text>
+             <Text style={styles.monthText}>
+               {selectedDate.toLocaleDateString('en-US', { month: 'long' })}
+             </Text>
              <TouchableOpacity
                style={styles.yearButton}
                onPress={handleYearSelect}

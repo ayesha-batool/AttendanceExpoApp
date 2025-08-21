@@ -197,8 +197,30 @@ class OfflineAuthService {
       console.log('✅ Offline login successful');
       return session;
     } catch (error) {
-      console.error('❌ Offline login failed:', error);
-      throw error;
+      // Extract clean error message from Appwrite error format
+      let cleanErrorMessage = error.message || '';
+      if (cleanErrorMessage.includes('AppwriteException:')) {
+        cleanErrorMessage = cleanErrorMessage.split('AppwriteException:')[1]?.trim() || cleanErrorMessage;
+      }
+      console.log('❌ Offline login failed:', cleanErrorMessage);
+      
+      // Provide user-friendly error messages for offline authentication
+      let userFriendlyMessage = 'Login failed. Please check your credentials and try again.';
+      
+      if (error.message) {
+        const errorMessage = error.message.toLowerCase();
+        
+        if (errorMessage.includes('user not found')) {
+          userFriendlyMessage = 'Account not found. Please check your email or create a new account.';
+        } else if (errorMessage.includes('invalid credentials')) {
+          userFriendlyMessage = 'Invalid email or password. Please check your credentials and try again.';
+        }
+      }
+      
+      // Create a new error with user-friendly message
+      const friendlyError = new Error(userFriendlyMessage);
+      friendlyError.originalError = error;
+      throw friendlyError;
     }
   }
 

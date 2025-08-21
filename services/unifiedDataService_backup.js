@@ -3,17 +3,16 @@ import { Account, Client, Databases, ID, Query, Storage } from 'appwrite';
 import Constants from 'expo-constants';
 import * as Network from 'expo-network';
 import { useEffect, useState } from 'react';
-import appConfig from '../config/appConfig';
-// Use centralized configuration
+// Unified config
 const config = {
-  endpoint: appConfig.appwrite.endpoint,
-  project: appConfig.appwrite.projectId,
-  databaseId: appConfig.appwrite.databaseId,
-  employeesCollectionId: appConfig.appwrite.collections.employees,
-  casesCollectionId: appConfig.appwrite.collections.cases,
-  expensesCollectionId: appConfig.appwrite.collections.expenses,
-  attendanceCollectionId: appConfig.appwrite.collections.attendance,
-  customOptionsCollectionId: appConfig.appwrite.collections.customOptions
+  endpoint: process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1',
+  project: process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID,
+  databaseId: process.env.EXPO_PUBLIC_APPWRITE_DB_ID || 'shelfie_database',
+  employeesCollectionId: process.env.EXPO_PUBLIC_APPWRITE_EMPLOYEES_COLLECTION_ID || '689ca41b00061e94a51f',
+  casesCollectionId: process.env.EXPO_PUBLIC_APPWRITE_CASES_COLLECTION_ID || 'cases',
+  expensesCollectionId: process.env.EXPO_PUBLIC_APPWRITE_EXPENSES_COLLECTION_ID || 'expenses',
+  attendanceCollectionId: process.env.EXPO_PUBLIC_APPWRITE_ATTENDANCE_COLLECTION_ID || 'attendance',
+  customOptionsCollectionId: 'customOptions'
 };
 
 // Initialize Appwrite
@@ -646,57 +645,57 @@ export const dataService = {
               console.log(`👤 User not authenticated, using local storage for ${collectionId}`);
               // Don't throw error, just use local storage
             } else {
-            throw authError;
-          }
+              throw authError;
+            }
           }
           
           if (user) {
             console.log(`🌐 Online mode: syncing ${collectionId} from Appwrite...`);
-          
-          const collectionMap = {
-            employees: config.employeesCollectionId,
-            cases: config.casesCollectionId,
-            expenses: config.expensesCollectionId,
-            attendance: config.attendanceCollectionId,
-            customOptions: config.customOptionsCollectionId
-          };
-          
-          const appwriteCollectionId = collectionMap[collectionId];
-          if (!appwriteCollectionId) {
-            console.warn(`⚠️ No Appwrite collection mapping for ${collectionId}`);
-            throw new Error('No collection mapping');
-          }
             
-          // Fetch from Appwrite
-          const appwriteDocuments = await databases.listDocuments(
-            config.databaseId,
-            appwriteCollectionId,
-            [Query.limit(100)] // Limit to 100 documents
-          );
-          
-          console.log(`📥 Received ${appwriteDocuments.documents.length} documents from Appwrite for ${collectionId}`);
-          
-          // Get all local keys for this collection
-          const localKeys = await storage.getAllKeys();
-          const collectionLocalKeys = localKeys.filter(key => key.startsWith(`${collectionId}_`));
+            const collectionMap = {
+              employees: config.employeesCollectionId,
+              cases: config.casesCollectionId,
+              expenses: config.expensesCollectionId,
+              attendance: config.attendanceCollectionId,
+              customOptions: config.customOptionsCollectionId
+            };
             
-          // Create a set of Appwrite document IDs for fast lookup
-          const appwriteDocIds = new Set(appwriteDocuments.documents.map(doc => doc.$id));
-          
-          // Remove local items that no longer exist in Appwrite (deletions)
-          for (const localKey of collectionLocalKeys) {
-            const localDocId = localKey.split('_')[1];
-            if (!appwriteDocIds.has(localDocId)) {
-              await storage.delete(localKey);
-              console.log(`🗑️ Removed deleted document ${localDocId} from local storage`);
+            const appwriteCollectionId = collectionMap[collectionId];
+            if (!appwriteCollectionId) {
+              console.warn(`⚠️ No Appwrite collection mapping for ${collectionId}`);
+              throw new Error('No collection mapping');
             }
-          }
-          
-            // Store each document in local storage and handle duplicates
-          for (const doc of appwriteDocuments.documents) {
-            const localKey = `${collectionId}_${doc.$id}`;
-            const existingData = await storage.get(localKey);
             
+            // Fetch from Appwrite
+            const appwriteDocuments = await databases.listDocuments(
+              config.databaseId,
+              appwriteCollectionId,
+              [Query.limit(100)] // Limit to 100 documents
+            );
+            
+            console.log(`📥 Received ${appwriteDocuments.documents.length} documents from Appwrite for ${collectionId}`);
+            
+            // Get all local keys for this collection
+            const localKeys = await storage.getAllKeys();
+            const collectionLocalKeys = localKeys.filter(key => key.startsWith(`${collectionId}_`));
+            
+            // Create a set of Appwrite document IDs for fast lookup
+            const appwriteDocIds = new Set(appwriteDocuments.documents.map(doc => doc.$id));
+            
+            // Remove local items that no longer exist in Appwrite (deletions)
+            for (const localKey of collectionLocalKeys) {
+              const localDocId = localKey.split('_')[1];
+              if (!appwriteDocIds.has(localDocId)) {
+                await storage.delete(localKey);
+                console.log(`🗑️ Removed deleted document ${localDocId} from local storage`);
+              }
+            }
+            
+            // Store each document in local storage and handle duplicates
+            for (const doc of appwriteDocuments.documents) {
+              const localKey = `${collectionId}_${doc.$id}`;
+              const existingData = await storage.get(localKey);
+              
                              // Check for duplicates based on business rules
                let isDuplicate = false;
                if (collectionId === 'employees' && doc.badgeNumber) {
@@ -738,21 +737,21 @@ export const dataService = {
                }
               
               // Only save if it doesn't exist locally, is newer, or is not a duplicate
-            if (!existingData || (doc.$updatedAt && existingData.$updatedAt && doc.$updatedAt > existingData.$updatedAt)) {
+              if (!existingData || (doc.$updatedAt && existingData.$updatedAt && doc.$updatedAt > existingData.$updatedAt)) {
                 if (!isDuplicate) {
-              const localData = {
-                ...doc,
-                id: doc.$id,
-                $id: doc.$id,
-                $createdAt: doc.$createdAt,
+                  const localData = {
+                    ...doc,
+                    id: doc.$id,
+                    $id: doc.$id,
+                    $createdAt: doc.$createdAt,
                     $updatedAt: doc.$updatedAt,
                     deviceId: doc.deviceId || 'unknown'
-              };
-              await storage.save(localKey, localData);
+                  };
+                  await storage.save(localKey, localData);
                   console.log(`💾 Synced document ${doc.$id} (device: ${doc.deviceId || 'unknown'}) to local storage`);
                 } else {
                   console.log(`⚠️ Skipping duplicate document ${doc.$id}`);
-            }
+                }
               }
             }
           } else {
@@ -922,14 +921,14 @@ export const dataService = {
             console.log(`✅ Successfully created in Appwrite: ${uniqueId}`);
           } catch (createError) {
             if (createError.message.includes('Document with the requested ID already exists')) {
-            // Document exists, update it
-            await databases.updateDocument(
-              config.databaseId,
-              appwriteCollectionId,
-              uniqueId,
-              appwriteData
-            );
-            console.log(`✅ Successfully updated in Appwrite: ${uniqueId}`);
+              // Document exists, update it
+              await databases.updateDocument(
+                config.databaseId,
+                appwriteCollectionId,
+                uniqueId,
+                appwriteData
+              );
+              console.log(`✅ Successfully updated in Appwrite: ${uniqueId}`);
             } else {
               throw createError;
             }
@@ -1045,12 +1044,12 @@ export const dataService = {
             if (updateError.message.includes('Document with the requested ID could not be found')) {
               // Document doesn't exist, create it
               try {
-              await databases.createDocument(
-                config.databaseId,
-                collectionMap[collectionId],
-                validDocumentId,
-                appwriteData
-              );
+                await databases.createDocument(
+                  config.databaseId,
+                  collectionMap[collectionId],
+                  validDocumentId,
+                  appwriteData
+                );
                 console.log(`✅ Successfully created in Appwrite: ${validDocumentId}`);
               } catch (createError) {
                 throw createError;
@@ -1059,23 +1058,24 @@ export const dataService = {
               throw updateError;
             }
           }
-        } catch (error) {
-          console.log('❌ Could not update/create in Appwrite:', error.message);
+            } catch (error) {
+              console.log('❌ Could not update/create in Appwrite:', error.message);
+              // Add to pending sync queue for later retry
               await pendingSyncQueue.addPendingSync('update', collectionId, cleanData, documentId);
-        }
-      } else {
+            }
+          } else {
             console.log('📱 Offline mode - updated local storage and added to pending sync');
             await pendingSyncQueue.addPendingSync('update', collectionId, cleanData, documentId);
-      }
-      
-      return cleanData;
-    } catch (error) {
-      console.error('❌ Error updating data:', error);
-      throw error;
-    }
-      
-    
-  },
+          }
+          
+          return cleanData;
+        } catch (error) {
+          console.log('❌ Could not update/create in Appwrite:', error.message);
+          // Add to pending sync queue for later retry
+          await pendingSyncQueue.addPendingSync('update', collectionId, cleanData, documentId);
+        }
+      } ,
+  
 
   async deleteData(key, documentId, collectionId) {
     try {
@@ -1516,38 +1516,8 @@ export const authService = {
       console.log('✅ Login successful');
       return result;
     } catch (error) {
-      // Extract clean error message from Appwrite error format
-      let cleanErrorMessage = error.message || '';
-      if (cleanErrorMessage.includes('AppwriteException:')) {
-        cleanErrorMessage = cleanErrorMessage.split('AppwriteException:')[1]?.trim() || cleanErrorMessage;
-      }
-      console.log('❌ Login failed:', cleanErrorMessage);
-      
-      // Handle specific Appwrite errors and provide user-friendly messages
-      let userFriendlyMessage = 'Login failed. Please check your credentials and try again.';
-      
-      if (error.message) {
-        const errorMessage = error.message.toLowerCase();
-        
-        if (errorMessage.includes('invalid credentials') || 
-            errorMessage.includes('invalid email') || 
-            errorMessage.includes('invalid password')) {
-          userFriendlyMessage = 'Invalid email or password. Please check your credentials and try again.';
-        } else if (errorMessage.includes('user not found')) {
-          userFriendlyMessage = 'Account not found. Please check your email address or create a new account.';
-        } else if (errorMessage.includes('email not verified')) {
-          userFriendlyMessage = 'Please verify your email address before logging in.';
-        } else if (errorMessage.includes('too many requests')) {
-          userFriendlyMessage = 'Too many login attempts. Please wait a moment and try again.';
-        } else if (errorMessage.includes('network') || errorMessage.includes('connection')) {
-          userFriendlyMessage = 'Network error. Please check your internet connection and try again.';
-        }
-      }
-      
-      // Create a new error with user-friendly message
-      const friendlyError = new Error(userFriendlyMessage);
-      friendlyError.originalError = error;
-      throw friendlyError;
+      // console.error('❌ Login failed:', error);
+      throw error;
     }
   },
 
@@ -1598,37 +1568,13 @@ export const authService = {
       
       return user;
     } catch (error) {
-      // Extract clean error message from Appwrite error format
-      let cleanErrorMessage = error.message || '';
-      if (cleanErrorMessage.includes('AppwriteException:')) {
-        cleanErrorMessage = cleanErrorMessage.split('AppwriteException:')[1]?.trim() || cleanErrorMessage;
-      }
-      console.log('❌ Registration failed:', cleanErrorMessage);
-      
-      // Handle specific Appwrite errors and provide user-friendly messages
-      let userFriendlyMessage = 'Registration failed. Please try again.';
-      
-      if (error.message) {
-        const errorMessage = error.message.toLowerCase();
-        
-        if (errorMessage.includes('user already exists') || 
-            errorMessage.includes('email already exists')) {
-          userFriendlyMessage = 'An account with this email already exists. Please try logging in instead.';
-        } else if (errorMessage.includes('invalid email')) {
-          userFriendlyMessage = 'Please enter a valid email address.';
-        } else if (errorMessage.includes('password') && errorMessage.includes('weak')) {
-          userFriendlyMessage = 'Password is too weak. Please use a stronger password.';
-        } else if (errorMessage.includes('too many requests')) {
-          userFriendlyMessage = 'Too many registration attempts. Please wait a moment and try again.';
-        } else if (errorMessage.includes('network') || errorMessage.includes('connection')) {
-          userFriendlyMessage = 'Network error. Please check your internet connection and try again.';
-        }
-      }
-      
-      // Create a new error with user-friendly message
-      const friendlyError = new Error(userFriendlyMessage);
-      friendlyError.originalError = error;
-      throw friendlyError;
+      console.error('❌ Registration failed:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        code: error.code,
+        type: error.constructor.name
+      });
+      throw error;
     }
   },
 
@@ -1649,7 +1595,7 @@ export const authService = {
       await account.deleteSession("current");
       console.log('✅ Logout successful');
     } catch (error) {
-      console.log('❌ Logout failed:', error.message);
+      console.error('❌ Logout failed:', error);
       throw error;
     }
   }
@@ -2188,16 +2134,16 @@ export const backgroundSyncService = {
                   console.log(`✅ Updated existing document ${existingDoc.$id} in Appwrite`);
                 } else {
                   // Create new document
-                console.log(`📝 Creating missing document ${itemId} in Appwrite for ${collectionId}`);
-                const cleanData = await cleanDataForAppwrite(item, collectionId);
-                await databases.createDocument(
-                  config.databaseId,
-                  collectionMap[collectionId],
-                  generateValidAppwriteId(itemId),
-                  cleanData
-                );
-                totalSynced++;
-                console.log(`✅ Created document ${itemId} in Appwrite`);
+                  console.log(`📝 Creating missing document ${itemId} in Appwrite for ${collectionId}`);
+                  const cleanData = await cleanDataForAppwrite(item, collectionId);
+                  await databases.createDocument(
+                    config.databaseId,
+                    collectionMap[collectionId],
+                    generateValidAppwriteId(itemId),
+                    cleanData
+                  );
+                  totalSynced++;
+                  console.log(`✅ Created document ${itemId} in Appwrite`);
                 }
               } catch (error) {
                 console.log(`❌ Error syncing document ${itemId} in ${collectionId}:`, error.message);

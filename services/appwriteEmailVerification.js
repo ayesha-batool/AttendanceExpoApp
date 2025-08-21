@@ -1,4 +1,5 @@
 import { Account, Client } from 'appwrite';
+import { getVerificationUrl } from '../config/appConfig';
 
 // Use the same client configuration as the main service
 const client = new Client();
@@ -56,11 +57,8 @@ export const appwriteEmailVerification = {
         };
       }
       
-             // Use Appwrite's built-in email verification
-       // Note: Appwrite requires a valid HTTP/HTTPS URL, not a custom scheme
-       // For development, we'll use localhost:8081
-       const verificationUrl = process.env.EXPO_PUBLIC_VERIFICATION_URL || 'http://localhost:8081/verify';
-       
+             // Use centralized configuration for verification URL
+       const verificationUrl = getVerificationUrl();
        console.log('🔗 Using verification URL:', verificationUrl);
        
        const response = await accountService.createVerification(verificationUrl);

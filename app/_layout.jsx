@@ -2,6 +2,7 @@ import * as Linking from 'expo-linking';
 import { Stack, useRouter } from "expo-router";
 import { useEffect } from "react";
 import Toast, { BaseToast, ErrorToast } from "react-native-toast-message";
+import { getVerificationUrl } from "../config/appConfig";
 import { AppProvider } from "../context/AppContext";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 import { EmployeeProvider } from "../context/EmployeeContext";
@@ -131,7 +132,10 @@ const AuthenticatedLayout = () => {
       
       // Parse the URL to extract userId and secret
       const url = event.url;
-      if (url.includes('localhost:8081://verify')) {
+      const verificationUrl = getVerificationUrl();
+      const verificationHost = new URL(verificationUrl).host;
+      
+      if (url.includes(`${verificationHost}://verify`) || url.includes('shelfieclean://verify')) {
         console.log('📧 Verification deep link detected');
         
         // Extract query parameters

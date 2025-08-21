@@ -11,7 +11,7 @@ const EmployeeDetailsModal = ({ visible, employee, onClose }) => {
   const [currentMonthStats, setCurrentMonthStats] = useState({
     present: 0,
     absent: 0,
-    onLeave: 0,
+    leave: 0,
     totalWorkingHours: '0h 0m'
   });
 
@@ -24,6 +24,8 @@ const EmployeeDetailsModal = ({ visible, employee, onClose }) => {
   const loadAttendanceData = async () => {
     try {
       const savedData = await getItems('attendance');
+      console.log('📊 Employee Details - Raw attendance data:', savedData);
+      
       const currentMonth = new Date().getMonth();
       const currentYear = new Date().getFullYear();
       
@@ -31,6 +33,13 @@ const EmployeeDetailsModal = ({ visible, employee, onClose }) => {
       const employeeAttendance = savedData.filter(record => 
         record.employeeId === employee.id || record.employeeId === employee.$id
       );
+      
+      console.log('📊 Employee Details - Employee attendance data:', {
+        employeeId: employee.id || employee.$id,
+        employeeName: employee.fullName,
+        totalRecords: employeeAttendance.length,
+        records: employeeAttendance.map(r => ({ date: r.date, status: r.status }))
+      });
 
       const currentMonthAttendance = employeeAttendance.filter(record => {
         const recordDate = new Date(record.date);
@@ -38,7 +47,7 @@ const EmployeeDetailsModal = ({ visible, employee, onClose }) => {
       });
 
       // Calculate stats
-      let present = 0, absent = 0, onLeave = 0, totalHours = 0;
+      let present = 0, absent = 0, leave = 0, totalHours = 0;
       
       currentMonthAttendance.forEach(record => {
         switch (record.status) {
@@ -48,8 +57,9 @@ const EmployeeDetailsModal = ({ visible, employee, onClose }) => {
           case 'absent':
             absent++;
             break;
-          case 'onLeave':
-            onLeave++;
+                  case 'leave':
+        case 'onLeave':
+            leave++;
             break;
         }
         
@@ -65,10 +75,20 @@ const EmployeeDetailsModal = ({ visible, employee, onClose }) => {
       const totalHoursInt = Math.floor(totalHours);
       const totalMinutes = Math.round((totalHours - totalHoursInt) * 60);
       
+      console.log('📊 Employee Details - Attendance Stats:', {
+        employeeName: employee.fullName,
+        present,
+        absent,
+        leave,
+        totalWorkingHours: `${totalHoursInt}h ${totalMinutes}m`,
+        totalRecords: currentMonthAttendance.length,
+        records: currentMonthAttendance.map(r => ({ date: r.date, status: r.status }))
+      });
+      
       setCurrentMonthStats({
         present,
         absent,
-        onLeave,
+        leave,
         totalWorkingHours: `${totalHoursInt}h ${totalMinutes}m`
       });
     } catch (error) {
@@ -289,7 +309,7 @@ const EmployeeDetailsModal = ({ visible, employee, onClose }) => {
               <View style={styles.attendanceItem}>
                 <Ionicons name="calendar" size={24} color="#8b5cf6" />
                 <Text style={styles.attendanceLabel}>Leave</Text>
-                <Text style={styles.attendanceValue}>{currentMonthStats.onLeave}</Text>
+                <Text style={styles.attendanceValue}>{currentMonthStats.leave}</Text>
               </View>
               <View style={styles.attendanceItem}>
                 <Ionicons name="time" size={24} color="#f59e0b" />

@@ -101,9 +101,17 @@ const AuthScreen = () => {
         router.replace("/Dashboard");
       }
     } catch (err) {
-      console.error('❌ Authentication error:', err);
-      setError(err?.message || "Authentication failed.");
-      showCustomToast('error', 'Authentication Failed', err?.message || "Please check your credentials and try again.");
+      // Extract clean error message from Appwrite error format
+      let cleanErrorMessage = err?.message || '';
+      if (cleanErrorMessage.includes('AppwriteException:')) {
+        cleanErrorMessage = cleanErrorMessage.split('AppwriteException:')[1]?.trim() || cleanErrorMessage;
+      }
+      console.log('❌ Authentication error:', cleanErrorMessage);
+      
+      // Use the user-friendly error message
+      const errorMessage = err?.message || "Authentication failed. Please try again.";
+      setError(errorMessage);
+      showCustomToast('error', 'Authentication Failed', errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -116,7 +124,7 @@ const AuthScreen = () => {
       await sendVerificationEmail();
       showCustomToast('success', 'Verification Email Sent!', 'Please check your inbox for the verification link.');
     } catch (error) {
-      console.error('❌ Failed to resend verification:', error);
+      console.log('❌ Failed to resend verification:', error.message);
       showCustomToast('error', 'Failed to Send', error.message || 'Please try again later.');
     } finally {
       setIsLoading(false);

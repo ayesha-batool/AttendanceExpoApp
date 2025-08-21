@@ -68,8 +68,22 @@ export const AuthProvider = ({ children }) => {
         requiresVerification: !user.emailVerification
       };
     } catch (error) {
-      console.error('❌ Registration failed:', error);
-      throw error;
+      // Extract clean error message from Appwrite error format
+      let cleanErrorMessage = error.message || '';
+      if (cleanErrorMessage.includes('AppwriteException:')) {
+        cleanErrorMessage = cleanErrorMessage.split('AppwriteException:')[1]?.trim() || cleanErrorMessage;
+      }
+      console.log('❌ Registration failed:', cleanErrorMessage);
+      
+      // If it's already a user-friendly error, just re-throw it
+      if (error.message && !error.message.includes('Appwrite')) {
+        throw error;
+      }
+      
+      // For technical errors, provide a generic message
+      const friendlyError = new Error('Registration failed. Please try again.');
+      friendlyError.originalError = error;
+      throw friendlyError;
     }
   };
 
@@ -94,7 +108,7 @@ export const AuthProvider = ({ children }) => {
         throw new Error(result.message);
       }
     } catch (error) {
-      console.error('❌ Error sending verificatin email:', error);
+      console.log('❌ Error sending verification email:', error.message);
       throw error;
     }
   };
@@ -119,7 +133,7 @@ export const AuthProvider = ({ children }) => {
         throw new Error(result.message);
       }
     } catch (error) {
-      console.error('❌ Error completing verification:', error);
+      console.log('❌ Error completing verification:', error.message);
       throw error;
     }
   };
@@ -172,8 +186,22 @@ export const AuthProvider = ({ children }) => {
       
       return result;
     } catch (error) {
-      console.error('❌ Login failed:', error);
-      throw error;
+      // Extract clean error message from Appwrite error format
+      let cleanErrorMessage = error.message || '';
+      if (cleanErrorMessage.includes('AppwriteException:')) {
+        cleanErrorMessage = cleanErrorMessage.split('AppwriteException:')[1]?.trim() || cleanErrorMessage;
+      }
+      console.log('❌ Login failed:', cleanErrorMessage);
+      
+      // If it's already a user-friendly error, just re-throw it
+      if (error.message && !error.message.includes('Appwrite')) {
+        throw error;
+      }
+      
+      // For technical errors, provide a generic message
+      const friendlyError = new Error('Login failed. Please check your credentials and try again.');
+      friendlyError.originalError = error;
+      throw friendlyError;
     }
   };
 
@@ -195,7 +223,7 @@ export const AuthProvider = ({ children }) => {
       setIsEmailVerified(false);
       return result;
     } catch (error) {
-      console.error('❌ Logout failed:', error);
+      console.log('❌ Logout failed:', error.message);
       throw error;
     }
   };

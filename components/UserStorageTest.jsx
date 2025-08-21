@@ -10,6 +10,7 @@ import {
   View
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { getVerificationUrl } from '../config/appConfig';
 
 const UserStorageTest = () => {
   const [verificationStatus, setVerificationStatus] = useState(null);
@@ -120,12 +121,12 @@ const UserStorageTest = () => {
   const testConfiguration = () => {
     console.log('🔧 Testing Appwrite configuration...');
     
-         const config = {
-       endpoint: process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT,
-       projectId: process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID,
-       verificationUrl: process.env.EXPO_PUBLIC_VERIFICATION_URL || 'http://localhost:8081/verify',
-       databaseId: process.env.EXPO_PUBLIC_APPWRITE_DB_ID
-     };
+    const config = {
+      endpoint: process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT,
+      projectId: process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID,
+      verificationUrl: getVerificationUrl(),
+      databaseId: process.env.EXPO_PUBLIC_APPWRITE_DB_ID
+    };
     
     console.log('🔧 Configuration:', config);
     
@@ -383,7 +384,7 @@ const UserStorageTest = () => {
               Verification Status: {verificationStatus?.success ? 'Working' : 'Error'}
             </Text>
                          <Text style={styles.debugText}>
-               Verification URL: {process.env.EXPO_PUBLIC_VERIFICATION_URL || 'http://localhost:8081/verify'}
+               Verification URL: {process.env.EXPO_PUBLIC_VERIFICATION_URL || 'http://localhost:8082/verify'}
              </Text>
             <Text style={styles.debugText}>
               App Scheme: shelfieclean

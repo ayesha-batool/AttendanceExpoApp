@@ -16,11 +16,11 @@ import {
   View
 } from "react-native";
 
+
 // Contexts & Services
 import { useAuth } from "../context/AuthContext";
-import { customOptionsService, dataService } from "../services/unifiedDataService";
+import { hybridDataService } from "../services/hybridDataService";
 import { CUSTOM_VALIDATORS, formatErrorMessage, validateForm, VALIDATION_SCHEMAS } from "../utils/validation";
-
 
 
 // Constants - Only keep gender options as they are static
@@ -51,7 +51,7 @@ const DAYS_OF_WEEK = [
 
 
 
-const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null }) => {
+const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null, deviceInfo = null, workLocation = null }) => {
   const { currentUser } = useAuth();
   const [form, setForm] = useState({
     badgeNumber: "", fullName: "", fatherName: "", cnic: "", dateOfBirth: new Date("2000-01-01"), gender: "",
@@ -103,9 +103,9 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null })
   const loadInitialDropdownOptions = async () => {
     try {
       const [departments, ranks, status] = await Promise.all([
-        customOptionsService.getOptions('departments'),
-customOptionsService.getOptions('ranks'),
-customOptionsService.getOptions('employment_status')
+        hybridDataService.getOptions('departments'),
+        hybridDataService.getOptions('ranks'),
+        hybridDataService.getOptions('employment_status')
       ]);
 
       setDropdownOptions({
@@ -209,7 +209,7 @@ customOptionsService.getOptions('employment_status')
 
   const refreshDropdownOptions = async (fieldName) => {
     try {
-      const allOptions = await customOptionsService.getOptions(fieldName);
+      const allOptions = await hybridDataService.getOptions(fieldName);
       const formattedOptions = allOptions.map(option => ({ label: option, value: option }));
       
       setDropdownOptions(prev => ({
@@ -264,14 +264,11 @@ customOptionsService.getOptions('employment_status')
   // Test function to debug Appwrite setup (v2.0)
   const testAppwriteSetup = async () => {
     try {
-      console.log('🧪 Testing Appwrite setup from AddOfficerModal (v2.0)...');
       
       // Force cache refresh by adding timestamp
       const cacheBuster = Date.now();
-      console.log('Cache buster:', cacheBuster);
       
-      const result = await dataService.testAppwriteSetup();
-      console.log('🧪 Test result:', result);
+      const result = await hybridDataService.getAppwriteHealth();
       
       if (result.success) {
         setCustomToast({
@@ -299,7 +296,7 @@ customOptionsService.getOptions('employment_status')
 
   const loadExistingEmployees = async () => {
     try {
-      const employeesData = await dataService.getItems("employees");
+      const employeesData = await hybridDataService.getItems("employees");
       const validEmployees = employeesData.filter(item => item && typeof item === 'object');
       const uniqueEmployees = validEmployees.filter((employee, index, self) => {
         const badgeNumber = employee.badgeNumber || employee.employeeId || "";
@@ -397,6 +394,15 @@ customOptionsService.getOptions('employment_status')
         validation.isValid = false;
       }
 
+      // Validate phone number format (Pakistani format: +923260764834)
+      if (form.contactNumber) {
+        const phoneRegex = /^\+923\d{9}$/;
+        if (!phoneRegex.test(form.contactNumber)) {
+          validation.errors.contactNumber = "Phone number must be in format +923XXXXXXXXX";
+          validation.isValid = false;
+        }
+      }
+
       setErrors(validation.errors);
       return validation;
     } catch (error) {
@@ -407,34 +413,111 @@ customOptionsService.getOptions('employment_status')
 
   const onSubmit = async () => {
     try {
+      console.log("onSubmit called");
       const validationResult = validateFormData();
+      console.log("Validation result:", validationResult);
       if (!validationResult.isValid) {
         const errorMessages = Object.values(validationResult.errors).filter(error => error && error.trim() !== "");
         const firstError = errorMessages.length > 0 ? errorMessages[0] : "Please fix the errors in the form";
         setCustomToast({
-        type: 'error',
-        title: 'Validation Error',
-        message: firstError
-      });
-      setTimeout(() => setCustomToast(null), 4000);
+          type: 'error',
+          title: 'Validation Error',
+          message: firstError
+        });
+        setTimeout(() => setCustomToast(null), 4000);
+        console.log("Validation failed, first error:", firstError);
         return;
       }
 
       setLoading(true);
       const officerData = {
         ...form,
-        dateOfBirth: form.dateOfBirth.toISOString(), joiningDate: form.joiningDate.toISOString(),
-        lastPromotionDate: form.lastPromotionDate.toISOString(), lastAdvanceDate: form.lastAdvanceDate.toISOString(),
-        employeeId: form.badgeNumber, phone: form.contactNumber, postingStation: form.postingStation,
-        dateOfJoining: form.joiningDate.toISOString(), dutyShift: form.shift, status: form.status,
+        dateOfBirth: form.dateOfBirth.toISOString(),
+        joiningDate: form.joiningDate.toISOString(),
+        lastPromotionDate: form.lastPromotionDate.toISOString(),
+        lastAdvanceDate: form.lastAdvanceDate.toISOString(),
+        employeeId: form.badgeNumber,
+        phone: form.contactNumber,
+        postingStation: form.postingStation,
+        dateOfJoining: form.joiningDate.toISOString(),
+        dutyShift: form.shift,
+        status: form.status,
         // photoUrl removed to prevent sync errors
       };
 
+      console.log("Officer data before device/admin logic:", officerData);
+      console.log("Current work location in form:", form.workLocation);
+      console.log("Work location prop:", workLocation);
+      console.log("Editing officer:", editingOfficer ? "Yes" : "No");
+
+      // Set device-specific information if available (only for new employees)
+      if (!editingOfficer) {
+        console.log("🔍 [DEVICE ID LOGIC] deviceInfo:", deviceInfo);
+        console.log("🔍 [DEVICE ID LOGIC] currentUser:", currentUser);
+        
+        if (deviceInfo && deviceInfo.deviceId) {
+          // For new device employees, use device-specific device ID
+          console.log("🔍 [DEVICE ID LOGIC] Using DEVICE employee logic");
+          officerData.deviceId = await hybridDataService.getDeviceEmployeeDeviceId();
+          officerData.registrationType = "device"; // Device-registered employee
+          officerData.registeredBy = "device";
+          officerData.registrationDate = new Date().toISOString();
+          console.log("🔍 [DEVICE ID LOGIC] Device employee deviceId:", officerData.deviceId);
+        } else {
+          // For new admin employees, use admin-specific device ID
+          console.log("🔍 [DEVICE ID LOGIC] Using ADMIN employee logic");
+          officerData.deviceId = await hybridDataService.getAdminDeviceId();
+          officerData.registrationType = "admin"; // Admin-created employee
+          officerData.registeredBy = currentUser?.email || "admin";
+          officerData.registrationDate = new Date().toISOString();
+          console.log("🔍 [DEVICE ID LOGIC] Admin employee deviceId:", officerData.deviceId);
+        }
+      } else {
+        // For existing employees, preserve their original device and registration info
+        console.log("Preserving existing employee device and registration info:", {
+          deviceId: editingOfficer.deviceId,
+          registrationType: editingOfficer.registrationType,
+          registeredBy: editingOfficer.registeredBy
+        });
+      }
+
+      // Add work location if provided (only for new officers or if explicitly provided)
+      if (workLocation && !editingOfficer) {
+        // For new officers, use the provided work location
+        officerData.workLocation = workLocation;
+        console.log("Work location added for new officer:", workLocation);
+      } else if (editingOfficer && workLocation) {
+        // For existing officers, only update if a new work location is explicitly provided
+        officerData.workLocation = workLocation;
+        console.log("Work location updated for existing officer:", workLocation);
+      }
+      // If editing existing officer and no new work location provided, keep the existing one
+      
+      console.log("Final work location in officerData:", officerData.workLocation);
+
+      let finalOfficerData = officerData;
+      
       if (editingOfficer) {
         const key = `employees_${editingOfficer.id}`;
-        await dataService.updateData(key, editingOfficer.id, officerData, "employees");
+        console.log("Updating existing officer, key:", key, "officerData:", officerData);
+        
+        // Preserve critical fields that identify the employee
+        finalOfficerData = {
+          ...officerData,
+          id: editingOfficer.id, // Preserve the original ID
+          deviceId: editingOfficer.deviceId, // Preserve device ID
+          registrationType: editingOfficer.registrationType, // Preserve registration type
+          registeredBy: editingOfficer.registeredBy, // Preserve who registered them
+          registrationDate: editingOfficer.registrationDate, // Preserve registration date
+          createdAt: editingOfficer.createdAt, // Preserve creation date
+          updatedAt: new Date().toISOString() // Update the updated timestamp
+        };
+        
+        const result = await hybridDataService.updateData(key, editingOfficer.id, finalOfficerData, "employees");
+        console.log("Updated existing officer, result:", result);
       } else {
-        await dataService.saveData(officerData, "employees");
+        console.log("Saving new officer, officerData:", officerData);
+        await hybridDataService.saveData(officerData, "employees");
       }
 
       setCustomToast({
@@ -444,10 +527,14 @@ customOptionsService.getOptions('employment_status')
       });
       setTimeout(() => {
         setCustomToast(null);
-      if (onSuccess) onSuccess();
-          onClose();
+        if (onSuccess) {
+          onSuccess(finalOfficerData);
+        }
+        onClose();
       }, 2000);
+      console.log("Officer saved successfully");
     } catch (error) {
+      console.error("Error in onSubmit:", error);
       setCustomToast({
         type: 'error',
         title: 'Error',
@@ -456,6 +543,7 @@ customOptionsService.getOptions('employment_status')
       setTimeout(() => setCustomToast(null), 4000);
     } finally {
       setLoading(false);
+      console.log("onSubmit finished, loading set to false");
     }
   };
 
@@ -808,7 +896,7 @@ customOptionsService.getOptions('employment_status')
               <LinearGradient colors={["#007AFF", "#0056CC"]} style={styles.submitGradient}>
                 <Ionicons name="checkmark" size={20} color="#fff" />
                 <Text style={styles.submitButtonText}>
-                  {loading ? "Saving..." : editingOfficer ? "Update Officer" : "Add Officer"}
+                  {loading ? "Saving..." : editingOfficer ? "Update Officer" : "Add Oficer"}
                 </Text>
               </LinearGradient>
             </TouchableOpacity>

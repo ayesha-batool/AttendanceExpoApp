@@ -12,13 +12,9 @@ import ExpenseForm from '../../components/ExpenseForm';
 import LoadingOverlay from '../../components/LoadingOverlay';
 import LoadingState from '../../components/LoadingState';
 import SearchBar from '../../components/SearchBar';
-
-import { useExpensesContext } from '../../context/ExpensesContext';
-import { customOptionsService, dataService } from '../../services/unifiedDataService';
+import { hybridDataService } from '../../services/hybridDataService';
 
 const ExpensesManagementScreen = () => {
-  const { setHeaderActionButton, clearHeaderAction } = useExpensesContext();
-  
   // State management - compressed
   const [expenses, setExpenses] = useState([]);
   const [filteredExpenses, setFilteredExpenses] = useState([]);
@@ -86,8 +82,8 @@ const ExpensesManagementScreen = () => {
   const loadDropdownOptions = async () => {
     try {
       const [categories, departments] = await Promise.all([
-        customOptionsService.getOptions('expense_categories'),
-        customOptionsService.getOptions('departments')
+        hybridDataService.getOptions('expense_categories'),
+        hybridDataService.getOptions('departments')
       ]);
       
       const categoryOptions = categories.map(category => ({
@@ -110,7 +106,7 @@ const ExpensesManagementScreen = () => {
     try {
       setLoading(true);
       
-      const expensesData = await dataService.getItems('expenses');
+      const expensesData = await hybridDataService.getItems('expenses');
       
       const validExpenses = expensesData.filter(item => item && typeof item === 'object');
       
@@ -212,7 +208,7 @@ const ExpensesManagementScreen = () => {
       }
       
       const key = `expenses_${expenseId}`;
-              await dataService.deleteData(key, expenseId, 'expenses');
+              await hybridDataService.deleteData(key, expenseId, 'expenses');
       
       // Remove from state
       setExpenses(prev => prev.filter(expense => getExpenseId(expense) !== expenseId));
@@ -253,7 +249,7 @@ const ExpensesManagementScreen = () => {
         }
         
         const key = `expenses_${expenseId}`;
-        await dataService.updateData(key, expenseId, expenseData, 'expenses');
+        await hybridDataService.updateData(key, expenseId, expenseData, 'expenses');
         
         const updatedExpense = { ...expenseData, $id: expenseId, id: expenseId };
         
@@ -266,7 +262,7 @@ const ExpensesManagementScreen = () => {
         
         showCustomToast('success', 'Success', 'Expense updated successfully');
       } else {
-        const newExpense = await dataService.saveData(expenseData, 'expenses');
+        const newExpense = await hybridDataService.saveData(expenseData, 'expenses');
         
         const expenseWithId = { 
           ...newExpense, 
@@ -514,7 +510,7 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 12, color: '#64748b', fontWeight: '500' },
   searchFilter: { flexDirection: 'row', alignItems: 'center', gap: 6 ,width:'100%'},
 
-  list: { padding: 20 },
+  list: { padding: 16 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { backgroundColor: '#fff', borderRadius: 20, width: '95%', maxHeight: '85%', minHeight: '60%', padding: 0 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 24, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },

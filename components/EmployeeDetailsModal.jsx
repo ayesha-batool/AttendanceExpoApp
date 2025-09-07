@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from 'react';
 import { Dimensions, Modal, Image as RNImage, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { getItems } from '../services/unifiedDataService';
+import { hybridDataService } from '../services/hybridDataService';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -14,6 +14,10 @@ const EmployeeDetailsModal = ({ visible, employee, onClose }) => {
     leave: 0,
     totalWorkingHours: '0h 0m'
   });
+  const [calendarData, setCalendarData] = useState([]);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [allAttendanceData, setAllAttendanceData] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (visible && employee) {
@@ -23,33 +27,73 @@ const EmployeeDetailsModal = ({ visible, employee, onClose }) => {
 
   const loadAttendanceData = async () => {
     try {
-      const savedData = await getItems('attendance');
-      console.log('📊 Employee Details - Raw attendance data:', savedData);
+      setIsLoading(true);
+      const savedData = await hybridDataService.getItems('attendance');
       
-      const currentMonth = new Date().getMonth();
-      const currentYear = new Date().getFullYear();
-      
-      // Filter attendance data for current employee and current month
+      // Filter attendance data for current employee
       const employeeAttendance = savedData.filter(record => 
         record.employeeId === employee.id || record.employeeId === employee.$id
       );
       
-      console.log('📊 Employee Details - Employee attendance data:', {
-        employeeId: employee.id || employee.$id,
-        employeeName: employee.fullName,
-        totalRecords: employeeAttendance.length,
-        records: employeeAttendance.map(r => ({ date: r.date, status: r.status }))
-      });
+      // Store all attendance data for this employee
+      setAllAttendanceData(employeeAttendance);
+      
+      // Load current month data
+      await loadAttendanceDataForMonth(selectedDate, employeeAttendance);
+    } catch (error) {
+      console.error('Error loading attendance data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-      const currentMonthAttendance = employeeAttendance.filter(record => {
+  const generateCalendarData = (attendanceRecords, targetDate = selectedDate) => {
+    const targetMonth = targetDate.getMonth();
+    const targetYear = targetDate.getFullYear();
+    
+    // Create a map of attendance records by date
+    const attendanceMap = {};
+    attendanceRecords.forEach(record => {
+      const date = new Date(record.date);
+      const dateKey = date.getDate();
+      attendanceMap[dateKey] = record.status;
+    });
+
+    // Get first day of month and total days
+    const firstDay = new Date(targetYear, targetMonth, 1).getDay();
+    const totalDays = new Date(targetYear, targetMonth + 1, 0).getDate();
+    
+    const calendar = [];
+    
+    // Add empty cells for days before the first day of the month
+    for (let i = 0; i < firstDay; i++) {
+      calendar.push({ day: '', status: null });
+    }
+    
+    // Add all days of the month
+    for (let day = 1; day <= totalDays; day++) {
+      const status = attendanceMap[day];
+      calendar.push({ day, status });
+    }
+    
+    setCalendarData(calendar);
+  };
+
+  const loadAttendanceDataForMonth = async (targetDate, attendanceData = allAttendanceData) => {
+    try {
+      const targetMonth = targetDate.getMonth();
+      const targetYear = targetDate.getFullYear();
+      
+      // Filter attendance data for target month from cached data
+      const targetMonthAttendance = attendanceData.filter(record => {
         const recordDate = new Date(record.date);
-        return recordDate.getMonth() === currentMonth && recordDate.getFullYear() === currentYear;
+        return recordDate.getMonth() === targetMonth && recordDate.getFullYear() === targetYear;
       });
 
-      // Calculate stats
+      // Calculate stats for the target month
       let present = 0, absent = 0, leave = 0, totalHours = 0;
       
-      currentMonthAttendance.forEach(record => {
+      targetMonthAttendance.forEach(record => {
         switch (record.status) {
           case 'present':
             present++;
@@ -57,8 +101,8 @@ const EmployeeDetailsModal = ({ visible, employee, onClose }) => {
           case 'absent':
             absent++;
             break;
-                  case 'leave':
-        case 'onLeave':
+          case 'leave':
+          case 'onLeave':
             leave++;
             break;
         }
@@ -75,24 +119,17 @@ const EmployeeDetailsModal = ({ visible, employee, onClose }) => {
       const totalHoursInt = Math.floor(totalHours);
       const totalMinutes = Math.round((totalHours - totalHoursInt) * 60);
       
-      console.log('📊 Employee Details - Attendance Stats:', {
-        employeeName: employee.fullName,
-        present,
-        absent,
-        leave,
-        totalWorkingHours: `${totalHoursInt}h ${totalMinutes}m`,
-        totalRecords: currentMonthAttendance.length,
-        records: currentMonthAttendance.map(r => ({ date: r.date, status: r.status }))
-      });
-      
       setCurrentMonthStats({
         present,
         absent,
         leave,
         totalWorkingHours: `${totalHoursInt}h ${totalMinutes}m`
       });
+
+      // Generate calendar data for target month
+      generateCalendarData(targetMonthAttendance, targetDate);
     } catch (error) {
-      console.error('Error loading attendance data:', error);
+      console.error('Error loading attendance data for month:', error);
     }
   };
 
@@ -170,6 +207,133 @@ const EmployeeDetailsModal = ({ visible, employee, onClose }) => {
     );
   };
 
+  const renderCalendar = () => {
+    const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const monthName = selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+    const getStatusColor = (status) => {
+      switch (status) {
+        case 'present': return '#22c55e';
+        case 'absent': return '#ef4444';
+        case 'leave':
+        case 'onLeave': return '#8b5cf6';
+        default: return 'transparent';
+      }
+    };
+
+    const getStatusBackground = (status) => {
+      switch (status) {
+        case 'present': return '#dcfce7';
+        case 'absent': return '#fee2e2';
+        case 'leave':
+        case 'onLeave': return '#ede9fe';
+        default: return '#ffffff';
+      }
+    };
+
+    const navigateMonth = (direction) => {
+      const newDate = new Date(selectedDate);
+      if (direction === 'prev') {
+        newDate.setMonth(newDate.getMonth() - 1);
+      } else {
+        newDate.setMonth(newDate.getMonth() + 1);
+      }
+      setSelectedDate(newDate);
+      loadAttendanceDataForMonth(newDate, allAttendanceData);
+    };
+
+    const navigateYear = (direction) => {
+      const newDate = new Date(selectedDate);
+      if (direction === 'prev') {
+        newDate.setFullYear(newDate.getFullYear() - 1);
+      } else {
+        newDate.setFullYear(newDate.getFullYear() + 1);
+      }
+      setSelectedDate(newDate);
+      loadAttendanceDataForMonth(newDate, allAttendanceData);
+    };
+
+    return (
+      <View style={styles.calendarContainer}>
+        {/* Month/Year Navigation */}
+        <View style={styles.calendarNavigation}>
+          <TouchableOpacity onPress={() => navigateYear('prev')} style={styles.navButton}>
+            <Ionicons name="play-back" size={16} color="#007AFF" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity onPress={() => navigateMonth('prev')} style={styles.navButton}>
+            <Ionicons name="chevron-back" size={20} color="#007AFF" />
+          </TouchableOpacity>
+          
+          <Text style={styles.calendarTitle}>{monthName}</Text>
+          
+          <TouchableOpacity onPress={() => navigateMonth('next')} style={styles.navButton}>
+            <Ionicons name="chevron-forward" size={20} color="#007AFF" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity onPress={() => navigateYear('next')} style={styles.navButton}>
+            <Ionicons name="play-forward" size={16} color="#007AFF" />
+          </TouchableOpacity>
+        </View>
+        
+        <View style={styles.calendarHeader}>
+          {weekDays.map((day, index) => (
+            <View key={index} style={styles.calendarHeaderCell}>
+              <Text style={styles.calendarHeaderText}>{day}</Text>
+            </View>
+          ))}
+        </View>
+        
+        <View style={styles.calendarGrid}>
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              {/* <ActivityIndicator size="small" color="#007AFF" /> */}
+              <Text style={styles.loadingText}>Loading...</Text>
+            </View>
+          ) : (
+            calendarData.map((item, index) => (
+              <View key={index} style={styles.calendarCell}>
+                {item.day ? (
+                  <View style={[
+                    styles.calendarDay, 
+                    { 
+                      backgroundColor: item.status ? getStatusColor(item.status) : '#ffffff',
+                      borderColor: item.status ? getStatusColor(item.status) : '#e2e8f0'
+                    }
+                  ]}>
+                    <Text style={[
+                      styles.calendarDayText, 
+                      { color: item.status ? '#ffffff' : '#6b7280' }
+                    ]}>
+                      {item.day}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.calendarEmptyCell} />
+                )}
+              </View>
+            ))
+          )}
+        </View>
+        
+        <View style={styles.calendarLegend}>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: '#22c55e' }]} />
+            <Text style={styles.legendText}>Present</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: '#ef4444' }]} />
+            <Text style={styles.legendText}>Absent</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: '#8b5cf6' }]} />
+            <Text style={styles.legendText}>Leave</Text>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
   const renderPayrollCard = () => (
     <View style={styles.payrollCard}>
       <View style={styles.payrollHeader}>
@@ -228,6 +392,8 @@ const EmployeeDetailsModal = ({ visible, employee, onClose }) => {
     );
   };
 
+
+
   return (
     <Modal
       visible={visible}
@@ -285,7 +451,7 @@ const EmployeeDetailsModal = ({ visible, employee, onClose }) => {
             <View style={styles.heroInfo}>
               <Text style={styles.employeeName}>{String(employee.fullName || 'Unknown Officer')}</Text>
               <Text style={styles.employeeBadge}>Badge: {String(employee.badgeNumber || employee.employeeId || 'N/A')}</Text>
-              <Text style={styles.employeeRank}>{String(employee.rank || 'N/A')}</Text>
+              <Text style={styles.employeeRank}>Rank: {String(employee.rank || 'N/A')}</Text>
               {renderStatusBadge(employee.status)}
             </View>
           </View>
@@ -295,28 +461,33 @@ const EmployeeDetailsModal = ({ visible, employee, onClose }) => {
 
           {/* Attendance Information */}
           {renderSection('Current Month Attendance', (
-            <View style={styles.attendanceGrid}>
-              <View style={styles.attendanceItem}>
-                <Ionicons name="checkmark-circle" size={24} color="#22c55e" />
-                <Text style={styles.attendanceLabel}>Present</Text>
-                <Text style={styles.attendanceValue}>{currentMonthStats.present}</Text>
+            <>
+              <View style={styles.attendanceGrid}>
+                <View style={styles.attendanceItem}>
+                  <Ionicons name="checkmark-circle" size={24} color="#22c55e" />
+                  <Text style={styles.attendanceLabel}>Present</Text>
+                  <Text style={styles.attendanceValue}>{currentMonthStats.present}</Text>
+                </View>
+                <View style={styles.attendanceItem}>
+                  <Ionicons name="close-circle" size={24} color="#ef4444" />
+                  <Text style={styles.attendanceLabel}>Absent</Text>
+                  <Text style={styles.attendanceValue}>{currentMonthStats.absent}</Text>
+                </View>
+                <View style={styles.attendanceItem}>
+                  <Ionicons name="calendar" size={24} color="#8b5cf6" />
+                  <Text style={styles.attendanceLabel}>Leave</Text>
+                  <Text style={styles.attendanceValue}>{currentMonthStats.leave}</Text>
+                </View>
+                <View style={styles.attendanceItem}>
+                  <Ionicons name="time" size={24} color="#f59e0b" />
+                  <Text style={styles.attendanceLabel}>Total Hours</Text>
+                  <Text style={styles.attendanceValue}>{currentMonthStats.totalWorkingHours}</Text>
+                </View>
               </View>
-              <View style={styles.attendanceItem}>
-                <Ionicons name="close-circle" size={24} color="#ef4444" />
-                <Text style={styles.attendanceLabel}>Absent</Text>
-                <Text style={styles.attendanceValue}>{currentMonthStats.absent}</Text>
-              </View>
-              <View style={styles.attendanceItem}>
-                <Ionicons name="calendar" size={24} color="#8b5cf6" />
-                <Text style={styles.attendanceLabel}>Leave</Text>
-                <Text style={styles.attendanceValue}>{currentMonthStats.leave}</Text>
-              </View>
-              <View style={styles.attendanceItem}>
-                <Ionicons name="time" size={24} color="#f59e0b" />
-                <Text style={styles.attendanceLabel}>Total Hours</Text>
-                <Text style={styles.attendanceValue}>{currentMonthStats.totalWorkingHours}</Text>
-              </View>
-            </View>
+              
+              {/* Calendar View */}
+              {renderCalendar()}
+            </>
           ), 'time')}
 
           {/* Basic Information */}
@@ -719,6 +890,150 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1e293b',
   },
+  calendarContainer: {
+    marginTop: 20,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    // padding: 20,
+  
+  },
+  calendarNavigation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+    paddingHorizontal: 4,
+  },
+  navButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#f8fafc',
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    borderColor: '#e2e8f0',
+  },
+  calendarTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#1e293b',
+    textAlign: 'center',
+    letterSpacing: 0.5,
+  },
+  calendarHeader: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    paddingHorizontal: 8,
+  },
+  calendarHeaderCell: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  calendarHeaderText: {
+    fontSize: 14,
+    color: '#64748b',
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 8,
+  },
+  calendarCell: {
+    width: '14.28%', // 100% / 7 days
+    aspectRatio: 1,
+    padding: 2,
+  },
+  calendarDay: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+    minWidth: 36,
+    minHeight: 36,
+  },
+  calendarDayText: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  statusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginTop: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  calendarEmptyCell: {
+    flex: 1,
+    borderRadius: 12,
+    backgroundColor: 'transparent',
+  },
+  calendarLegend: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 24,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#f8fafc',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  legendDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    marginRight: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  legendText: {
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '600',
+  },
+  loadingContainer: {
+    gridColumn: '1 / -1',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#64748b',
+  },
 });
 
 export default EmployeeDetailsModal;
+

@@ -10,15 +10,14 @@ import EmptyState from '../../components/EmptyState';
 import InputField from '../../components/InputField';
 import LoadingOverlay from '../../components/LoadingOverlay';
 import LoadingState from '../../components/LoadingState';
+import OfflineStatus from '../../components/OfflineStatus';
 import SearchBar from '../../components/SearchBar';
 import SelectDropdown from '../../components/SelectDropdown';
 import { useAuth } from '../../context/AuthContext';
-import { useCasesContext } from '../../context/CasesContext';
-import { backgroundSyncService, customOptionsService, dataService, syncMonitor } from '../../services/unifiedDataService';
+import { hybridDataService } from '../../services/hybridDataService';
 import { validateForm, VALIDATION_SCHEMAS } from '../../utils/validation';
 
 const CasesScreen = () => {
-  const { setHeaderActionButton, clearHeaderAction } = useCasesContext();
   const { currentUser } = useAuth();
   const [cases, setCases] = useState([]);
   const [filteredCases, setFilteredCases] = useState([]);
@@ -59,41 +58,35 @@ const CasesScreen = () => {
   // Load dropdown options from custom options service
   const checkSyncStatus = async () => {
     try {
-      const status = await syncMonitor.getStatus();
+      const health = await hybridDataService.getAppwriteHealth();
       setSyncStatus({
-        hasPendingItems: status.hasPendingItems,
-        pendingCount: status.pendingCount
+        hasPendingItems: !health.healthy,
+        pendingCount: health.healthy ? 0 : 1
       });
     } catch (error) {
       console.error('Error checking sync status:', error);
+      setSyncStatus({
+        hasPendingItems: true,
+        pendingCount: 1
+      });
     }
   };
 
   const loadDropdownOptions = async () => {
     try {
-      // First, try to initialize default options if they don't exist
-      const status = await customOptionsService.checkDefaultOptionsStatus();
-      const needsInitialization = Object.values(status).some(item => !item.hasLocal);
-      if (needsInitialization) {
-        console.log('Initializing default options...');
-        await customOptionsService.initializeDefaultOptions();
-      }
-
-      const [statusData, priorityData, categoryData] = await Promise.all([
-        customOptionsService.getOptions('case_status'),
-        customOptionsService.getOptions('case_priority'),
-        customOptionsService.getOptions('case_categories')
+      const [statusOptions, priorityOptions, categoryOptions] = await Promise.all([
+        hybridDataService.getOptions('case_status'),
+        hybridDataService.getOptions('case_priority'),
+        hybridDataService.getOptions('case_categories')
       ]);
 
-      console.log('Loaded options:', { statusData, priorityData, categoryData });
-
+  
       // Check if arrays are valid
-      const validStatusData = Array.isArray(statusData) ? statusData : [];
-      const validPriorityData = Array.isArray(priorityData) ? priorityData : [];
-      const validCategoryData = Array.isArray(categoryData) ? categoryData : [];
+      const validStatusData = Array.isArray(statusOptions) ? statusOptions : [];
+      const validPriorityData = Array.isArray(priorityOptions) ? priorityOptions : [];
+      const validCategoryData = Array.isArray(categoryOptions) ? categoryOptions : [];
 
-      console.log('Valid options:', { validStatusData, validPriorityData, validCategoryData });
-
+     
       setStatusOptions(validStatusData.map(status => ({ label: status, value: status.toLowerCase().replace(/\s+/g, '_') })));
       setPriorityOptions(validPriorityData.map(priority => ({ label: priority, value: priority.toLowerCase() })));
       setCategoryOptions(validCategoryData.map(category => ({ label: category, value: category })));
@@ -181,8 +174,8 @@ const CasesScreen = () => {
       setLoading(true);
       
       const [casesData, employeesData] = await Promise.all([
-        dataService.getItems('cases'),
-        dataService.getItems('employees')
+        hybridDataService.getItems('cases'),
+        hybridDataService.getItems('employees')
       ]);
       
     
@@ -195,13 +188,28 @@ const CasesScreen = () => {
       
     } catch (error) {
       if (error.code === 'AUTH_REQUIRED') {
-        console.log('🔐 Authentication required, redirecting to auth page');
-        // Redirect to auth page
+       // Redirect to auth page
         router.replace('/auth');
         return;
       }
-      console.error('❌ Failed to load cases data:', error);
-      showCustomToast('error', 'Error', 'Failed to load data. Please try again.');
+      
+      // Check if it's a network-related error
+      const errorMessage = error.message?.toLowerCase() || '';
+      const isNetworkError = errorMessage.includes('bad gateway') || 
+                           errorMessage.includes('network') || 
+                           errorMessage.includes('connection') ||
+                           errorMessage.includes('timeout') ||
+                           errorMessage.includes('502') ||
+                           errorMessage.includes('503') ||
+                           errorMessage.includes('504');
+      
+      if (isNetworkError) {
+        console.error('❌ Network error loading cases data:', error);
+        showCustomToast('error', 'Connection Error', 'Unable to connect to server. Please check your internet connection and try again.');
+      } else {
+        console.error('❌ Failed to load cases data:', error);
+        showCustomToast('error', 'Error', 'Failed to load data. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -278,7 +286,7 @@ const CasesScreen = () => {
         const caseId = selected.editCase.id || selected.editCase.$id;
         const key = `cases_${caseId}`;
         
-        await dataService.updateData(key, caseId, caseData, 'cases');
+        await hybridDataService.updateData(key, caseId, caseData, 'cases');
         
         const updatedCase = { ...caseData, id: caseId, $id: caseId };
         setCases(prev => prev.map(c => (c.id || c.$id) === caseId ? updatedCase : c));
@@ -286,7 +294,7 @@ const CasesScreen = () => {
         showCustomToast('success', 'Success', 'Case updated successfully');
         setTimeout(() => setCustomToast(null), 3000);
       } else {
-        const newCase = await dataService.saveData(caseData, 'cases');
+        const newCase = await hybridDataService.saveData(caseData, 'cases');
         
         const caseWithId = { ...newCase, id: newCase.$id || newCase.id, $id: newCase.$id || newCase.id };
         setCases(prev => [...prev, caseWithId]);
@@ -303,7 +311,6 @@ const CasesScreen = () => {
       
     } catch (error) {
       if (error.code === 'AUTH_REQUIRED') {
-        console.log('🔐 Authentication required, redirecting to auth page');
         router.replace('/auth');
         return;
       }
@@ -323,14 +330,13 @@ const CasesScreen = () => {
       const caseId = selected.deleteCase.id || selected.deleteCase.$id;
       const key = `cases_${caseId}`;
       
-              await dataService.deleteData(key, caseId, 'cases');
+              await hybridDataService.deleteData(key, caseId, 'cases');
       
       setCases(prev => prev.filter(c => (c.id || c.$id) !== caseId));
       setFilteredCases(prev => prev.filter(c => (c.id || c.$id) !== caseId));
       showCustomToast('success', 'Success', 'Case deleted successfully');
     } catch (error) {
       if (error.code === 'AUTH_REQUIRED') {
-        console.log('🔐 Authentication required, redirecting to auth page');
         router.replace('/auth');
         return;
       }
@@ -346,7 +352,7 @@ const CasesScreen = () => {
   const handleSync = async () => {
     try {
       setIsSyncing(true);
-      const result = await dataService.manualSync();
+      const result = await hybridDataService.manualSync();
       if (result.success) {
         showCustomToast('success', 'Success', 'Sync completed successfully');
         // Refresh data after sync
@@ -383,6 +389,9 @@ const CasesScreen = () => {
 
   return (
     <View style={styles.container}>
+      {/* Offline Status */}
+      <OfflineStatus />
+      
       <View style={styles.stats}>
         <View style={styles.statRow}>
           <StatCard icon="folder" color="#dc2626" value={stats.total} label="Total Cases" />
@@ -396,46 +405,6 @@ const CasesScreen = () => {
 
       <View style={styles.searchContainer}>
         <SearchBar value={searchQuery} onChangeText={setSearchQuery} placeholder="Search cases..." onClear={() => setSearchQuery('')} />
-        <TouchableOpacity 
-          style={styles.initButton} 
-          onPress={async () => {
-            try {
-              await customOptionsService.initializeDefaultOptions();
-              await loadDropdownOptions();
-              showCustomToast('success', 'Success', 'Options initialized successfully');
-            } catch (error) {
-              showCustomToast('error', 'Error', 'Failed to initialize options');
-            }
-          }}
-        >
-          <Text style={styles.initButtonText}>Init Options</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.syncButton, syncStatus.hasPendingItems && styles.syncButtonPending]} 
-          onPress={async () => {
-            try {
-              const result = await backgroundSyncService.syncPendingChanges(currentUser);
-              if (result.success) {
-                showCustomToast('success', 'Sync Complete', result.message);
-                await fetchData(); // Reload cases after sync
-                await checkSyncStatus(); // Update sync status
-              } else {
-                showCustomToast('error', 'Sync Failed', result.message);
-              }
-            } catch (error) {
-              if (error.code === 'AUTH_REQUIRED') {
-                console.log('🔐 Authentication required, redirecting to auth page');
-                router.replace('/auth');
-                return;
-              }
-              showCustomToast('error', 'Sync Error', error.message);
-            }
-          }}
-        >
-          <Text style={styles.syncButtonText}>
-            {syncStatus.hasPendingItems ? `Sync (${syncStatus.pendingCount})` : 'Sync'}
-          </Text>
-        </TouchableOpacity>
       </View>
 
       {filteredCases.length === 0 ? (
@@ -476,20 +445,20 @@ const CasesScreen = () => {
                   </View>
                   
                   <View style={styles.infoRow}>
-                    <Ionicons name="location" size={16} color="#64748b" />
-                    <Text style={styles.infoText}>{String(item.location || 'Location not specified')}</Text>
-                  </View>
-                  
-                  <View style={styles.infoRow}>
                     <Ionicons name="calendar" size={16} color="#64748b" />
                     <Text style={styles.infoText}>{String(item.startDate ? new Date(item.startDate).toLocaleDateString() : 'No start date')}</Text>
                   </View>
                 </View>
                 
                 <View style={styles.caseStatus}>
-                  <Text style={styles.statusText}>{String(item.status || 'Unknown')}</Text>
-                  <Text style={styles.priorityText}>{String(item.priority || 'Unknown')}</Text>
+                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+                    <Text style={styles.statusText}>{String(item.status || 'Unknown')}</Text>
+                  </View>
+                  <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(item.priority) }]}>
+                    <Text style={styles.priorityText}>{String(item.priority || 'Unknown')}</Text>
+                  </View>
                 </View>
+                
               </LinearGradient>
             </TouchableOpacity>
           )}
@@ -627,7 +596,7 @@ const CasesScreen = () => {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Case Details</Text>
               <TouchableOpacity style={styles.closeButton} onPress={() => updateModal('details', false)}>
-                <Ionicons name="close" size={24} color="#666" />
+                <Ionicons name="close" size={24} color="#fff" />
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.modalBody}>
@@ -782,13 +751,15 @@ const styles = StyleSheet.create({
   syncButtonPending: { backgroundColor: '#f59e0b' },
   syncButton: { padding: 8, borderRadius: 8, backgroundColor: '#f1f5f9' },
   syncButtonDisabled: { opacity: 0.5 },
-  casesList: { padding: 20 },
+  casesList: { padding: 16 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
   emptyTitle: { fontSize: 20, fontWeight: '600', color: '#374151', marginTop: 16, marginBottom: 8 },
   emptyMessage: { fontSize: 14, color: '#6b7280', textAlign: 'center' },
-  caseCard: { marginBottom: 16, borderRadius: 16, boxShadowColor: '#000', boxShadowOffset: { width: 0, height: 4 }, boxShadowOpacity: 0.1, boxShadowRadius: 12, elevation: 4 },
-  cardGradient: { borderRadius: 16, padding: 20 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
+  caseCard: { marginBottom: 12, borderRadius: 1, boxShadowColor: '#000', 
+    boxShadowOffset: { width: 0, height: 2 }, boxShadowOpacity: 0.08, boxShadowRadius: 8, elevation: 3,
+  },
+  cardGradient: { borderRadius: 12, padding: 16 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
   cardTitleContainer: { flex: 1, marginRight: 12 },
   caseInfo: {
     flex: 1,
@@ -814,13 +785,13 @@ const styles = StyleSheet.create({
   cardActions: { flexDirection: 'row', gap: 8 },
   actionButton: { padding: 8, borderRadius: 8, backgroundColor: '#f8fafc' },
   cardContent: { marginBottom: 12 },
-  infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
   infoText: { fontSize: 14, color: '#64748b', flex: 1, marginLeft: 8 },
   cardFooter: { flexDirection: 'row', gap: 8 },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  statusText: { fontSize: 12, fontWeight: '600', color: '#fff' },
-  priorityBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  priorityText: { fontSize: 12, fontWeight: '600', color: '#fff' },
+  statusBadge: { paddingHorizontal: 6, paddingVertical: 3, borderRadius: 4 },
+  statusText: { fontSize: 10, fontWeight: '600', color: '#fff', textTransform: 'uppercase' },
+  priorityBadge: { paddingHorizontal: 6, paddingVertical: 3, borderRadius: 4 },
+  priorityText: { fontSize: 10, fontWeight: '600', color: '#fff', textTransform: 'uppercase' },
   modalOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#f8f9fa', zIndex: 1000 },
   modalContent: { flex: 1, backgroundColor: '#f8f9fa' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#dc2626', backgroundColor: '#dc2626' },
@@ -866,12 +837,13 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   caseDetails: {
-    marginBottom: 12,
+    marginBottom: 8,
   },
   caseStatus: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 12,
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 8,
   },
 });
 

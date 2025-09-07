@@ -1,41 +1,26 @@
 {
   "expo": {
-    "name": "shelfie_clean",
-    "slug": "shelfie_clean",
+    "name": "Police Shield",
+    "slug": "police-shield",
     "version": "1.0.0",
-    "description": "APK Download Link: https://expo.dev/artifacts/eas/eJrc5bfS9jknDX7GTTbAa.apk",
+    "description": "Police Department Management System - Secure, Efficient, Professional",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "shelfieclean",
+    "icon": "./assets/images/police-shield-icon.png",
+    "scheme": "policeshield",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "ios": {
-      "supportsTablet": true
-    },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
-      "edgeToEdgeEnabled": true,
-      "package": "com.ayeshabatool.shelfie_clean"
-    },
-    "web": {
-      "bundler": "metro",
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
-    },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/police-shield-splash.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#1e40af"
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true
@@ -43,9 +28,45 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "cba50b01-2f1d-4fbf-b4fc-88021d36b947"
+        "projectId": "f16974c7-155d-4d28-ab4f-d76d3bb37947"
       }
     },
-    "owner": "ayeshabatool"
+    "owner": "ayeshabatool",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.police.shield",
+      "associatedDomains": [
+        "applinks:policeshield.app"
+      ]
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/police-shield-adaptive.png",
+        "backgroundColor": "#1e40af"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.police.shield",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "policeshield.app"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/police-shield-favicon.png"
+    }
   }
 }

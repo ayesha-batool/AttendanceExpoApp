@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { dataService, useNetworkStatus } from "../services/unifiedDataService";
+import { hybridDataService, useNetworkStatus } from "../services/hybridDataService";
 
 // Create context
 const AppContext = createContext();
@@ -13,14 +13,14 @@ export const AppProvider = ({ children }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [selectedItem, setSelectedItem] = useState(null);
     const [currentCollection, setCurrentCollection] = useState("employees");
-    const isConnected = useNetworkStatus();
+    const isConnected = useNetworkStatus;
 
     const fetchItems = async (collectionId) => {
         setIsLoading(true);
         let data = []; // ✅ Declare it here so it's available outside try block
     
         try {
-            data = await dataService.getItems(collectionId);
+            data = await hybridDataService.getItems(collectionId);
             setItems(data);
             setFilteredItems(data);
             if (collectionId) {
@@ -28,7 +28,6 @@ export const AppProvider = ({ children }) => {
             }
         } catch (err) {
             if (err.code === 'AUTH_REQUIRED') {
-                console.log('🔐 Authentication required, redirecting to auth page');
                 router.replace('/auth');
                 return;
             }
@@ -53,11 +52,10 @@ export const AppProvider = ({ children }) => {
 
     const deleteItem = async (docId) => {
         try {
-            await dataService.deleteData(`Items_${docId}`, docId, currentCollection);
+            await hybridDataService.deleteData(`Items_${docId}`, docId, currentCollection);
             await fetchItems(currentCollection);
         } catch (err) {
             if (err.code === 'AUTH_REQUIRED') {
-                console.log('🔐 Authentication required, redirecting to auth page');
                 router.replace('/auth');
                 return;
             }
@@ -68,7 +66,7 @@ export const AppProvider = ({ children }) => {
 
     useEffect(() => {
         if (isConnected) {
-            dataService.syncPendingData();
+            hybridDataService.syncWithMongoDB(currentCollection);
         }
     }, [isConnected]);
 

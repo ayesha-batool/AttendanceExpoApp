@@ -3,17 +3,16 @@ import { Picker } from '@react-native-picker/picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useState } from 'react';
 import {
-    FlatList,
-    Modal,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  FlatList,
+  Modal,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { customOptionsService } from '../services/unifiedDataService';
+import { hybridDataService } from '../services/hybridDataService';
 import AddNewOptionModal from './AddNewOptionModal';
-
 const SelectDropdown = ({
   label,
   selectedValue,
@@ -65,12 +64,9 @@ const SelectDropdown = ({
 
   const handleOptionRemoved = async (optionToRemove) => {
     try {
-      const result = await customOptionsService.removeOption(
-        fieldName,
-        optionToRemove
-      );
+      const result = await hybridDataService.removeOption(fieldName, optionToRemove);
 
-      if (result.success) {
+      if (result) {
         // Clear the form field if the removed option was selected
         if (selectedValue === optionToRemove) {
           onValueChange('');
@@ -87,7 +83,7 @@ const SelectDropdown = ({
         // Show success toast
         showCustomToast('success', 'Success', `${optionToRemove} removed successfully`);
       } else {
-        showCustomToast('error', 'Error', result.message || 'Failed to remove option');
+        showCustomToast('error', 'Error', 'Failed to remove option');
       }
     } catch (error) {
       console.error('Error removing option:', error);
@@ -159,10 +155,10 @@ const SelectDropdown = ({
         >
           <Picker.Item label="Select" value="" />
           {displayOptions.map((item, index) => {
-            const key =
-              typeof item === 'string'
-                ? item
-                : item.value || `option_${index}`;
+            // Create unique key by combining value and index to avoid duplicates
+            const key = typeof item === 'string' 
+              ? `${item}-${index}` 
+              : `${item?.value || item?.label || 'option'}-${index}`;
             const isAddNewOption = item.value === 'add_new_option';
             const isRemoveOption = item.value === 'remove_option';
 
@@ -235,7 +231,7 @@ const SelectDropdown = ({
 
             <FlatList
               data={filteredRemoveOptions}
-              keyExtractor={(item, index) => index.toString()}
+              keyExtractor={(item, index) => `${item}-${index}`}
               renderItem={({ item }) => {
                 const optionLabel =
                   typeof item === 'string' ? item : item.label || item.value;

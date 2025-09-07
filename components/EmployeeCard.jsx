@@ -120,7 +120,7 @@ const EmployeeCard = ({
               styles.employeeId,
               !isActive && styles.inactiveEmployeeText
             ]}>
-              ID: {employee.employeeId || employee.policeId || 'N/A'}
+              ID: {employee.badgeNumber || employee.policeId || 'N/A'}
             </Text>
 
             <View style={styles.infoRow}>
@@ -151,7 +151,7 @@ const EmployeeCard = ({
                   styles.infoText,
                   !isActive && styles.inactiveEmployeeText
                 ]}>
-                  {employee.phone || 'No Phone'}
+                  {employee.contactNumber || 'No Phone'}
                 </Text>
               </View>
               <View style={styles.infoItem}>
@@ -160,7 +160,7 @@ const EmployeeCard = ({
                   styles.infoText,
                   !isActive && styles.inactiveEmployeeText
                 ]}>
-                  Joined: {formatDate(employee.dateOfJoining)}
+                  Joined: {formatDate(employee.joiningDate)}
                 </Text>
               </View>
             </View>

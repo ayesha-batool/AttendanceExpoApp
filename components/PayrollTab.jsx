@@ -9,7 +9,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { dataService } from '../services/unifiedDataService';
+import { hybridDataService } from '../services/hybridDataService';
 
 const PayrollTab = ({ employees }) => {
   const [payrollData, setPayrollData] = useState([]);
@@ -33,10 +33,10 @@ const PayrollTab = ({ employees }) => {
       setLoading(true);
       
       // Fetch attendance records
-      const attendanceRecords = await dataService.getItems('attendance');
+      const attendanceRecords = await hybridDataService.getItems('attendance');
       
       // Fetch advance records
-      const advanceRecords = await dataService.getItems('advances');
+              const advanceRecords = await hybridDataService.getItems('advances');
       
       const calculatedPayroll = employees.map(employee => {
         // Filter attendance for current month/year
@@ -137,7 +137,7 @@ const PayrollTab = ({ employees }) => {
 
       // Update each employee with new data
       for (const employee of updatedEmployees) {
-        const { dataService } = await import('../services/unifiedDataService');
+        const { hybridDataService } = await import('../services/hybridDataService');
         await handleDataUpdate(`employees_${employee.id || employee.$id}`, employee.id || employee.$id, employee, 'employees');
       }
 

@@ -1,43 +1,26 @@
 import { Stack } from 'expo-router';
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import PageHeader from '../../components/PageHeader';
-import { ExpensesProvider, useExpensesContext } from '../../context/ExpensesContext';
 
-const ExpensesManagementLayoutContent = () => {
-  const { headerAction } = useExpensesContext();
-
+const ExpensesLayoutContent = () => {
   return (
-    <View style={styles.container}>
-      <PageHeader
-        title="Expense Management"
-        subtitle="Track & manage department expenses"
+    <View style={{ flex: 1 }}>
+      <PageHeader 
+        title="Expenses Management" 
         icon="card"
-        gradientColors={['#8b5cf6', '#7c3aed', '#6d28d9']}
-        showBackButton={true}
-        actionButton={headerAction}
+        gradientColors={['#ef4444', '#dc2626', '#b91c1c']}
       />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-        }}
-      >
-        <Stack.Screen name="index" />
+      <Stack>
+        <Stack.Screen
+          name="index"
+          options={{
+            title: 'Expenses',
+            headerShown: false,
+          }}
+        />
       </Stack>
     </View>
   );
 };
 
-export default function ExpensesManagementLayout() {
-  return (
-    <ExpensesProvider>
-      <ExpensesManagementLayoutContent />
-    </ExpensesProvider>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-}); 
+export default ExpensesLayoutContent; 

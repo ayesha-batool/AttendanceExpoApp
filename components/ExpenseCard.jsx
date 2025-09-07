@@ -1,10 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import {
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 
 const ExpenseCard = ({ expense, onPress, onEdit, onDelete }) => {
@@ -141,20 +141,20 @@ const ExpenseCard = ({ expense, onPress, onEdit, onDelete }) => {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
     boxShadowColor: '#000',
-    boxShadowOffset: { width: 0, height: 2 },
-    boxShadowOpacity: 0.1,
-    boxShadowRadius: 8,
-    elevation: 3,
+    boxShadowOffset: { width: 0, height: 1 },
+    boxShadowOpacity: 0.08,
+    boxShadowRadius: 6,
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   titleContainer: {
     flexDirection: 'row',
@@ -203,12 +203,12 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   cardBody: {
-    marginBottom: 12,
+    marginBottom: 8,
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   infoText: {
     fontSize: 14,

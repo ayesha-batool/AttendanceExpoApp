@@ -34,14 +34,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   title: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 8,
     textAlign: 'center',
   },
   message: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
     textAlign: 'center',
     marginBottom: 24,
@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
   },
 });

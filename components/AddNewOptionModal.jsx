@@ -2,15 +2,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import {
-    Modal,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Modal,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { customOptionsService } from '../services/unifiedDataService';
 
+import { hybridDataService } from '../services/hybridDataService';
 const AddNewOptionModal = ({ 
   visible, 
   onClose, 
@@ -45,8 +45,8 @@ const AddNewOptionModal = ({
 
     setLoading(true);
     try {
-      const result = await customOptionsService.addOption(fieldName, newOption.trim());
-      if (result.success) {
+      const result = await hybridDataService.addOption(fieldName, newOption.trim());
+      if (result) {
         // Call onSuccess to update parent component
         onSuccess(newOption.trim());
         

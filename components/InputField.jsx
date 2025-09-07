@@ -78,12 +78,12 @@ const styles = StyleSheet.create({
   },
   label: { 
     marginBottom: 4, 
-    fontSize: 14, 
+    fontSize: 16, 
     fontWeight: '600', 
     color: '#333' 
   },
   optionalText: { 
-    fontSize: 12, 
+    fontSize: 14, 
     fontWeight: 'normal', 
     color: '#888' 
   },
@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     backgroundColor: '#fff',
-    fontSize: 14,
+    fontSize: 16,
     color: '#333',
   },
   textarea: {
@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#721c24',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '500',
   },
 });

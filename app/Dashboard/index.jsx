@@ -4,23 +4,33 @@ import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import PageHeader from '../../components/PageHeader';
 import { useAuth } from '../../context/AuthContext';
 // import { useCasesContext } from '../../context/CasesContext';
-import { customOptionsService, dataService } from '../../services/unifiedDataService';
-const { width: screenWidth } = Dimensions.get('window');
+
+import { hybridDataService } from '../../services/hybridDataService';
+
 
 const DashboardScreen = () => {
   const router = useRouter();
-  const { user } = useAuth();
+  const { currentUser, logout } = useAuth();
   const [employees, setEmployees] = useState([]);
   const [cases, setCases] = useState([]);
   const [expenses, setExpenses] = useState([]);
-  const [upcomingHolidays, setUpcomingHolidays] = useState([]);
+
   const [loading, setLoading] = useState(true);
   const [deviceInfo, setDeviceInfo] = useState({ local: null, appwrite: null });
   const [customToast, setCustomToast] = useState(null);
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [stats, setStats] = useState({
+    employees: 0,
+    cases: 0,
+    expenses: 0
+  });
+  const [appwriteHealth, setAppwriteHealth] = useState(null);
+  const [healthLoading, setHealthLoading] = useState(false);
+
 
   const showCustomToast = (type, title, message) => {
     setCustomToast({ type, title, message });
@@ -29,6 +39,7 @@ const DashboardScreen = () => {
 
   useEffect(() => {
     fetchData();
+    checkAppwriteHealth();
   }, []);
 
   useFocusEffect(useCallback(() => {
@@ -38,11 +49,15 @@ const DashboardScreen = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-              const [employeesData, casesData, expensesData] = await Promise.all([
-          dataService.getItems('employees'),
-          dataService.getItems('cases'),
-          dataService.getItems('expenses')
-        ]);
+      
+      // Add a small delay to allow authentication session to be established
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+            const [employeesData, casesData, expensesData] = await Promise.all([
+        hybridDataService.getItems('employees'),
+        hybridDataService.getItems('cases'),
+        hybridDataService.getItems('expenses')
+      ]);
       const validEmployees = employeesData.filter(item => item && typeof item === 'object');
       const validCases = casesData.filter(item => item && typeof item === 'object');
       const validExpenses = expensesData.filter(item => item && typeof item === 'object');
@@ -50,28 +65,117 @@ const DashboardScreen = () => {
       setCases(validCases);
       setExpenses(validExpenses);
       
+      // Set the stats for display
+      const newStats = {
+        employees: validEmployees.length,
+        cases: validCases.length,
+        expenses: validExpenses.length
+      };
+      
+      console.log('🔍 [DASHBOARD] Setting stats:', newStats);
+      console.log('🔍 [DASHBOARD] Employees data:', validEmployees);
+      console.log('🔍 [DASHBOARD] Cases data:', validCases);
+      console.log('🔍 [DASHBOARD] Expenses data:', validExpenses);
+      
+      setStats(newStats);
+      
       // Check device IDs
       await checkDeviceIds();
       
-      try {
-        const holidaysData = await AsyncStorage.getItem('employee_holidays');
-        if (holidaysData) {
-          const holidays = JSON.parse(holidaysData);
-          const today = new Date();
-          const upcoming = holidays.filter(holiday => {
-            const holidayDate = new Date(holiday.date);
-            return holidayDate >= today;
-          }).sort((a, b) => new Date(a.date) - new Date(b.date)).slice(0, 5);
-          setUpcomingHolidays(upcoming);
-        }
-      } catch (error) {
-        console.error('Error fetching holidays:', error);
-      }
+      
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      const [employeesData, casesData, expensesData] = await Promise.all([
+        hybridDataService.getItems('employees'),
+        hybridDataService.getItems('cases'),
+        hybridDataService.getItems('expenses')
+      ]);
+
+      // Set the actual data arrays
+      setEmployees(employeesData);
+      setCases(casesData);
+      setExpenses(expensesData);
+
+      setStats({
+        employees: employeesData.length,
+        cases: casesData.length,
+        expenses: expensesData.length
+      });
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const checkAppwriteHealth = async () => {
+    try {
+      setHealthLoading(true);
+      const health = await hybridDataService.getAppwriteHealth();
+      setAppwriteHealth(health);
+      
+      if (health.healthy) {
+        Alert.alert('Health Check', '✅ Appwrite is healthy and available!');
+      } else {
+        Alert.alert('Health Check', `⚠️ Appwrite has issues:\n\nError: ${health.error}\nMessage: ${health.message}`);
+      }
+    } catch (error) {
+      console.error('Error forcing health check:', error);
+      Alert.alert('Error', 'Failed to check Appwrite health');
+    } finally {
+      setHealthLoading(false);
+    }
+  };
+
+  const forceHealthCheck = async () => {
+    try {
+      setHealthLoading(true);
+      const health = await hybridDataService.checkAppwriteHealth();
+      setAppwriteHealth(health);
+      
+      if (health.healthy) {
+        Alert.alert('Health Check', '✅ Appwrite is healthy and available!');
+      } else {
+        Alert.alert('Health Check', `⚠️ Appwrite has issues:\n\nError: ${health.error}\nMessage: ${health.message}`);
+      }
+    } catch (error) {
+      console.error('Error forcing health check:', error);
+      Alert.alert('Error', 'Failed to check Appwrite health');
+    } finally {
+      setHealthLoading(false);
+    }
+  };
+
+  const handleDebugDeviceId = async () => {
+    try {
+      const deviceId = await AsyncStorage.getItem('deviceId');
+      Alert.alert('Device ID', `Current Device ID: ${deviceId || 'Not set'}`);
+    } catch (error) {
+      console.error('Error getting device ID:', error);
+    }
+  };
+
+  const handleSyncData = async () => {
+    try {
+      const result = await hybridDataService.manualSync();
+      if (result.success) {
+        Alert.alert('Sync Success', result.message);
+        loadDashboardData(); // Refresh dashboard data
+      } else {
+        Alert.alert('Sync Failed', result.message);
+      }
+    } catch (error) {
+      console.error('Error syncing data:', error);
+      Alert.alert('Sync Error', 'Failed to sync data');
     }
   };
 
@@ -84,34 +188,8 @@ const DashboardScreen = () => {
   };
 
 
-  const handleInitializeDefaults = async () => {
-    try {
-      const result = await customOptionsService.initializeDefaultOptions();
-      
-      showCustomToast(result.success ? 'success' : 'error', 'Initialize Defaults', result.message || result.error);
-    } catch (error) {
-      console.error('Initialize failed:', error);
-      showCustomToast('error', 'Initialize Failed', error.message);
-    }
-  };
 
-  const handleCheckDefaultsStatus = async () => {
-    try {
-      const status = await customOptionsService.checkDefaultOptionsStatus();
-      
-      showCustomToast('info', 'Default Options Status', 'Check console for details');
-    } catch (error) {
-      console.error('Status check failed:', error);
-      showCustomToast('error', 'Status Check Failed', error.message);
-    }
-  };
-
-
-
-  const getUpcomingHolidaysCount = () => {
-    return upcomingHolidays.length;
-  };
-
+ 
   const checkDeviceIds = async () => {
     try {
       // Get local device ID from storage
@@ -120,14 +198,13 @@ const DashboardScreen = () => {
       // Get device ID from Appwrite if online
       let appwriteDeviceId = null;
       try {
-        const appwriteData = await dataService.getItems('employees');
+        const appwriteData = await hybridDataService.getItems('employees');
         if (appwriteData.length > 0) {
           // Get the first employee's deviceId from Appwrite
           const firstEmployee = appwriteData[0];
           appwriteDeviceId = firstEmployee.deviceId;
         }
       } catch (error) {
-        console.log('Could not fetch Appwrite device ID:', error.message);
       }
       
       setDeviceInfo({
@@ -135,8 +212,7 @@ const DashboardScreen = () => {
         appwrite: appwriteDeviceId
       });
       
-      console.log('Device IDs:', { local: localDeviceId, appwrite: appwriteDeviceId });
-    } catch (error) {
+   } catch (error) {
       console.error('Error checking device IDs:', error);
     }
   };
@@ -191,6 +267,56 @@ const DashboardScreen = () => {
     return breakdown;
   };
 
+  const getUserInitials = () => {
+    if (!currentUser) return 'PMS'; // Police Management System initials
+    if (currentUser.name) {
+      return currentUser.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 3);
+    }
+    if (currentUser.email) {
+      return currentUser.email.split('@')[0].toUpperCase().slice(0, 3);
+    }
+    return 'U';
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setShowUserModal(false);
+      setTimeout(() => {
+        router.replace('/');
+      }, 1000); // Small delay to show the success toast
+    } catch (error) {
+      console.error('❌ Logout failed:', error);
+      showCustomToast('error', 'Logout Failed', error.message);
+    }
+  };
+
+  const getHealthStatusColor = () => {
+    if (!appwriteHealth) return '#666';
+    if (appwriteHealth.healthy) return '#10b981';
+    if (appwriteHealth.error === 'payment_required' || appwriteHealth.error === 'resource_limit') return '#ef4444';
+    if (appwriteHealth.error === 'rate_limit' || appwriteHealth.error === 'network') return '#f59e0b';
+    return '#ef4444';
+  };
+
+  const getHealthStatusText = () => {
+    if (!appwriteHealth) return 'Unknown';
+    if (appwriteHealth.healthy) return 'Healthy';
+    if (appwriteHealth.error === 'payment_required') return 'Payment Required';
+    if (appwriteHealth.error === 'resource_limit') return 'Resource Limit';
+    if (appwriteHealth.error === 'rate_limit') return 'Rate Limited';
+    if (appwriteHealth.error === 'network') return 'Network Issue';
+    if (appwriteHealth.error === 'unauthorized') return 'Unauthorized';
+    return 'Unhealthy';
+  };
+
+  const getDataOperationStatus = () => {
+    if (!appwriteHealth) return 'Checking...';
+    if (appwriteHealth.healthy) return '✅ Can add/edit/delete data via Appwrite';
+    return '📱 Data operations via local storage only';
+  };
+
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -229,102 +355,201 @@ const DashboardScreen = () => {
       )}
 
       <LinearGradient colors={['#1e40af', '#1e3a8a', '#1e293b']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
-        <View style={styles.headerContent}>
-          {/* <View style={styles.headerLeft}>
-            <View style={styles.titleContainer}>
-              <View style={styles.headerIconContainer}>
-                <Ionicons name="shield" size={screenWidth > 768 ? 32 : 24} color="#fff" />
-              </View>
-              <View style={styles.titleTextContainer}>
-                <Text style={styles.headerTitle}>Police Management System</Text>
-                <Text style={styles.headerSubtitle}>Department Overview & Analytics</Text>
-              </View>
-            </View>
-          </View> */}
-          <PageHeader
-        title="Police Management System"
-        subtitle="Department Overview & Analytics"
-        icon="shield"
-        gradientColors={['#1e40af', '#1e3a8a']}
-        showBackButton={true}
-        // actionButton={headerAction}
-      />
-          {/* {user && (
-            <TouchableOpacity style={styles.userInitialsContainer} onPress={() => router.push('/auth')}>
-              <Text style={styles.userInitials}>
-                {user.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U'}
-              </Text>
-            </TouchableOpacity>
-          )} */}
-        </View>
+        <PageHeader
+          title="Police Management System"
+          subtitle="Department Overview & Analytics"
+          icon="shield"
+          gradientColors={['#1e40af', '#1e3a8a']}
+          showBackButton={true}
+        />
       </LinearGradient>
 
-      <View style={styles.kpiSection}>
-        <View style={styles.kpiGrid}>
-          <View style={styles.kpiCard}>
-            <View style={styles.kpiIconContainer}>
-              <Ionicons name="people" size={20} color="#1e40af" />
-            </View>
-            <View style={styles.kpiContent}>
-              <Text style={styles.kpiValue}>{String(employees.length)}</Text>
-              <Text style={styles.kpiLabel}>Total Officers</Text>
-              <Text style={styles.kpiSubtext}>Department strength</Text>
-            </View>
+      {/* Statistics Cards */}
+      <View style={styles.statsSection}>
+        <Text style={styles.sectionTitle}>Quick Statistics</Text>
+        <View style={styles.statsContainer}>
+          <View style={styles.statCard}>
+            <LinearGradient colors={['#3b82f6', '#1d4ed8']} style={styles.statGradient}>
+              <View style={styles.statIconContainer}>
+                <Ionicons name="people" size={28} color="#fff" />
+              </View>
+              <Text style={styles.statNumber}>{stats.employees}</Text>
+              <Text style={styles.statLabel}>Employees</Text>
+              <View style={styles.statTrend}>
+                <Ionicons name="trending-up" size={16} color="#fff" />
+                <Text style={styles.statTrendText}>Active</Text>
+              </View>
+            </LinearGradient>
           </View>
-          <View style={styles.kpiCard}>
-            <View style={styles.kpiIconContainer}>
-              <Ionicons name="folder" size={20} color="#dc2626" />
-            </View>
-            <View style={styles.kpiContent}>
-              <Text style={styles.kpiValue}>{String(getActiveCasesCount())}</Text>
-              <Text style={styles.kpiLabel}>Active Cases</Text>
-              <Text style={styles.kpiSubtext}>Ongoing investigations</Text>
-            </View>
+
+          <View style={styles.statCard}>
+            <LinearGradient colors={['#8b5cf6', '#7c3aed']} style={styles.statGradient}>
+              <View style={styles.statIconContainer}>
+                <Ionicons name="document-text" size={28} color="#fff" />
+              </View>
+              <Text style={styles.statNumber}>{stats.cases}</Text>
+              <Text style={styles.statLabel}>Cases</Text>
+              <View style={styles.statTrend}>
+                <Ionicons name="trending-up" size={16} color="#fff" />
+                <Text style={styles.statTrendText}>Ongoing</Text>
+              </View>
+            </LinearGradient>
           </View>
-          <View style={styles.kpiCard}>
-            <View style={styles.kpiIconContainer}>
-              <Ionicons name="card" size={20} color="#8b5cf6" />
-            </View>
-            <View style={styles.kpiContent}>
-              <Text style={styles.kpiValue}>${getTotalExpenses().toLocaleString()}</Text>
-              <Text style={styles.kpiLabel}>Total Expenses</Text>
-              <Text style={styles.kpiSubtext}>All time spending</Text>
-            </View>
+
+          <View style={styles.statCard}>
+            <LinearGradient colors={['#ef4444', '#dc2626']} style={styles.statGradient}>
+              <View style={styles.statIconContainer}>
+                <Ionicons name="card" size={28} color="#fff" />
+              </View>
+              <Text style={styles.statNumber}>{stats.expenses}</Text>
+              <Text style={styles.statLabel}>Expenses</Text>
+              <View style={styles.statTrend}>
+                <Ionicons name="trending-up" size={16} color="#fff" />
+                <Text style={styles.statTrendText}>Tracked</Text>
+              </View>
+            </LinearGradient>
           </View>
         </View>
       </View>
 
+      {/* Action Cards */}
       <View style={styles.actionsSection}>
         <Text style={styles.sectionTitle}>Quick Actions</Text>
         <View style={styles.actionsGrid}>
           <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/Employee')}>
-            <LinearGradient colors={['#1e40af', '#1e3a8a']} style={styles.actionGradient}>
-              <Ionicons name="people" size={32} color="#fff" />
-              <Text style={styles.actionTitle}>Manage Team</Text>
-              <Text style={styles.actionSubtitle}>Officers & Attendance</Text>
+            <LinearGradient colors={['#3b82f6', '#1d4ed8']} style={styles.actionGradient}>
+              <View style={styles.actionIconContainer}>
+                <Ionicons name="people" size={28} color="#fff" />
+              </View>
+              <Text style={styles.actionTitle}>Manage Employees</Text>
+              <Text style={styles.actionSubtitle}>Add, edit, and manage personnel</Text>
             </LinearGradient>
           </TouchableOpacity>
+
           <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/Cases')}>
-            <LinearGradient colors={['#dc2626', '#b91c1c']} style={styles.actionGradient}>
-              <Ionicons name="folder" size={32} color="#fff" />
+            <LinearGradient colors={['#8b5cf6', '#7c3aed']} style={styles.actionGradient}>
+              <View style={styles.actionIconContainer}>
+                <Ionicons name="document-text" size={28} color="#fff" />
+              </View>
               <Text style={styles.actionTitle}>Manage Cases</Text>
-              <Text style={styles.actionSubtitle}>Investigations</Text>
+              <Text style={styles.actionSubtitle}>Track investigations and cases</Text>
             </LinearGradient>
           </TouchableOpacity>
+
           <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/ExpensesManagement')}>
-            <LinearGradient colors={['#8b5cf6', '#7c3aed']} style={styles.actionGradient}>
-              <Ionicons name="card" size={32} color="#fff" />
-              <Text style={styles.actionTitle}>Expenses</Text>
-              <Text style={styles.actionSubtitle}>Financial Management</Text>
+            <LinearGradient colors={['#ef4444', '#dc2626']} style={styles.actionGradient}>
+              <View style={styles.actionIconContainer}>
+                <Ionicons name="card" size={28} color="#fff" />
+              </View>
+              <Text style={styles.actionTitle}>Manage Expenses</Text>
+              <Text style={styles.actionSubtitle}>Track and manage costs</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/DataTransfer')}>
+            <LinearGradient colors={['#10b981', '#059669']} style={styles.actionGradient}>
+              <View style={styles.actionIconContainer}>
+                <Ionicons name="swap-horizontal" size={28} color="#fff" />
+              </View>
+              <Text style={styles.actionTitle}>Data Transfer</Text>
+              <Text style={styles.actionSubtitle}>Export and import data</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
-
-
-
-        
-       
       </View>
+
+      {/* Login Section - Show only if user is not logged in */}
+      {!currentUser && (
+        <View style={styles.loginSection}>
+          <Text style={styles.sectionTitle}>Authentication</Text>
+          <TouchableOpacity 
+            style={styles.loginButton} 
+            onPress={() => router.push('/auth')}
+          >
+            <LinearGradient colors={['#10b981', '#059669']} style={styles.loginGradient}>
+              <Ionicons name="log-in" size={24} color="#fff" />
+              <Text style={styles.loginButtonText}>Login to Police Management System</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      )}
+
+   
+
+      {/* User Profile Modal */}
+      <Modal
+        visible={showUserModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowUserModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>User Profile</Text>
+              <TouchableOpacity onPress={() => setShowUserModal(false)}>
+                <Ionicons name="close" size={24} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            {currentUser ? (
+              <View style={styles.userProfileContent}>
+                <View style={styles.userAvatarContainer}>
+                  <View style={styles.userAvatar}>
+                    <Text style={styles.userAvatarText}>{getUserInitials()}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.userInfoSection}>
+                  <Text style={styles.userName}>
+                    {currentUser.name || 'Police Officer'}
+                  </Text>
+                  <Text style={styles.userEmail}>{currentUser.email}</Text>
+                  
+                
+                </View>
+
+                <View style={styles.modalActions}>
+                
+                  
+                  {/* Test button to verify TouchableOpacity works */}
+           
+                  
+                  <TouchableOpacity 
+                    style={styles.modalActionButton} 
+                    onPress={() => {
+                      handleLogout();
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <LinearGradient colors={['#dc2626', '#b91c1c']} style={styles.modalActionGradient}>
+                      <Ionicons name="log-out" size={20} color="#fff" />
+                      <Text style={styles.modalActionText}>Logout</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.noUserContent}>
+                <Ionicons name="person-circle" size={64} color="#64748b" />
+                <Text style={styles.noUserText}>No user logged in</Text>
+                <TouchableOpacity 
+                  style={styles.modalActionButton} 
+                  onPress={() => {
+                    setShowUserModal(false);
+                    router.push('/auth');
+                  }}
+                >
+                  <LinearGradient colors={['#10b981', '#059669']} style={styles.modalActionGradient}>
+                    <Ionicons name="log-in" size={20} color="#fff" />
+                    <Text style={styles.modalActionText}>Login</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -349,87 +574,59 @@ const styles = StyleSheet.create({
     marginTop: 16, 
     fontWeight: '600' 
   },
- 
-  headerContent: { 
-    flexDirection: 'row', 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-   
-  
-
+  header: {
+    paddingTop: 0,
+    paddingBottom: 0,
   },
-  userInitialsContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
+  headerStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 20,
+    paddingHorizontal: 20,
+  },
+  headerStat: {
     alignItems: 'center',
-    marginLeft: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    minWidth: 80,
   },
-  userInitials: {
-    fontSize: 16,
+  headerStatNumber: {
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#fff',
+    marginBottom: 4,
   },
-  // headerLeft: { 
-  //   flex: 1, 
-  //   backgroundColor:"green"
-  // },
-  // titleContainer: { 
-  //   flexDirection: 'row', 
-  //   alignItems: 'center',
-  //   flexWrap: 'wrap',
- 
-  //    backgroundColor:"purple"
-  // },
-  headerIconContainer: { 
-    width: screenWidth > 768 ? 64 : 48, 
-    height: screenWidth > 768 ? 64 : 48, 
-    borderRadius: screenWidth > 768 ? 32 : 24, 
-    backgroundColor: 'rgba(255, 255, 255, 0.2)', 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    marginRight: 12 
-  },
-  titleTextContainer: {
-    flex: 1,
-    minWidth: 0,
-  },
-  headerTitle: { 
-    fontSize: screenWidth > 768 ? 28 : 22, 
-    fontWeight: 'bold', 
-    color: '#fff', 
-   
-    flexWrap: 'wrap'
-    
-  },
-  headerSubtitle: { 
-    fontSize: screenWidth > 768 ? 16 : 14, 
-    color: '#fff', 
-    opacity: 0.9 
+  headerStatLabel: {
+    fontSize: 12,
+    color: '#e5e7eb',
+    textAlign: 'center',
+    opacity: 0.9,
   },
   kpiSection: { 
-    padding: 12,
-    
+    padding: 20,
+    backgroundColor: '#f8fafc',
   },
   kpiGrid: { 
     flexDirection: 'row', 
     justifyContent: 'space-between',
-    gap: 8,
-    marginTop: 18
+    gap: 16,
+    marginTop: 20
   },
   kpiCard: { 
     flex: 1,
     backgroundColor: '#fff', 
-    borderRadius: 12, 
-    padding: 12, 
+    borderRadius: 16, 
+    padding: 20, 
     boxShadowColor: '#000', 
-    boxShadowOffset: { width: 0, height: 2 }, 
-    boxShadowOpacity: 0.08, 
-    boxShadowRadius: 8, 
-    elevation: 3,
-    marginBottom: 8
+    boxShadowOffset: { width: 0, height: 4 }, 
+    boxShadowOpacity: 0.1, 
+    boxShadowRadius: 12, 
+    elevation: 4,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0'
   },
   kpiIconContainer: { 
     width: 40, 
@@ -444,62 +641,198 @@ const styles = StyleSheet.create({
     flex: 1 
   },
   kpiValue: { 
-    fontSize: 20, 
+    fontSize: 22, 
     fontWeight: 'bold', 
     color: '#1e293b', 
     marginBottom: 3 
   },
   kpiLabel: { 
-    fontSize: 13, 
+    fontSize: 15, 
     fontWeight: '600', 
     color: '#374151', 
     marginBottom: 2 
   },
   kpiSubtext: { 
-    fontSize: 11, 
+    fontSize: 13, 
     color: '#64748b' 
   },
   actionsSection: { 
-    padding: 16 
+    padding: 24,
+    backgroundColor: '#fff',
+    marginTop: 8
   },
   sectionTitle: { 
-    fontSize: 20, 
+    fontSize: 24, 
     fontWeight: '700', 
     color: '#1e293b', 
-    marginBottom: 16 
+    marginBottom: 20,
+    textAlign: 'center'
   },
   actionsGrid: { 
-    gap: 12 
+    gap: 16 
   },
   actionCard: { 
-    borderRadius: 16, 
+    borderRadius: 20, 
     boxShadowColor: '#000', 
-    boxShadowOffset: { width: 0, height: 4 }, 
-    boxShadowOpacity: 0.1, 
-    boxShadowRadius: 12, 
-    elevation: 4 
+    boxShadowOffset: { width: 0, height: 6 }, 
+    boxShadowOpacity: 0.15, 
+    boxShadowRadius: 16, 
+    elevation: 6,
+    marginBottom: 8
   },
   actionGradient: { 
-    padding: 20, 
-    borderRadius: 16, 
+    padding: 24, 
+    borderRadius: 20, 
     alignItems: 'center' 
   },
+  actionIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
   actionTitle: { 
-    fontSize: 18, 
+    fontSize: 20, 
     fontWeight: '700', 
     color: '#fff', 
     marginTop: 12, 
     marginBottom: 4 
   },
   actionSubtitle: { 
-    fontSize: 14, 
+    fontSize: 16, 
     color: '#fff', 
     opacity: 0.9 
   },
-  debugSection: {
+  loginSection: {
+    padding: 16,
     marginTop: 16,
   },
+  loginButton: {
+    borderRadius: 16,
+    boxShadowColor: '#000',
+    boxShadowOffset: { width: 0, height: 4 },
+    boxShadowOpacity: 0.1,
+    boxShadowRadius: 12,
+    elevation: 4,
+  },
+  loginGradient: {
+    padding: 20,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loginButtonText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#fff',
+    marginLeft: 8,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+    margin: 20,
+    width: '90%',
+    maxWidth: 400,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1e293b',
+  },
+  userProfileContent: {
+    alignItems: 'center',
+  },
+  userAvatarContainer: {
+    marginBottom: 20,
+  },
+  userAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#1e40af',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  userAvatarText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  userInfoSection: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  userName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginBottom: 4,
+  },
+  userEmail: {
+    fontSize: 16,
+    color: '#64748b',
+    marginBottom: 12,
+  },
+
+  modalActions: {
+    width: '100%',
+    gap: 12,
+  },
+  modalActionButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  modalActionGradient: {
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalActionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    marginLeft: 8,
+  },
+  noUserContent: {
+    alignItems: 'center',
+    padding: 20,
+  },
+  noUserText: {
+    fontSize: 18,
+    color: '#64748b',
+    marginTop: 12,
+    marginBottom: 20,
+  },
+  debugSection: {
+    padding: 16,
+    marginTop: 16,
+  },
+  debugButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
   debugButton: {
+    flex: 1,
     borderRadius: 12,
     boxShadowColor: '#000',
     boxShadowOffset: { width: 0, height: 2 },
@@ -519,6 +852,41 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fff',
     marginLeft: 8,
+  },
+  deviceInfoCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    boxShadowColor: '#000',
+    boxShadowOffset: { width: 0, height: 2 },
+    boxShadowOpacity: 0.1,
+    boxShadowRadius: 8,
+    elevation: 3,
+  },
+  deviceInfoTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginBottom: 12,
+  },
+  deviceInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  deviceInfoLabel: {
+    fontSize: 14,
+    color: '#64748b',
+    fontWeight: '500',
+    flex: 1,
+  },
+  deviceInfoValue: {
+    fontSize: 14,
+    color: '#1e293b',
+    fontWeight: '600',
+    flex: 2,
+    textAlign: 'right',
   },
   customToastContainer: {
     position: 'absolute',
@@ -549,8 +917,20 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     flex: 1,
   },
+  logoutGradient: {
+    padding: 10,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: "auto",
+    justifyContent: 'center',
+    width: '50%',
+  },
+  logoutButton: {
+ 
+  },
   toastTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#fff',
   },
@@ -558,6 +938,142 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#fff',
     marginTop: 2,
+  },
+  healthSection: {
+    padding: 20,
+  },
+  healthCard: {
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  healthStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  healthDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  healthText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  healthMessage: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+    fontStyle: 'italic',
+  },
+  dataOperationStatus: {
+    fontSize: 14,
+    color: '#10b981',
+    marginBottom: 8,
+    fontWeight: '500',
+    textAlign: 'center',
+    paddingVertical: 8,
+    backgroundColor: '#f0fdf4',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  debugInfo: {
+    backgroundColor: '#f3f4f6',
+    padding: 8,
+    borderRadius: 6,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+  },
+  debugText: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontFamily: 'monospace',
+    marginBottom: 2,
+  },
+  healthActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  healthButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#007AFF',
+    gap: 6,
+  },
+  healthButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#007AFF',
+  },
+  statsSection: {
+    padding: 20,
+    paddingBottom: 10,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  statCard: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  statGradient: {
+    padding: 20,
+    alignItems: 'center',
+    minHeight: 140,
+  },
+  statIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  statNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginTop: 8,
+  },
+  statLabel: {
+    fontSize: 14,
+    color: '#fff',
+    marginTop: 8,
+    opacity: 0.9,
+    fontWeight: '600',
+  },
+  statTrend: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 4,
+  },
+  statTrendText: {
+    fontSize: 12,
+    color: '#fff',
+    opacity: 0.9,
   },
 });
 

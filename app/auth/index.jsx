@@ -1,153 +1,111 @@
-import { useAuth } from "@/context/AuthContext";
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useRouter } from 'expo-router';
+import React, { useState } from 'react';
 import {
-  Dimensions,
-  KeyboardAvoidingView,
-  Platform,
+  ActivityIndicator,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View
-} from "react-native";
-import Icon from "react-native-vector-icons/Ionicons";
+} from 'react-native';
+import { useAuth } from '../../context/AuthContext';
 
-const { width, height } = Dimensions.get('window');
 
 const AuthScreen = () => {
-  const [email, setEmail] = useState("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [isRegister, setIsRegister] = useState(false);
-  const [error, setError] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [customToast, setCustomToast] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  const { 
-    login, 
-    register, 
-    currentUser, 
-    verificationSent,
-    sendVerificationEmail,
-    checkVerificationStatus
-  } = useAuth();
+  const { login, loading, isAuthenticated, currentUser, debugAuthState } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [customToast, setCustomToast] = useState(null);
+
+  // Simple credential check function
+  const isAuthorizedUser = (email, password) => {
+    // Add your fixed credentials here
+    const authorizedEmail = 'abdulhameedzootg@gmail.com';
+    const authorizedPassword = '4811186@Police';
+    
+    return email === authorizedEmail && password === authorizedPassword;
+  };
 
   const showCustomToast = (type, title, message) => {
     setCustomToast({ type, title, message });
-    setTimeout(() => setCustomToast(null), 3000);
-  };
-  
-  const toggleMode = () => {
-    setIsRegister(!isRegister);
-    setError("");
-    setEmail("");
-    setPassword("");
-    setConfirmPassword("");
-    setUsername("");
+    setTimeout(() => setCustomToast(null), 4000);
   };
 
   const handleAuth = async () => {
-    if (!email || !password || (isRegister && (!confirmPassword || !username))) {
-      setError("Please fill in all required fields.");
+    if (!email || !password) {
+      showCustomToast('error', 'Error', 'Please fill in email and password');
       return;
     }
-
-    if (isRegister && password !== confirmPassword) {
-      setError("Passwords do not match.");
-      return;
-    }
-
-    setIsLoading(true);
-    setError("");
 
     try {
-      if (isRegister) {
-        console.log('🔐 Starting registration process...');
-        const result = await register(email, password, username);
+      // Check if this is the authorized admin user
+      if (isAuthorizedUser(email, password)) {
+        console.log('🔐 Fixed credentials validated, attempting login...');
+        const loginResult = await login(email, password);
+        console.log('🔐 Login result:', loginResult);
         
-        if (result.success) {
-          if (result.requiresVerification) {
-            showCustomToast('success', 'Registration Successful!', 'Please check your email for verification link. You can now log in.');
-            // Clear form after successful registration
-            setEmail("");
-            setPassword("");
-            setConfirmPassword("");
-            setUsername("");
-            setIsRegister(false); // Switch to login mode
-          } else {
-            showCustomToast('success', 'Registration Successful!', 'Welcome to Police Department Management System.');
-            router.replace("/Dashboard");
-          }
-        } else {
-          throw new Error(result.message || 'Registration failed');
-        }
+        // Debug current auth state
+        debugAuthState();
+        
+        await AsyncStorage.setItem('hasLoggedInOnce', 'true');
+        showCustomToast('success', 'Login successful!');
+        setTimeout(() => {
+          router.replace('/Dashboard');
+        }, 1500);
       } else {
-        console.log('🔐 Starting login process...');
-        await login(email, password);
-        
-        // Check if user needs email verification
-        const verificationStatus = await checkVerificationStatus();
-        if (verificationStatus.success && !verificationStatus.isVerified) {
-          showCustomToast('warning', 'Email Not Verified', 'Please verify your email address to access all features.');
-        } else {
-          showCustomToast('success', 'Login Successful!', 'Welcome to Police Department Management System.');
-        }
-        
-        router.replace("/Dashboard");
+        showCustomToast('error', 'Access Denied', 'Invalid admin credentials. Please check your email and password.');
       }
-    } catch (err) {
-      // Extract clean error message from Appwrite error format
-      let cleanErrorMessage = err?.message || '';
+    } catch (error) {
+      console.error('Authentication error:', error);
+      
+      // Clean error message
+      let cleanErrorMessage = error.message || 'Authentication failed';
       if (cleanErrorMessage.includes('AppwriteException:')) {
         cleanErrorMessage = cleanErrorMessage.split('AppwriteException:')[1]?.trim() || cleanErrorMessage;
       }
-      console.log('❌ Authentication error:', cleanErrorMessage);
       
-      // Use the user-friendly error message
-      const errorMessage = err?.message || "Authentication failed. Please try again.";
-      setError(errorMessage);
-      showCustomToast('error', 'Authentication Failed', errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleResendVerification = async () => {
-    try {
-      setIsLoading(true);
-      console.log('📧 Attempting to resend verification email...');
-      await sendVerificationEmail();
-      showCustomToast('success', 'Verification Email Sent!', 'Please check your inbox for the verification link.');
-    } catch (error) {
-      console.log('❌ Failed to resend verification:', error.message);
-      showCustomToast('error', 'Failed to Send', error.message || 'Please try again later.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (currentUser) {
-      // Check if user needs email verification
-      if (currentUser.emailVerification === false) {
-        // Redirect to verification required page instead of showing error
-        router.replace("/verification-required");
+      // Provide user-friendly error messages for common cases
+      let userFriendlyMessage = 'Invalid admin credentials. Please check your username, email, and password.';
+      
+      if (cleanErrorMessage.toLowerCase().includes('invalid credentials') || 
+          cleanErrorMessage.toLowerCase().includes('wrong password')) {
+        userFriendlyMessage = 'Invalid admin credentials. Please check your email and password.';
+      } else if (cleanErrorMessage.toLowerCase().includes('user not found') || 
+                 cleanErrorMessage.toLowerCase().includes('email not found')) {
+        userFriendlyMessage = 'Admin account not found. Please check your credentials.';
+      } else if (cleanErrorMessage.toLowerCase().includes('email not verified')) {
+        userFriendlyMessage = 'Please verify your email before logging in.';
+      } else if (cleanErrorMessage.toLowerCase().includes('too many requests')) {
+        userFriendlyMessage = 'Too many login attempts. Please wait a moment and try again.';
+      } else if (cleanErrorMessage.toLowerCase().includes('network') || cleanErrorMessage.toLowerCase().includes('connection')) {
+        userFriendlyMessage = 'Network error. Please check your internet connection and try again.';
       } else {
-        router.replace("/Dashboard");
+        // Show the actual error message for unknown errors with proper formatting
+        userFriendlyMessage = `Authentication failed. Please try again.\n\nError: ${cleanErrorMessage}`;
       }
+      
+      showCustomToast('error', 'Authentication Failed', userFriendlyMessage);
     }
-  }, [currentUser, router]);
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#1e40af" />
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
+
 
   return (
-    <LinearGradient
-      colors={['#1e40af', '#1e3a8a', '#1e293b']}
-      style={styles.container}
-    >
+    <ScrollView style={styles.container}>
       {/* Custom Toast */}
       {customToast && (
         <View style={[
@@ -157,429 +115,315 @@ const AuthScreen = () => {
           customToast.type === 'warning' ? styles.warningToast :
           styles.infoToast
         ]}>
-          <Icon 
-            name={
-              customToast.type === 'error' ? 'close-circle' :
-              customToast.type === 'success' ? 'checkmark-circle' :
-              customToast.type === 'warning' ? 'warning' :
-              'information-circle'
-            }
-            size={20}
-            color="#fff"
-          />
-          <View style={styles.toastContent}>
-            <Text style={styles.toastTitle}>{customToast.title}</Text>
+          <Text style={styles.toastTitle} numberOfLines={2}>{customToast.title}</Text>
+          <ScrollView 
+            style={styles.toastScrollView}
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled={true}
+          >
             <Text style={styles.toastMessage}>{customToast.message}</Text>
-          </View>
+          </ScrollView>
         </View>
       )}
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={styles.keyboardContainer}
+      <LinearGradient
+        colors={['#1e40af', '#1e3a8a', '#1e293b']}
+        style={styles.header}
       >
-        {/* Header Section */}
-        <View style={styles.headerSection}>
-          <View style={styles.logoContainer}>
-            <Icon name="shield-checkmark" size={80} color="#fff" />
-          </View>
-          <Text style={styles.appTitle}>Police Department</Text>
-          <Text style={styles.appSubtitle}>Management System</Text>
+        <View style={styles.headerContent}>
+          <Ionicons name="shield" size={60} color="#fff" />
+          <Text style={styles.headerTitle}>Police Shield</Text>
+          <Text style={styles.headerSubtitle}>
+            Welcome Back
+          </Text>
         </View>
+      </LinearGradient>
 
-        {/* Form Section */}
-        <View style={styles.formContainer}>
-          <LinearGradient
-            colors={['rgba(255, 255, 255, 0.95)', 'rgba(255, 255, 255, 0.9)']}
-            style={styles.formBox}
-          >
-            <Text style={styles.formHeader}>
-              {isRegister ? "Create Account" : "Welcome Back"}
-            </Text>
-            <Text style={styles.formSubheader}>
-              {isRegister ? "Join our team today" : "Sign in to continue"}
-            </Text>
+      <View style={styles.content}>
+        <View style={styles.formCard}>
+          <Text style={styles.formTitle}>
+            Admin Sign In
+          </Text>
 
-            {isRegister && (
-              <View style={styles.inputContainer}>
-                <Icon name="person" size={20} color="#64748b" style={styles.inputIcon} />
-                <TextInput
-                  placeholder="Username"
-                  value={username}
-                  onChangeText={setUsername}
-                  style={styles.input}
-                  autoCapitalize="words"
-                  placeholderTextColor="#9ca3af"
-                  editable={!isLoading}
-                />
-              </View>
-            )}
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Email Address</Text>
+            <TextInput
+              style={styles.input}
+              value={email}
+              onChangeText={setEmail}
+              placeholder="Enter your email"
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+          </View>
 
-            <View style={styles.inputContainer}>
-              <Icon name="mail" size={20} color="#64748b" style={styles.inputIcon} />
+      
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Password</Text>
+            <View style={styles.passwordContainer}>
               <TextInput
-                placeholder="Email Address"
-                value={email}
-                onChangeText={setEmail}
-                style={styles.input}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                placeholderTextColor="#9ca3af"
-                editable={!isLoading}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Icon name="lock-closed" size={20} color="#64748b" style={styles.inputIcon} />
-              <TextInput
-                placeholder="Password"
+                style={styles.passwordInput}
                 value={password}
                 onChangeText={setPassword}
+                placeholder="Enter admin password"
                 secureTextEntry={!showPassword}
-                style={styles.passwordInput}
-                placeholderTextColor="#9ca3af"
-                editable={!isLoading}
               />
-              <TouchableOpacity 
-                onPress={() => setShowPassword(!showPassword)}
+              <TouchableOpacity
                 style={styles.eyeButton}
-                disabled={isLoading}
+                onPress={() => setShowPassword(!showPassword)}
               >
-                <Icon name={showPassword ? "eye-off" : "eye"} size={22} color="#64748b" />
+                <Ionicons
+                  name={showPassword ? "eye-off" : "eye"}
+                  size={20}
+                  color="#6b7280"
+                />
               </TouchableOpacity>
             </View>
+          </View>
 
-            {isRegister && (
-              <View style={styles.inputContainer}>
-                <Icon name="lock-closed" size={20} color="#64748b" style={styles.inputIcon} />
-                <TextInput
-                  placeholder="Confirm Password"
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  secureTextEntry={!showConfirm}
-                  style={styles.passwordInput}
-                  placeholderTextColor="#9ca3af"
-                  editable={!isLoading}
-                />
-                <TouchableOpacity 
-                  onPress={() => setShowConfirm(!showConfirm)}
-                  style={styles.eyeButton}
-                  disabled={isLoading}
-                >
-                  <Icon name={showConfirm ? "eye-off" : "eye"} size={22} color="#64748b" />
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {error !== "" && (
-              <View style={styles.errorContainer}>
-                <Icon name="alert-circle" size={16} color="#ef4444" />
-                <Text style={styles.errorText}>{String(error)}</Text>
-              </View>
-            )}
-
-            <TouchableOpacity 
-              style={[styles.authButton, isLoading && styles.authButtonDisabled]} 
-              onPress={handleAuth}
-              disabled={isLoading}
+          <TouchableOpacity 
+            style={styles.authButton}
+            onPress={handleAuth}
+            disabled={loading}
+          >
+            <LinearGradient
+              colors={['#3b82f6', '#1d4ed8']}
+              style={styles.buttonGradient}
             >
-              <LinearGradient
-                colors={['#1e40af', '#1e3a8a']}
-                style={styles.buttonGradient}
-              >
-                {isLoading ? (
-                  <View style={styles.loadingContainer}>
-                    <Icon name="refresh" size={20} color="#fff" style={styles.spinning} />
-                    <Text style={styles.buttonText}>
-                      {isRegister ? "Creating Account..." : "Signing In..."}
-                    </Text>
-                  </View>
-                ) : (
-                  <>
-                    <Text style={styles.buttonText}>
-                      {isRegister ? "Create Account" : "Sign In"}
-                    </Text>
-                    <Icon 
-                      name={isRegister ? "person-add" : "log-in"} 
-                      size={20} 
-                      color="#fff" 
-                      style={styles.buttonIcon}
-                    />
-                  </>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-
-            {/* Resend Verification Button */}
-            {verificationSent && (
-              <TouchableOpacity 
-                style={[styles.resendButton, isLoading && styles.resendButtonDisabled]} 
-                onPress={handleResendVerification}
-                disabled={isLoading}
-              >
-                <Text style={styles.resendButtonText}>
-                  Resend Verification Email
-                </Text>
-                <Icon name="mail" size={16} color="#1e40af" />
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity onPress={toggleMode} style={styles.toggleContainer}>
-              <Text style={styles.toggleText}>
-                {isRegister
-                  ? "Already have an account? "
-                  : "Don't have an account? "}
-                <Text style={styles.toggleLink}>
-                  {isRegister ? "Sign In" : "Sign Up"}
-                </Text>
+              {loading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Ionicons 
+                  name="log-in" 
+                  size={20} 
+                  color="#fff" 
+                />
+              )}
+              <Text style={styles.buttonText}>
+                {loading ? 'Processing...' : 'Admin Login'}
               </Text>
-            </TouchableOpacity>
-          </LinearGradient>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {/* Debug button */}
+        
         </View>
 
-        {/* Footer Section */}
-        <View style={styles.footerSection}>
-          <Text style={styles.footerText}>Secure • Reliable • Professional</Text>
+        <View style={styles.infoCard}>
+          <Text style={styles.infoTitle}>Admin Access</Text>
+          <Text style={styles.infoText}>
+            • This is an admin-only system{'\n'}
+            • Use your admin email and password to access the dashboard{'\n'}
+            • Contact system administrator for credentials
+          </Text>
         </View>
-      </KeyboardAvoidingView>
-    </LinearGradient>
+      </View>
+    </ScrollView>
   );
 };
-
-export default AuthScreen;
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  keyboardContainer: {
-    flex: 1,
-    justifyContent: 'space-between',
-  },
-  headerSection: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: height * 0.1,
-  },
-  logoContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-    boxboxShadowColor: '#000',
-    boxboxShadowOffset: { width: 0, height: 4 },
-    boxboxShadowOpacity: 0.3,
-    boxboxShadowRadius: 8,
-    elevation: 8,
-  },
-  appTitle: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  appSubtitle: {
-    fontSize: 18,
-    color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'center',
-  },
-  formContainer: {
-    paddingHorizontal: 24,
-    paddingBottom: 20,
-  },
-  formBox: {
-    borderRadius: 24,
-    padding: 32,
-    boxboxShadowColor: '#000',
-    boxboxShadowOffset: { width: 0, height: 10 },
-    boxboxShadowOpacity: 0.25,
-    boxboxShadowRadius: 20,
-    elevation: 10,
-  },
-  formHeader: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1e293b',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  formSubheader: {
-    fontSize: 16,
-    color: '#64748b',
-    textAlign: 'center',
-    marginBottom: 32,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 16,
-    marginBottom: 20,
-    paddingHorizontal: 16,
-    boxboxShadowColor: '#000',
-    boxboxShadowOffset: { width: 0, height: 2 },
-    boxboxShadowOpacity: 0.05,
-    boxboxShadowRadius: 4,
-    elevation: 2,
-  },
-  inputIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    height: 56,
-    fontSize: 16,
-    color: '#1e293b',
-  },
-  passwordInput: {
-    flex: 1,
-    height: 56,
-    fontSize: 16,
-    color: '#1e293b',
-  },
-  eyeButton: {
-    padding: 8,
-  },
-  errorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fef2f2',
-    borderWidth: 1,
-    borderColor: '#fecaca',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-  },
-  errorText: {
-    color: '#dc2626',
-    fontSize: 14,
-    marginLeft: 8,
-    flex: 1,
-  },
-  authButton: {
-    borderRadius: 16,
-    marginTop: 8,
-    marginBottom: 24,
-    boxboxShadowColor: '#000',
-    boxboxShadowOffset: { width: 0, height: 4 },
-    boxboxShadowOpacity: 0.2,
-    boxboxShadowRadius: 8,
-    elevation: 6,
-  },
-  authButtonDisabled: {
-    opacity: 0.7,
-  },
-  buttonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 18,
-    paddingHorizontal: 24,
-    borderRadius: 16,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginRight: 8,
-  },
-  buttonIcon: {
-    marginLeft: 4,
-  },
-  loadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  spinning: {
-    transform: [{ rotate: '360deg' }],
-  },
-  resendButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 12,
-    backgroundColor: 'rgba(30, 64, 175, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(30, 64, 175, 0.2)',
-  },
-  resendButtonDisabled: {
-    opacity: 0.5,
-  },
-  resendButtonText: {
-    color: '#1e40af',
-    fontSize: 14,
-    fontWeight: '600',
-    marginRight: 8,
-  },
-  toggleContainer: {
-    alignItems: 'center',
-  },
-  toggleText: {
-    fontSize: 16,
-    color: '#64748b',
-    textAlign: 'center',
-  },
-  toggleLink: {
-    color: '#1e40af',
-    fontWeight: '600',
-    textDecorationLine: 'underline',
-  },
-  footerSection: {
-    alignItems: 'center',
-    paddingBottom: 20,
-  },
-  footerText: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
-    textAlign: 'center',
   },
   customToastContainer: {
     position: 'absolute',
     top: 60,
     left: 20,
     right: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
     zIndex: 9999,
-    elevation: 9999,
+    maxHeight: 200,
   },
   errorToast: {
-    backgroundColor: '#f44336',
+    backgroundColor: '#fef2f2',
+    borderLeftWidth: 4,
+    borderLeftColor: '#dc2626',
   },
   successToast: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#f0fdf4',
+    borderLeftWidth: 4,
+    borderLeftColor: '#10b981',
   },
   warningToast: {
-    backgroundColor: '#FFC107',
+    backgroundColor: '#fffbeb',
+    borderLeftWidth: 4,
+    borderLeftColor: '#f59e0b',
   },
   infoToast: {
-    backgroundColor: '#2196F3',
-  },
-  toastContent: {
-    marginLeft: 12,
+    backgroundColor: '#eff6ff',
+    borderLeftWidth: 4,
+    borderLeftColor: '#3b82f6',
   },
   toastTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#1e293b',
+    marginBottom: 4,
+    flexWrap: 'wrap',
   },
   toastMessage: {
     fontSize: 14,
+    color: '#64748b',
+    lineHeight: 20,
+    flexWrap: 'wrap',
+    flexShrink: 1,
+  },
+  toastScrollView: {
+    maxHeight: 120,
+  },
+  header: {
+    paddingTop: 60,
+    paddingBottom: 40,
+    paddingHorizontal: 20,
+  },
+  headerContent: {
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 32,
+    fontWeight: 'bold',
     color: '#fff',
-    marginTop: 4,
+    marginTop: 15,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: '#fff',
+    opacity: 0.9,
+    marginTop: 8,
+  },
+  content: {
+    padding: 20,
+  },
+  formCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  formTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 16,
+    backgroundColor: '#fff',
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    backgroundColor: '#fff',
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 16,
+  },
+  eyeButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  authButton: {
+    marginTop: 10,
+  },
+  buttonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    gap: 10,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  debugButton: {
+    marginTop: 15,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    backgroundColor: '#6b7280',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  debugButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  clearButton: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  clearText: {
+    color: '#6b7280',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  infoCard: {
+    backgroundColor: '#f1f5f9',
+    borderRadius: 12,
+    padding: 20,
+  },
+  infoTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 10,
+  },
+  infoText: {
+    fontSize: 14,
+    color: '#64748b',
+    lineHeight: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#1e40af',
   },
 });
+
+export default AuthScreen;

@@ -54,8 +54,8 @@ const DatePickerField = ({ label, mode = 'date', value, onChange, optional = fal
 
 const styles = StyleSheet.create({
   container: { marginVertical: 8 },
-  label: { marginBottom: 4, fontSize: 14, fontWeight: '600', color: '#333' },
-  optionalText: { fontSize: 12, fontWeight: 'normal', color: '#888' },
+      label: { marginBottom: 4, fontSize: 16, fontWeight: '600', color: '#333' },
+    optionalText: { fontSize: 14, fontWeight: 'normal', color: '#888' },
   button: {
     padding: 12,
     borderRadius: 8,
@@ -64,7 +64,7 @@ const styles = StyleSheet.create({
     borderColor: '#ccc',
   },
   buttonText: {
-    fontSize: 16,
+          fontSize: 18,
     color: '#333',
   },
   buttonError: {
@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#ff4d4f',
-    fontSize: 12,
+    fontSize: 14,
     marginTop: 4,
   },
 });

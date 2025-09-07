@@ -10,11 +10,36 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_APPWRITE_ENDPOINT": "https://fra.cloud.appwrite.io/v1",
+        "EXPO_PUBLIC_APPWRITE_PROJECT_ID": "123456789012345678901234567890123456",
+        "EXPO_PUBLIC_APPWRITE_DB_ID": "Notes-db",
+        "EXPO_PUBLIC_APPWRITE_EMPLOYEES_COLLECTION_ID": "689ca41b00061e94a51f",
+        "EXPO_PUBLIC_APPWRITE_CASES_COLLECTION_ID": "cases",
+        "EXPO_PUBLIC_APPWRITE_EXPENSES_COLLECTION_ID": "expenses",
+        "EXPO_PUBLIC_APPWRITE_ATTENDANCE_COLLECTION_ID": "attendance",
+        "EXPO_PUBLIC_APPWRITE_CUSTOM_OPTIONS_COLLECTION_ID": "customOptions",
+        "EXPO_PUBLIC_APPWRITE_BUNDLE_ID": "com.police.shield"
+    
       }
     },
     "preview": {
+      "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_APPWRITE_ENDPOINT": "https://fra.cloud.appwrite.io/v1",
+        "EXPO_PUBLIC_APPWRITE_PROJECT_ID": "123456789012345678901234567890123456",
+        "EXPO_PUBLIC_APPWRITE_DB_ID": "Notes-db",
+        "EXPO_PUBLIC_APPWRITE_EMPLOYEES_COLLECTION_ID": "689ca41b00061e94a51f",
+        "EXPO_PUBLIC_APPWRITE_CASES_COLLECTION_ID": "cases",
+        "EXPO_PUBLIC_APPWRITE_EXPENSES_COLLECTION_ID": "expenses",
+        "EXPO_PUBLIC_APPWRITE_ATTENDANCE_COLLECTION_ID": "attendance",
+        "EXPO_PUBLIC_APPWRITE_CUSTOM_OPTIONS_COLLECTION_ID": "customOptions",
+        "EXPO_PUBLIC_APPWRITE_BUNDLE_ID": "com.police.shield"
+      
       }
     },
     
@@ -30,7 +55,18 @@
       "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_APPWRITE_ENDPOINT": "https://fra.cloud.appwrite.io/v1",
+        "EXPO_PUBLIC_APPWRITE_PROJECT_ID": "123456789012345678901234567890123456",
+        "EXPO_PUBLIC_APPWRITE_DB_ID": "Notes-db",
+        "EXPO_PUBLIC_APPWRITE_EMPLOYEES_COLLECTION_ID": "689ca41b00061e94a51f",
+        "EXPO_PUBLIC_APPWRITE_CASES_COLLECTION_ID": "cases",
+        "EXPO_PUBLIC_APPWRITE_EXPENSES_COLLECTION_ID": "expenses",
+        "EXPO_PUBLIC_APPWRITE_ATTENDANCE_COLLECTION_ID": "attendance",
+        "EXPO_PUBLIC_APPWRITE_CUSTOM_OPTIONS_COLLECTION_ID": "customOptions",
+        "EXPO_PUBLIC_APPWRITE_BUNDLE_ID": "com.police.shield"
+      }
     }
   },
   "submit": {

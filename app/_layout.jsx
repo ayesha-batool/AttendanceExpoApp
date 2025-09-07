@@ -1,12 +1,29 @@
-import * as Linking from 'expo-linking';
 import { Stack, useRouter } from "expo-router";
 import { useEffect } from "react";
 import Toast, { BaseToast, ErrorToast } from "react-native-toast-message";
-import { getVerificationUrl } from "../config/appConfig";
 import { AppProvider } from "../context/AppContext";
 import { AuthProvider, useAuth } from "../context/AuthContext";
-import { EmployeeProvider } from "../context/EmployeeContext";
-// import { initHybridStorage } from "../services/appwrite";
+
+// Fix font loading timeout issue
+if (typeof window !== 'undefined') {
+  // Increase font loading timeout for web
+  const originalSetTimeout = window.setTimeout;
+  window.setTimeout = (callback, delay, ...args) => {
+    if (delay === 6000 && callback.toString().includes('fontfaceobserver')) {
+      // Increase timeout for font loading
+      return originalSetTimeout(callback, 10000, ...args);
+    }
+    return originalSetTimeout(callback, delay, ...args);
+  };
+
+  // Handle font loading errors gracefully
+  window.addEventListener('error', (event) => {
+    if (event.message && event.message.includes('fontfaceobserver')) {
+      console.warn('Font loading timeout handled gracefully');
+      event.preventDefault();
+    }
+  });
+}
 
 
 const toastConfig = {
@@ -82,118 +99,68 @@ const RootLayout = () => {
   return (
     <AppProvider>
       <AuthProvider>
-        <EmployeeProvider>
-          <AuthenticatedLayout />
-          <Toast 
-            config={toastConfig} 
-            position="top"
-            topOffset={50}
-            visibilityTime={4000}
-            style={{
-              zIndex: 999999,
-              elevation: 999999,
-            }}
-          />
-        </EmployeeProvider>
+        <AuthenticatedLayout />
+        <Toast 
+          config={toastConfig} 
+          position="top"
+          topOffset={50}
+          visibilityTime={4000}
+          style={{
+            zIndex: 999999,
+            elevation: 999999,
+          }}
+        />
       </AuthProvider>
     </AppProvider>
   );
 };
 
 const AuthenticatedLayout = () => {
-  const { currentUser, loading, isEmailVerified } = useAuth();
+  const { currentUser, loading, isAuthenticated, isOfflineMode } = useAuth();
   const router = useRouter();
-  
-  // useEffect(() => {
-  //   // Initialize hybrid storage when app starts
-  //   initHybridStorage();
-  // }, []);
   
   useEffect(() => {
     if (!loading) {
-      if (!currentUser) {
-        // No user logged in, redirect to auth
-        if (router.canGoBack()) {
-          router.replace("/auth");
-        }
-      } else if (!isEmailVerified && !currentUser?.isOfflineUser) {
-        // User is logged in but email is not verified (and not offline), redirect to verification required
-        router.replace("/verification-required");
-      }
-      // If user is logged in and email is verified (or offline), they can access the dashboard
+      // Log current auth state for debugging
+      console.log('🔍 App Layout - Auth State:', {
+        isAuthenticated,
+        currentUser: currentUser ? {
+          id: currentUser.$id,
+          email: currentUser.email,
+          isOffline: currentUser.isOffline,
+          name: currentUser.name
+        } : null,
+        mode: isOfflineMode ? isOfflineMode() : 'unknown'
+      });
+      
+      // Don't automatically redirect - let users see the main index page
+      // They can manually navigate to Dashboard when needed
     }
+  }, [currentUser, loading, isAuthenticated, router, isOfflineMode]);
 
-  }, [currentUser, loading, isEmailVerified, router]);
-
-  // Handle deep linking for email verification
-  useEffect(() => {
-    const handleDeepLink = (event) => {
-      console.log('🔗 Deep link received:', event.url);
-      
-      // Parse the URL to extract userId and secret
-      const url = event.url;
-      const verificationUrl = getVerificationUrl();
-      const verificationHost = new URL(verificationUrl).host;
-      
-      if (url.includes(`${verificationHost}://verify`) || url.includes('shelfieclean://verify')) {
-        console.log('📧 Verification deep link detected');
-        
-        // Extract query parameters
-        const urlObj = new URL(url);
-        const userId = urlObj.searchParams.get('userId');
-        const secret = urlObj.searchParams.get('secret');
-        
-        console.log('🆔 userId:', userId);
-        console.log('🔑 secret:', secret);
-        
-        if (userId && secret) {
-          console.log('✅ Valid verification parameters, navigating to verify page');
-          router.push(`/verify?userId=${userId}&secret=${secret}`);
-        } else {
-          console.log('❌ Missing verification parameters');
-          router.push('/verify?error=missing_params');
-        }
-      }
-    };
-
-    // Handle initial URL if app was opened via deep link
-    Linking.getInitialURL().then((url) => {
-      if (url) {
-        console.log('🔗 Initial deep link URL:', url);
-        handleDeepLink({ url });
-      }
-    });
-
-    // Listen for deep link events
-    const subscription = Linking.addEventListener('url', handleDeepLink);
-
-    return () => {
-      subscription?.remove();
-    };
-  }, [router]);
   return (
     <Stack
-        screenOptions={{
-          headerShown: false, // Hide the root header
-          contentStyle: {
-            paddingTop: 0,
-            paddingHorizontal: 0,
-            paddingBottom: 0,
-          },
-        }}
-      >
+      screenOptions={{
+        headerShown: false, // Hide the root header
+        contentStyle: {
+          paddingTop: 0,
+          paddingHorizontal: 0,
+          paddingBottom: 0,
+        },
+      }}
+    >
       <Stack.Screen name="index" />
       <Stack.Screen name="auth" />
       <Stack.Screen name="Dashboard" />
       <Stack.Screen name="Employee" />
       <Stack.Screen name="Cases" />
       <Stack.Screen name="ExpensesManagement" />
-     
       <Stack.Screen name="Attendance" />
-      <Stack.Screen name="verify" />
-      <Stack.Screen name="verification-required" />
-      <Stack.Screen name="test-verification" />
-    
+
+      
+      {/* Device-based pages */}
+      <Stack.Screen name="device-employee" />
+      <Stack.Screen name="DataTransfer" />
     </Stack>
   );
 };

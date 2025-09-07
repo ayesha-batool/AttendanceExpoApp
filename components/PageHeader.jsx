@@ -3,10 +3,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import {
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 
 const PageHeader = ({ 
@@ -16,6 +16,8 @@ const PageHeader = ({
   iconName = 'arrow-back',
   onIconPress,
   actionButton,
+  userInitials,
+  onUserInitialsPress,
   gradientColors = ['#1e40af', '#1e3a8a', '#1e293b'],
   showBackButton = true 
 }) => {
@@ -63,18 +65,33 @@ const PageHeader = ({
             {subtitle && <Text style={styles.headerSubtitle}>{String(subtitle)}</Text>}
           </View>
           </View>
-          {actionButton && (
-            <TouchableOpacity 
-              style={styles.inlineActionButton} 
-              onPress={() => {
-                actionButton.onPress();
-              }}
-              activeOpacity={0.7}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name={actionButton.icon} size={20} color="#fff" />
-            </TouchableOpacity>
-          )}
+          <View style={styles.rightSection}>
+            {actionButton && (
+              <TouchableOpacity 
+                style={styles.inlineActionButton} 
+                onPress={() => {
+                  actionButton.onPress();
+                }}
+                activeOpacity={0.7}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name={actionButton.icon} size={20} color="#fff" />
+                {actionButton.label && (
+                  <Text style={styles.actionButtonLabel}>{actionButton.label}</Text>
+                )}
+              </TouchableOpacity>
+            )}
+            {userInitials && (
+              <TouchableOpacity 
+                style={styles.userInitialsButton} 
+                onPress={onUserInitialsPress}
+                activeOpacity={0.7}
+                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+              >
+                <Text style={styles.userInitialsText}>{userInitials}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </View>
     </LinearGradient>
@@ -93,11 +110,17 @@ const styles = StyleSheet.create({
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
   },
   leftSection: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+  },
+  rightSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   backButton: {
     
@@ -118,33 +141,59 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   titleAndActionContainer: {
-    // display: 'flex',
     flex: 1,
-    textAlign: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '700',
     color: '#fff',
     marginBottom: 4,
   },
   headerSubtitle: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#fff',
     opacity: 0.9,
     fontWeight: '400',
   },
   inlineActionButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    padding: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderRadius: 12,
-    marginLeft: 16,
     minWidth: 44,
     minHeight: 44,
     justifyContent: 'center',
     alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  userInitialsButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    minWidth: 56,
+    minHeight: 56,
+  },
+  userInitialsText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  actionButtonLabel: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 4,
   },
 });
 

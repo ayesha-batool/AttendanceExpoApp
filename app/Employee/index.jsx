@@ -1,54 +1,82 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { FlatList, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-
 import AddOfficerModal from '../../components/AddOfficerModal';
 import AttendanceTab from '../../components/AttendanceTab';
 import DeleteConfirmationModal from '../../components/DeleteConfirmationModal';
 import EmployeeCard from '../../components/EmployeeCard';
 import EmployeeDetailsModal from '../../components/EmployeeDetailsModal';
 import LoadingState from '../../components/LoadingState';
+import LocationMap from '../../components/LocationMap';
 import SearchBar from '../../components/SearchBar';
 import SelectDropdown from '../../components/SelectDropdown';
-import { useEmployeeContext } from '../../context/EmployeeContext';
-import { customOptionsService, dataService } from '../../services/unifiedDataService';
+import { useAuth } from '../../context/AuthContext';
+import { hybridDataService } from '../../services/hybridDataService';
 
 const EmployeeScreen = () => {
-  const { setHeaderActionButton, clearHeaderAction } = useEmployeeContext();
+  const { logout } = useAuth();
+  const router = useRouter();
   
   // State management
   const [employees, setEmployees] = useState([]);
   const [filteredEmployees, setFilteredEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState('active');
+  const [activeTab, setActiveTab] = useState('all');
   const [customOptions, setCustomOptions] = useState({ departments: [], ranks: [], employment_status: [] });
   const [filters, setFilters] = useState({ department: '', rank: '', status: '' });
   const [modals, setModals] = useState({ filter: false, addOfficer: false, delete: false, details: false });
   const [selected, setSelected] = useState({ employee: null, deleteEmployee: null, editEmployee: null });
   const [customToast, setCustomToast] = useState(null);
+  const [showMap, setShowMap] = useState(false);
 
   // Utility functions
   const showCustomToast = (type, title, message) => {
     setCustomToast({ type, title, message });
     setTimeout(() => setCustomToast(null), 3000);
   };
+
+  const handleLocationUpdate = (location) => {
+    // This function can be used to handle location updates if needed
+    console.log('Location updated:', location);
+  };
+
+  const toggleMapView = () => {
+    if (activeTab === 'map') {
+      setActiveTab('all');
+    } else {
+      setActiveTab('map');
+    }
+  };
   const updateModal = (key, value) => setModals(prev => ({ ...prev, [key]: value }));
   const updateSelected = (key, value) => setSelected(prev => ({ ...prev, [key]: value }));
   const updateFilter = (key, value) => setFilters(prev => ({ ...prev, [key]: value }));
+
+
+
+  // Debug: Monitor state changes
+  useEffect(() => {
+    console.log('🔍 [EMPLOYEE PAGE] State changed - employees:', employees.length);
+    console.log('🔍 [EMPLOYEE PAGE] State changed - filteredEmployees:', filteredEmployees.length);
+    console.log('🔍 [EMPLOYEE PAGE] State changed - loading:', loading);
+  }, [employees, filteredEmployees, loading]);
 
   // Data fetching
   const fetchData = async () => {
     try {
       setLoading(true);
       
+      // Add a small delay to allow authentication session to be established
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       const [employeesData, departmentsData, ranksData, statusData] = await Promise.all([
-        dataService.getItems('employees'),
-        customOptionsService.getOptions('departments'),
-customOptionsService.getOptions('ranks'),
-customOptionsService.getOptions('employment_status')
+        hybridDataService.getItems('employees'),
+        hybridDataService.getOptions('departments'),
+        hybridDataService.getOptions('ranks'),
+        hybridDataService.getOptions('employment_status')
       ]);
       
       const optionsData = {
@@ -59,9 +87,17 @@ customOptionsService.getOptions('employment_status')
       
       const validEmployees = employeesData.filter(item => item && typeof item === 'object');
       
+      console.log('🔍 [EMPLOYEE PAGE] Fetched employees:', employeesData);
+      console.log('🔍 [EMPLOYEE PAGE] Valid employees:', validEmployees);
+      console.log('🔍 [EMPLOYEE PAGE] Setting employees state:', validEmployees.length);
+      console.log('🔍 [EMPLOYEE PAGE] Custom options data:', optionsData);
+      
       setEmployees(validEmployees);
-      setFilteredEmployees(validEmployees);
+      setFilteredEmployees(validEmployees); // Set filtered employees immediately
       setCustomOptions(optionsData);
+      
+      console.log('🔍 [EMPLOYEE PAGE] Set filteredEmployees to:', validEmployees.length);
+      console.log('🔍 [EMPLOYEE PAGE] Set customOptions to:', optionsData);
       
     } catch (error) {
       console.error('❌ Error fetching employees:', error);
@@ -74,17 +110,13 @@ customOptionsService.getOptions('employment_status')
   const applyFiltering = () => {
     let filtered = [...employees];
     
-    // Filter by active tab
-    if (activeTab === 'active') {
-      filtered = filtered.filter(emp => {
-        const status = emp.status?.toLowerCase();
-        return status === 'active';
-      });
-    } else if (activeTab === 'other') {
-      filtered = filtered.filter(emp => {
-        const status = emp.status?.toLowerCase();
-        return status !== 'active';
-      });
+    // Filter by active tab - show all employees in "all" and "map" tabs
+    if (activeTab === 'all') {
+      // Show all employees - no status filtering
+      filtered = filtered;
+    } else if (activeTab === 'map') {
+      // Show all employees for map view
+      filtered = filtered;
     }
     
     // Apply search
@@ -151,7 +183,7 @@ customOptionsService.getOptions('employment_status')
       const key = `employees_${employeeId}`;
       
       // Update in storage
-      await dataService.updateData(key, employeeId, updatedEmployee, 'employees');
+              await hybridDataService.updateData(key, employeeId, updatedEmployee, 'employees');
       
       // Update local state
       setEmployees(prev => {
@@ -181,7 +213,7 @@ customOptionsService.getOptions('employment_status')
       const key = `employees_${employeeId}`;
       
       // Delete from storage
-      await dataService.deleteData(key, employeeId, 'employees');
+              await hybridDataService.deleteData(key, employeeId, 'employees');
       
       // Update local state
       setEmployees(prev => {
@@ -258,8 +290,8 @@ customOptionsService.getOptions('employment_status')
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScrollContainer}>
           <View style={styles.tabSliderContainer}>
             {[
-              { key: 'active', icon: 'people', label: 'Active Employees' },
-              { key: 'other', icon: 'person-remove', label: 'Other Employees' },
+              { key: 'all', icon: 'people', label: 'All Employees' },
+              { key: 'map', icon: 'map', label: 'Show Map' },
               { key: 'attendance', icon: 'calendar', label: 'Attendance' }
             ].map(tab => (
               <TouchableOpacity key={tab.key} style={[styles.tab, activeTab === tab.key && styles.activeTab]} onPress={() => setActiveTab(tab.key)}>
@@ -273,6 +305,22 @@ customOptionsService.getOptions('employment_status')
 
       {activeTab === 'attendance' ? (
         <AttendanceTab employees={employees} />
+      ) : activeTab === 'map' ? (
+        <View style={styles.mapTabContainer}>
+          <View style={styles.mapHeader}>
+            <Text style={styles.mapTitle}>Employee Locations</Text>
+            <Text style={styles.mapSubtitle}>
+              {employees.filter(emp => emp.workLocation).length} of {employees.length} employees have work locations
+            </Text>
+          </View>
+          <View style={styles.mapContent}>
+            <LocationMap
+              employees={employees}
+              showMap={true}
+              embedded={true}
+            />
+          </View>
+        </View>
       ) : (
         <>
           {/* Search and Filter */}
@@ -328,7 +376,7 @@ customOptionsService.getOptions('employment_status')
               <View style={styles.fullScreenModalHeader}>
                 <Text style={styles.fullScreenModalTitle}>Filter Employees</Text>
                 <TouchableOpacity style={styles.fullScreenCloseButton} onPress={() => updateModal('filter', false)}>
-                  <Ionicons name="close" size={24} color="#666" />
+                  <Ionicons name="close" size={24} color="#fff" />
                 </TouchableOpacity>
               </View>
               <ScrollView style={styles.fullScreenModalBody}>
@@ -336,21 +384,21 @@ customOptionsService.getOptions('employment_status')
                   label="Department" 
                   selectedValue={filters.department} 
                   onValueChange={(value) => updateFilter('department', value)} 
-                  options={[{ label: 'All Departments', value: '' }, ...customOptions.departments.map(dept => ({ label: dept, value: dept }))]} 
+                  options={[{ label: 'All Departments', value: '' }, ...(customOptions.departments || []).map(dept => ({ label: dept, value: dept }))]} 
                   showRemoveOption={false} 
                 />
                 <SelectDropdown 
                   label="Rank" 
                   selectedValue={filters.rank} 
                   onValueChange={(value) => updateFilter('rank', value)} 
-                  options={[{ label: 'All Ranks', value: '' }, ...customOptions.ranks.map(rank => ({ label: rank, value: rank }))]} 
+                  options={[{ label: 'All Ranks', value: '' }, ...(customOptions.ranks || []).map(rank => ({ label: rank, value: rank }))]} 
                   showRemoveOption={false} 
                 />
                 <SelectDropdown 
                   label="Status" 
                   selectedValue={filters.status} 
                   onValueChange={(value) => updateFilter('status', value)} 
-                  options={[{ label: 'All Status', value: '' }, ...customOptions.employment_status.map(status => ({ label: status, value: status }))]} 
+                  options={[{ label: 'All Status', value: '' }, ...(customOptions.employment_status || []).map(status => ({ label: status, value: status }))]} 
                   showRemoveOption={false} 
                 />
               </ScrollView>
@@ -421,6 +469,21 @@ customOptionsService.getOptions('employment_status')
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc',paddingBottom:20},
+  debugContainer: {
+    backgroundColor: '#f3f4f6',
+    padding: 8,
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+  },
+  debugText: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontFamily: 'monospace',
+    textAlign: 'center',
+  },
   tabContainer: { 
     backgroundColor: '#fff', 
     paddingVertical: 6, 
@@ -432,6 +495,54 @@ const styles = StyleSheet.create({
     boxShadowOpacity: 0.05,
     boxShadowRadius: 2,
     elevation: 1,
+  },
+  mapContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+    margin: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  mapTabContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+    margin: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  mapHeader: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
+  },
+  mapTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginBottom: 4,
+  },
+  mapSubtitle: {
+    fontSize: 14,
+    color: '#64748b',
+  },
+  mapContent: {
+    flex: 1,
+    minHeight: 400,
   },
   tabScrollContainer: { 
     flexDirection: 'row', 
@@ -493,6 +604,36 @@ const styles = StyleSheet.create({
     fontWeight: '600', 
     color: '#1e40af', 
     marginLeft: 5 
+  },
+  mapToggleButton: { 
+    flex: 1,
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    paddingHorizontal: 4, 
+    paddingVertical: 12, 
+    backgroundColor: '#f8fafc', 
+    borderRadius: 10, 
+    borderWidth: 1, 
+    borderColor: '#e2e8f0',
+    boxShadowColor: '#000',
+    boxShadowOffset: { width: 0, height: 1 },
+    boxShadowOpacity: 0.05,
+    boxShadowRadius: 2,
+    elevation: 1,
+  },
+  mapToggleButtonActive: { 
+    backgroundColor: '#1e40af', 
+    borderColor: '#1e40af',
+  },
+  mapToggleButtonText: { 
+    fontSize: 13, 
+    fontWeight: '600', 
+    color: '#1e40af', 
+    marginLeft: 5 
+  },
+  mapToggleButtonTextActive: { 
+    color: '#fff'
   },
   employeesList: { 
     paddingHorizontal: 16, 

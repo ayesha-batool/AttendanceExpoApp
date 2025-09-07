@@ -1,10 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Stack } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Stack, useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext'; // adjust path if needed
 
 const DashboardLayout = () => {
   const { currentUser } = useAuth();
+  const router = useRouter();
   
   // Get the username from the authenticated user
   const username = currentUser?.user?.username || currentUser?.username;
@@ -21,6 +20,8 @@ const DashboardLayout = () => {
   };
 
   const userInitials = getInitials(username);
+
+
 
   return (
     <Stack

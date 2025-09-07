@@ -1,96 +1,68 @@
-import Constants from 'expo-constants';
 
-// Get the current development server port
-const getDevServerPort = () => {
-  // Try to get port from Expo's development server
-  if (Constants.expoConfig?.hostUri) {
-    const portMatch = Constants.expoConfig.hostUri.match(/:(\d+)/);
-    if (portMatch) {
-      return portMatch[1];
+// Helper function to clean environment variables
+const cleanEnvVar = (value) => {
+  if (!value) return value;
+  // Remove extra quotes, commas, and URL encoding that might be added by environment variable parsing
+  let cleaned = value.replace(/^["']|["'],?$/g, '').trim();
+  // Decode URL encoding if present
+  try {
+    cleaned = decodeURIComponent(cleaned);
+  } catch (e) {
+    // If decodeURIComponent fails, use the original cleaned value
+  }
+  return cleaned;
+};
+
+// Simple configuration - all environment variables in one place
+export const appConfig = {
+  appwrite: {
+    endpoint: cleanEnvVar(process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT) ,
+    projectId: cleanEnvVar(process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID),
+    databaseId: cleanEnvVar(process.env.EXPO_PUBLIC_APPWRITE_DB_ID) ,
+    collections: {
+      employees: cleanEnvVar(process.env.EXPO_PUBLIC_APPWRITE_EMPLOYEES_COLLECTION_ID) ,
+      cases: cleanEnvVar(process.env.EXPO_PUBLIC_APPWRITE_CASES_COLLECTION_ID) ,
+      expenses: cleanEnvVar(process.env.EXPO_PUBLIC_APPWRITE_EXPENSES_COLLECTION_ID) ,
+      attendance: cleanEnvVar(process.env.EXPO_PUBLIC_APPWRITE_ATTENDANCE_COLLECTION_ID) ,
+      customOptions: cleanEnvVar(process.env.EXPO_PUBLIC_APPWRITE_CUSTOM_OPTIONS_COLLECTION_ID)
+    }
+  },
+
+  app: {
+    scheme: 'policeshield',
+    bundleId: process.env.EXPO_PUBLIC_APPWRITE_BUNDLE_ID || 'com.police.shield'
+  }
+};
+
+// Export individual parts for easy access
+export const { appwrite, app } = appConfig;
+
+// Helper function to validate configuration (less strict for development)
+export const validateConfig = () => {
+  const errors = [];
+  const warnings = [];
+  
+  // Only show errors for critical missing values
+  if (!appConfig.appwrite.projectId) {
+    if (__DEV__) {
+      warnings.push('EXPO_PUBLIC_APPWRITE_PROJECT_ID is not set (will use fallback values)');
+    } else {
+      errors.push('EXPO_PUBLIC_APPWRITE_PROJECT_ID is not set');
     }
   }
   
-  // Fallback to common development ports
-  return '8081';
-};
-
-// Get the current development server URL
-const getDevServerUrl = () => {
-  const port = getDevServerPort();
-  return `http://localhost:${port}`;
-};
-
-// App Configuration
-export const appConfig = {
-  // Appwrite Configuration
-  appwrite: {
-    endpoint: process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1',
-    projectId: process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID,
-    databaseId: process.env.EXPO_PUBLIC_APPWRITE_DB_ID || 'shelfie_database',
-    collections: {
-      employees: process.env.EXPO_PUBLIC_APPWRITE_EMPLOYEES_COLLECTION_ID || '689ca41b00061e94a51f',
-      cases: process.env.EXPO_PUBLIC_APPWRITE_CASES_COLLECTION_ID || 'cases',
-      expenses: process.env.EXPO_PUBLIC_APPWRITE_EXPENSES_COLLECTION_ID || 'expenses',
-      attendance: process.env.EXPO_PUBLIC_APPWRITE_ATTENDANCE_COLLECTION_ID || 'attendance',
-      customOptions: process.env.EXPO_PUBLIC_APPWRITE_CUSTOM_OPTIONS_COLLECTION_ID || 'customOptions'
-    }
-  },
-
-  // App Configuration
-  app: {
-    name: 'Police Department Management System',
-    scheme: 'shelfieclean',
-    bundleId: process.env.EXPO_PUBLIC_APPWRITE_BUNDLE_ID || 'com.ayeshabatool.shelfieclean'
-  },
-
-  // Verification Configuration
-  verification: {
-    // Automatically detect the correct verification URL based on environment
-    getUrl: () => {
-      // For production, use the environment variable
-      if (process.env.EXPO_PUBLIC_VERIFICATION_URL) {
-        return process.env.EXPO_PUBLIC_VERIFICATION_URL;
-      }
-      
-      // For development, use the current dev server
-      const devUrl = getDevServerUrl();
-      return `${devUrl}/verify`;
-    },
-    
-    // Get the deep link URL for the app
-    getDeepLinkUrl: () => {
-      return `${appConfig.app.scheme}://verify`;
-    },
-    
-    // Get the web URL for verification (used by Appwrite)
-    getWebUrl: () => {
-      return appConfig.verification.getUrl();
-    }
-  },
-
-  // Development Configuration
-  development: {
-    isDev: __DEV__,
-    devServerPort: getDevServerPort(),
-    devServerUrl: getDevServerUrl(),
-    enableLogs: __DEV__
-  },
-
-  // Network Configuration
-  network: {
-    timeout: 30000, // 30 seconds
-    retryAttempts: 3
+  if (!appConfig.appwrite.endpoint) {
+    warnings.push('EXPO_PUBLIC_APPWRITE_ENDPOINT is not set (using default)');
   }
+  
+  // Log warnings in development but don't fail
+  if (__DEV__ && warnings.length > 0) {
+    console.warn('⚠️ Configuration warnings:', warnings);
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors,
+    warnings
+  };
 };
-
-// Helper function to get verification URL
-export const getVerificationUrl = () => appConfig.verification.getUrl();
-
-// Helper function to get deep link URL
-export const getDeepLinkUrl = () => appConfig.verification.getDeepLinkUrl();
-
-// Helper function to get web URL
-export const getWebUrl = () => appConfig.verification.getWebUrl();
-
-// Export the configuration
-export default appConfig;

@@ -469,7 +469,7 @@ const ExpensesManagementScreen = () => {
 
       {/* Floating Action Button */}
       <TouchableOpacity style={styles.fab} onPress={handleAdd}>
-        <LinearGradient colors={['#8b5cf6', '#7c3aed']} style={styles.fabGradient}>
+        <LinearGradient colors={['#10b981', '#059669']} style={styles.fabGradient}>
           <Ionicons name="add" size={24} color="#fff" />
         </LinearGradient>
       </TouchableOpacity>
@@ -553,7 +553,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 8,
     marginHorizontal: 20,
-    marginBottom: 10,
+
   },
   tab: {
     flexDirection: 'row',

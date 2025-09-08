@@ -3,10 +3,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import {
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 const PageHeader = ({ 
@@ -27,19 +27,30 @@ const PageHeader = ({
     // Removed navigation toast as requested
     
     if (onIconPress) {
-      onIconPress();
+      try {
+        onIconPress();
+      } catch (error) {
+        console.error('Error in onIconPress:', error);
+      }
     } else if (showBackButton) {
       try {
         // Try to go back first
-        if (router.canGoBack()) {
+        if (router && typeof router.canGoBack === 'function' && router.canGoBack()) {
           router.back();
-        } else {
+        } else if (router && typeof router.push === 'function') {
           // If can't go back, navigate to dashboard
           router.push("/Dashboard");
         }
       } catch (error) {
-        // Fallback to dashboard
-        router.push("/Dashboard");
+        console.error('Navigation error in PageHeader:', error);
+        // Fallback - try to navigate to dashboard
+        try {
+          if (router && typeof router.push === 'function') {
+            router.push("/Dashboard");
+          }
+        } catch (fallbackError) {
+          console.error('Fallback navigation also failed:', fallbackError);
+        }
       }
     }
   };

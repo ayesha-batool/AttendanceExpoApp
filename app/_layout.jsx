@@ -4,26 +4,7 @@ import Toast, { BaseToast, ErrorToast } from "react-native-toast-message";
 import { AppProvider } from "../context/AppContext";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 
-// Fix font loading timeout issue
-if (typeof window !== 'undefined') {
-  // Increase font loading timeout for web
-  const originalSetTimeout = window.setTimeout;
-  window.setTimeout = (callback, delay, ...args) => {
-    if (delay === 6000 && callback.toString().includes('fontfaceobserver')) {
-      // Increase timeout for font loading
-      return originalSetTimeout(callback, 10000, ...args);
-    }
-    return originalSetTimeout(callback, delay, ...args);
-  };
-
-  // Handle font loading errors gracefully
-  window.addEventListener('error', (event) => {
-    if (event.message && event.message.includes('fontfaceobserver')) {
-      console.warn('Font loading timeout handled gracefully');
-      event.preventDefault();
-    }
-  });
-}
+// Fix font loading timeout issue - removed window code for mobile
 
 
 const toastConfig = {
@@ -116,37 +97,39 @@ const RootLayout = () => {
 };
 
 const AuthenticatedLayout = () => {
-  const { currentUser, loading, isAuthenticated, isOfflineMode } = useAuth();
+  const authContext = useAuth();
   const router = useRouter();
   
+  // Safe destructuring with fallbacks
+  const currentUser = authContext?.currentUser || null;
+  const loading = authContext?.loading || false;
+  const isAuthenticated = authContext?.isAuthenticated || false;
+  const isOfflineMode = authContext?.isOfflineMode || null;
+  
   useEffect(() => {
-    if (!loading) {
-      // Log current auth state for debugging
-      console.log('🔍 App Layout - Auth State:', {
-        isAuthenticated,
-        currentUser: currentUser ? {
-          id: currentUser.$id,
-          email: currentUser.email,
-          isOffline: currentUser.isOffline,
-          name: currentUser.name
-        } : null,
-        mode: isOfflineMode ? isOfflineMode() : 'unknown'
-      });
-      
-      // Don't automatically redirect - let users see the main index page
-      // They can manually navigate to Dashboard when needed
+    try {
+      if (!loading) {
+        // Log current auth state for debugging
+        console.log('🔍 App Layout - Auth State:', {
+          isAuthenticated,
+          currentUser: currentUser ? {
+            id: currentUser.$id,
+            email: currentUser.email,
+            isOffline: currentUser.isOffline,
+            name: currentUser.name
+          } : null,
+          mode: isOfflineMode ? (typeof isOfflineMode === 'function' ? isOfflineMode() : 'unknown') : 'unknown'
+        });
+      }
+    } catch (error) {
+      console.error('Error in AuthenticatedLayout useEffect:', error);
     }
   }, [currentUser, loading, isAuthenticated, router, isOfflineMode]);
 
   return (
     <Stack
       screenOptions={{
-        headerShown: false, // Hide the root header
-        contentStyle: {
-          paddingTop: 0,
-          paddingHorizontal: 0,
-          paddingBottom: 0,
-        },
+        headerShown: false,
       }}
     >
       <Stack.Screen name="index" />

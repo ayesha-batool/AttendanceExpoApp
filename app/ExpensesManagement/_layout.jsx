@@ -8,7 +8,7 @@ const ExpensesLayoutContent = () => {
       <PageHeader 
         title="Expenses Management" 
         icon="card"
-        gradientColors={['#ef4444', '#dc2626', '#b91c1c']}
+        gradientColors={['#10b981', '#059669']}
       />
       <Stack>
         <Stack.Screen

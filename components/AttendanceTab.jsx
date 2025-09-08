@@ -1,13 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import {
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { hybridDataService } from '../services/hybridDataService';
 import StatCard from './StatCard';
@@ -19,6 +19,11 @@ const AttendanceTab = ({ employees = [] }) => {
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [manualCheckInTime, setManualCheckInTime] = useState('09:00');
   const [manualCheckOutTime, setManualCheckOutTime] = useState('17:00');
+  const [timeErrors, setTimeErrors] = useState({
+    checkIn: '',
+    checkOut: '',
+    general: ''
+  });
   const [customToast, setCustomToast] = useState(null);
   const [showYearPicker, setShowYearPicker] = useState(false);
   const [tempYear, setTempYear] = useState('');
@@ -218,8 +223,8 @@ const AttendanceTab = ({ employees = [] }) => {
       }
       
       // Immediately save this individual attendance record
-      const dateOnly = dateKey.replace(/-/g, '');
-      const validId = `${dateOnly}_${employeeId}`;
+      // Use employeeId_date format as you specified
+      const validId = `${employeeId}_${dateKey}`;
       
       const attendanceRecord = {
         id: validId,
@@ -235,8 +240,12 @@ const AttendanceTab = ({ employees = [] }) => {
       };
       
       try {
-        console.log(`💾 Immediately saving ${employeeName} as ${status}...`);
+        console.log(`💾 Saving ${employeeName} as ${status}...`);
+        console.log(`🔍 Attendance record to save:`, attendanceRecord);
+        
+        // Let the saveData method handle duplicate checking and updating
         await hybridDataService.saveData(attendanceRecord, 'attendance');
+        
         console.log(`✅ Successfully saved ${employeeName} as ${status}`);
       } catch (error) {
         console.error(`❌ Failed to save ${employeeName}:`, error);
@@ -264,6 +273,14 @@ const AttendanceTab = ({ employees = [] }) => {
 
   const openManualTimeModal = (employee) => {
     setSelectedEmployee(employee);
+    
+    // Clear any previous errors
+    setTimeErrors({
+      checkIn: '',
+      checkOut: '',
+      general: ''
+    });
+    
     const employeeId = employee.id || employee.$id;
     const dateKey = formatDate(selectedDate);
     const attendance = attendanceData[dateKey]?.[employeeId];
@@ -288,20 +305,52 @@ const AttendanceTab = ({ employees = [] }) => {
 
   const saveManualTime = () => {
     if (!selectedEmployee) return;
+
+    // Clear previous errors
+    setTimeErrors({
+      checkIn: '',
+      checkOut: '',
+      general: ''
+    });
   
     // Regex for HH:MM AM/PM (12-hour format) - more flexible
     const timeRegex = /^(0?[1-9]|1[0-2]):[0-5][0-9]\s?(AM|PM)$/i;
-  
-    // Validate check-in time
-    if (manualCheckInTime && !timeRegex.test(manualCheckInTime.trim())) {
-      showCustomToast('error', 'Invalid Time', 'Check-in time must be in HH:MM AM/PM format (e.g. 12:07 AM)');
-      return;
+    
+    let hasErrors = false;
+
+    // Check if both fields are filled
+    if (!manualCheckInTime || !manualCheckInTime.trim()) {
+      setTimeErrors(prev => ({
+        ...prev,
+        checkIn: 'Check-in time is required'
+      }));
+      hasErrors = true;
+    }
+
+    if (!manualCheckOutTime || !manualCheckOutTime.trim()) {
+      setTimeErrors(prev => ({
+        ...prev,
+        checkOut: 'Check-out time is required'
+      }));
+      hasErrors = true;
     }
   
-    // Validate check-out time
-    if (manualCheckOutTime && !timeRegex.test(manualCheckOutTime.trim())) {
-      showCustomToast('error', 'Invalid Time', 'Check-out time must be in HH:MM AM/PM format (e.g. 06:07 PM)');
-      return;
+    // Validate check-in time format (only if filled)
+    if (manualCheckInTime && manualCheckInTime.trim() && !timeRegex.test(manualCheckInTime.trim())) {
+      setTimeErrors(prev => ({
+        ...prev,
+        checkIn: 'Check-in time must be in HH:MM AM/PM format (e.g. 12:07 AM)'
+      }));
+      hasErrors = true;
+    }
+  
+    // Validate check-out time format (only if filled)
+    if (manualCheckOutTime && manualCheckOutTime.trim() && !timeRegex.test(manualCheckOutTime.trim())) {
+      setTimeErrors(prev => ({
+        ...prev,
+        checkOut: 'Check-out time must be in HH:MM AM/PM format (e.g. 06:07 PM)'
+      }));
+      hasErrors = true;
     }
   
     // Function to convert "HH:MM AM/PM" → minutes since midnight
@@ -320,12 +369,27 @@ const AttendanceTab = ({ employees = [] }) => {
       return hours * 60 + minutes;
     };
   
-    const checkInMinutes = convertToMinutes(manualCheckInTime);
-    const checkOutMinutes = convertToMinutes(manualCheckOutTime);
-  
-    // Validate check-out > check-in
-    if (checkInMinutes !== null && checkOutMinutes !== null && checkOutMinutes <= checkInMinutes) {
-      showCustomToast('error', 'Invalid Time', 'Check-out must be after check-in');
+    // Only validate time sequence if both times are provided and valid format
+    if (manualCheckInTime && manualCheckInTime.trim() && 
+        manualCheckOutTime && manualCheckOutTime.trim() && 
+        timeRegex.test(manualCheckInTime.trim()) && 
+        timeRegex.test(manualCheckOutTime.trim())) {
+      
+      const checkInMinutes = convertToMinutes(manualCheckInTime);
+      const checkOutMinutes = convertToMinutes(manualCheckOutTime);
+    
+      // Validate check-out > check-in
+      if (checkInMinutes !== null && checkOutMinutes !== null && checkOutMinutes <= checkInMinutes) {
+        setTimeErrors(prev => ({
+          ...prev,
+          general: 'Check-out time must be after check-in time'
+        }));
+        hasErrors = true;
+      }
+    }
+
+    // If there are errors, don't save
+    if (hasErrors) {
       return;
     }
   
@@ -409,8 +473,8 @@ const AttendanceTab = ({ employees = [] }) => {
     setManualCheckOutTime('');
     
     // Immediately save the manual time entry
-    const dateOnly = currentDateKey.replace(/-/g, '');
-    const validId = `${dateOnly}_${currentEmployeeId}`;
+    // Use employeeId_date format as you specified
+    const validId = `${currentEmployeeId}_${currentDateKey}`;
     
     const attendanceRecord = {
       id: validId,
@@ -426,8 +490,12 @@ const AttendanceTab = ({ employees = [] }) => {
     };
     
     try {
-      console.log(`💾 Immediately saving manual time for ${selectedEmployee.fullName}...`);
-              await hybridDataService.saveData(attendanceRecord, 'attendance');
+      console.log(`💾 Saving manual time for ${selectedEmployee.fullName}...`);
+      console.log(`🔍 Attendance record to save:`, attendanceRecord);
+      
+      // Let the saveData method handle duplicate checking and updating
+      await hybridDataService.saveData(attendanceRecord, 'attendance');
+      
       console.log(`✅ Successfully saved manual time for ${selectedEmployee.fullName}`);
       showCustomToast('success', 'Time Saved', `Time saved for ${selectedEmployee?.fullName || 'Employee'}`);
     } catch (error) {
@@ -845,27 +913,40 @@ const AttendanceTab = ({ employees = [] }) => {
               <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Check-in Time (HH:MM AM/PM)</Text>
 <TextInput
-  style={styles.input}
+  style={[styles.input, timeErrors.checkIn && styles.inputError]}
   value={manualCheckInTime}
   onChangeText={setManualCheckInTime}
   placeholder="09:00 AM"
   placeholderTextColor="#9ca3af"
   keyboardType="default" // use default so user can type letters (AM/PM)
 />
+              {timeErrors.checkIn ? (
+                <Text style={styles.errorText}>{timeErrors.checkIn}</Text>
+              ) : null}
               </View>
               
               <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Check-out Time (HH:MM AM/PM)</Text>
 <TextInput
-  style={styles.input}
+  style={[styles.input, timeErrors.checkOut && styles.inputError]}
   value={manualCheckOutTime}
   onChangeText={setManualCheckOutTime}
   placeholder="05:00 PM"
   placeholderTextColor="#9ca3af"
   keyboardType="default"
 />
+              {timeErrors.checkOut ? (
+                <Text style={styles.errorText}>{timeErrors.checkOut}</Text>
+              ) : null}
               </View>
             </View>
+            
+            {/* General error display */}
+            {timeErrors.general ? (
+              <View style={styles.generalErrorContainer}>
+                <Text style={styles.generalErrorText}>{timeErrors.general}</Text>
+              </View>
+            ) : null}
             
             <View style={styles.modalFooter}>
               <TouchableOpacity 
@@ -1366,6 +1447,31 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: '#fff',
   },
+  inputError: {
+    borderColor: '#ef4444',
+    borderWidth: 2,
+  },
+  errorText: {
+    color: '#ef4444',
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 4,
+  },
+  generalErrorContainer: {
+    backgroundColor: '#fef2f2',
+    borderColor: '#fecaca',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginHorizontal: 20,
+    marginVertical: 10,
+  },
+  generalErrorText: {
+    color: '#dc2626',
+    fontSize: 14,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
   modalFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1400,3 +1506,4 @@ const styles = StyleSheet.create({
 });
 
 export default AttendanceTab;
+

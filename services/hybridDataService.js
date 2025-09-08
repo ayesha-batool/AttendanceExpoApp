@@ -138,9 +138,11 @@ export const hybridDataService = {
         console.log(`🔄 [GET ITEMS] Fetching ${collectionId} from Appwrite...`);
         
         try {
-          // Appwrite code would go here when it's available
-          // For now, this will never execute since isAppwriteAvailable returns false
-          console.log(`✅ [GET ITEMS] Successfully fetched from Appwrite (not implemented yet)`);
+          // Use the unified data service to actually fetch from Appwrite
+          const { dataService } = await import('./unifiedDataService');
+          const appwriteItems = await dataService.getItems(collectionId);
+          console.log(`✅ [GET ITEMS] Successfully fetched ${appwriteItems.length} items from Appwrite for ${collectionId}`);
+          return appwriteItems;
         } catch (appwriteError) {
           console.log(`⚠️ [GET ITEMS] Appwrite fetch failed for ${collectionId}, using local storage:`, appwriteError.message);
         }
@@ -199,7 +201,7 @@ export const hybridDataService = {
       const uniqueId = this.generateId();
       const cleanData = { 
         ...data, 
-        id: uniqueId, 
+        id:data.id || uniqueId, 
         deviceId,
         synced: false,
         createdAt: new Date(),

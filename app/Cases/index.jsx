@@ -419,44 +419,81 @@ const CasesScreen = () => {
           keyExtractor={(item) => item.id || item.$id}
           renderItem={({ item }) => (
             <TouchableOpacity style={styles.caseCard} onPress={() => handleView(item)}>
-              <LinearGradient colors={['#fff', '#f8fafc']} style={styles.cardGradient}>
+              <LinearGradient colors={['#ffffff', '#fefefe']} style={styles.cardGradient}>
+                {/* Priority Indicator Bar */}
+                <View style={[styles.priorityBar, { backgroundColor: getPriorityColor(item.priority) }]} />
+                
+                {/* Header Section */}
                 <View style={styles.cardHeader}>
                   <View style={styles.cardTitleContainer}>
-                    <View style={styles.caseInfo}>
-                      <Text style={styles.caseTitle}>{String(item.title || 'Untitled')}</Text>
+                    <Text style={styles.caseTitle} numberOfLines={2}>{String(item.title || 'Untitled Case')}</Text>
+                    <View style={styles.caseMetaRow}>
                       <View style={styles.caseMeta}>
-                        <Text style={styles.caseCategoryText}>{String(item.category || 'Uncategorized')}</Text>
+                        <Ionicons name="folder-outline" size={12} color="#6366f1" />
+                        <Text style={styles.caseCategoryText}>{String(item.category || 'General')}</Text>
+                      </View>
+                      <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+                        <Text style={styles.statusText}>{String(item.status || 'Unknown').toUpperCase()}</Text>
                       </View>
                     </View>
                   </View>
                   <View style={styles.cardActions}>
                     <TouchableOpacity style={styles.actionButton} onPress={(e) => { e.stopPropagation(); handleEdit(item); }}>
-                      <Ionicons name="create-outline" size={20} color="#3b82f6" />
+                      <Ionicons name="create-outline" size={18} color="#6366f1" />
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.actionButton} onPress={(e) => { e.stopPropagation(); handleDelete(item); }}>
-                      <Ionicons name="trash-outline" size={20} color="#ef4444" />
+                    <TouchableOpacity style={[styles.actionButton, styles.deleteButton]} onPress={(e) => { e.stopPropagation(); handleDelete(item); }}>
+                      <Ionicons name="trash-outline" size={18} color="#ef4444" />
                     </TouchableOpacity>
                   </View>
                 </View>
-                <View style={styles.caseDetails}>
+
+                {/* Content Section */}
+                <View style={styles.cardContent}>
                   <View style={styles.infoRow}>
-                    <Ionicons name="person" size={16} color="#64748b" />
-                    <Text style={styles.infoText}>{String(item.assignedOfficer || 'Unassigned')}</Text>
+                    <View style={styles.infoIconContainer}>
+                      <Ionicons name="person-outline" size={16} color="#6366f1" />
+                    </View>
+                    <View style={styles.infoContent}>
+                      <Text style={styles.infoLabel}>Assigned Officer</Text>
+                      <Text style={styles.infoValue}>{String(item.assignedOfficer || 'Unassigned')}</Text>
+                    </View>
                   </View>
                   
                   <View style={styles.infoRow}>
-                    <Ionicons name="calendar" size={16} color="#64748b" />
-                    <Text style={styles.infoText}>{String(item.startDate ? new Date(item.startDate).toLocaleDateString() : 'No start date')}</Text>
+                    <View style={styles.infoIconContainer}>
+                      <Ionicons name="calendar-outline" size={16} color="#6366f1" />
+                    </View>
+                    <View style={styles.infoContent}>
+                      <Text style={styles.infoLabel}>Start Date</Text>
+                      <Text style={styles.infoValue}>{String(item.startDate ? new Date(item.startDate).toLocaleDateString() : 'Not set')}</Text>
+                    </View>
                   </View>
+
+                  {item.location && (
+                    <View style={styles.infoRow}>
+                      <View style={styles.infoIconContainer}>
+                        <Ionicons name="location-outline" size={16} color="#6366f1" />
+                      </View>
+                      <View style={styles.infoContent}>
+                        <Text style={styles.infoLabel}>Location</Text>
+                        <Text style={styles.infoValue}>{String(item.location)}</Text>
+                      </View>
+                    </View>
+                  )}
                 </View>
-                
-                <View style={styles.caseStatus}>
-                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-                    <Text style={styles.statusText}>{String(item.status || 'Unknown')}</Text>
+
+                {/* Footer Section */}
+                <View style={styles.cardFooter}>
+                  <View style={styles.priorityContainer}>
+                    <Text style={styles.priorityLabel}>Priority</Text>
+                    <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(item.priority) }]}>
+                      <Text style={styles.priorityText}>{String(item.priority || 'Medium').toUpperCase()}</Text>
+                    </View>
                   </View>
-                  <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(item.priority) }]}>
-                    <Text style={styles.priorityText}>{String(item.priority || 'Unknown')}</Text>
-                  </View>
+                  <TouchableOpacity style={styles.viewButton} onPress={() => handleView(item)}>
+                    <Text style={styles.viewButtonText}>View Details</Text>
+                    <Ionicons name="chevron-forward" size={16} color="#6366f1" />
+                  </TouchableOpacity>
                 </View>
                 
               </LinearGradient>
@@ -755,43 +792,174 @@ const styles = StyleSheet.create({
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
   emptyTitle: { fontSize: 20, fontWeight: '600', color: '#374151', marginTop: 16, marginBottom: 8 },
   emptyMessage: { fontSize: 14, color: '#6b7280', textAlign: 'center' },
-  caseCard: { marginBottom: 12, borderRadius: 1, boxShadowColor: '#000', 
-    boxShadowOffset: { width: 0, height: 2 }, boxShadowOpacity: 0.08, boxShadowRadius: 8, elevation: 3,
+  caseCard: { 
+    marginBottom: 16, 
+    borderRadius: 16, 
+    backgroundColor: '#ffffff',
+    shadowColor: '#6366f1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
-  cardGradient: { borderRadius: 12, padding: 16 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
-  cardTitleContainer: { flex: 1, marginRight: 12 },
-  caseInfo: {
-    flex: 1,
+  cardGradient: { 
+    borderRadius: 16, 
+    padding: 0,
+    overflow: 'hidden',
+  },
+  priorityBar: {
+    height: 4,
+    width: '100%',
+  },
+  cardHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'flex-start', 
+    padding: 16,
+    paddingBottom: 12,
+  },
+  cardTitleContainer: { 
+    flex: 1, 
+    marginRight: 16 
   },
   caseTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#1e293b',
     marginBottom: 8,
+    lineHeight: 24,
+  },
+  caseMetaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   caseMeta: {
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f9ff',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#bae6fd',
   },
   caseCategoryText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#475569',
+    color: '#0369a1',
+    marginLeft: 4,
   },
-  cardActions: { flexDirection: 'row', gap: 8 },
-  actionButton: { padding: 8, borderRadius: 8, backgroundColor: '#f8fafc' },
-  cardContent: { marginBottom: 12 },
-  infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-  infoText: { fontSize: 14, color: '#64748b', flex: 1, marginLeft: 8 },
-  cardFooter: { flexDirection: 'row', gap: 8 },
-  statusBadge: { paddingHorizontal: 6, paddingVertical: 3, borderRadius: 4 },
-  statusText: { fontSize: 10, fontWeight: '600', color: '#fff', textTransform: 'uppercase' },
-  priorityBadge: { paddingHorizontal: 6, paddingVertical: 3, borderRadius: 4 },
-  priorityText: { fontSize: 10, fontWeight: '600', color: '#fff', textTransform: 'uppercase' },
+  cardActions: { 
+    flexDirection: 'row', 
+    gap: 8 
+  },
+  actionButton: { 
+    padding: 10, 
+    borderRadius: 10, 
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  deleteButton: {
+    backgroundColor: '#fef2f2',
+    borderColor: '#fecaca',
+  },
+  cardContent: { 
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  infoRow: { 
+    flexDirection: 'row', 
+    alignItems: 'flex-start', 
+    marginBottom: 12,
+  },
+  infoIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#f0f9ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  infoContent: {
+    flex: 1,
+  },
+  infoLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#6b7280',
+    marginBottom: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  infoValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    lineHeight: 20,
+  },
+  cardFooter: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#f9fafb',
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+  },
+  priorityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  priorityLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#6b7280',
+    marginRight: 8,
+  },
+  statusBadge: { 
+    paddingHorizontal: 8, 
+    paddingVertical: 4, 
+    borderRadius: 6,
+  },
+  statusText: { 
+    fontSize: 10, 
+    fontWeight: '700', 
+    color: '#fff', 
+    letterSpacing: 0.5,
+  },
+  priorityBadge: { 
+    paddingHorizontal: 8, 
+    paddingVertical: 4, 
+    borderRadius: 6,
+  },
+  priorityText: { 
+    fontSize: 10, 
+    fontWeight: '700', 
+    color: '#fff',
+    letterSpacing: 0.5,
+  },
+  viewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#f0f9ff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#bae6fd',
+  },
+  viewButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0369a1',
+    marginRight: 4,
+  },
   modalOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#f8f9fa', zIndex: 1000 },
   modalContent: { flex: 1, backgroundColor: '#f8f9fa' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#dc2626', backgroundColor: '#dc2626' },
@@ -835,15 +1003,6 @@ const styles = StyleSheet.create({
     boxShadowOpacity: 0.3,
     boxShadowRadius: 8,
     elevation: 8,
-  },
-  caseDetails: {
-    marginBottom: 8,
-  },
-  caseStatus: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 8,
-    marginTop: 8,
   },
 });
 

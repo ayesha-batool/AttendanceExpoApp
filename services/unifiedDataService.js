@@ -178,7 +178,7 @@ const generateId = () => {
 const markItemAsSynced = async (collectionId, itemId) => {
   try {
     const key = `${collectionId}_${itemId}`;
-    const existingData = await storage.load(key);
+    const existingData = await storage.get(key);
     if (existingData) {
       const updatedData = { ...existingData, synced: true, syncedAt: new Date().toISOString() };
       await storage.save(key, updatedData);
@@ -277,7 +277,7 @@ const cleanDataForAppwrite = async (data, collectionId) => {
     ],
                                        attendance: [
         'employeeId', 'employeeName', 'date', 'status',
-         'totalWorkingHours', 'timestamp', 'deviceId'
+        'totalWorkingHours', 'timestamp', 'deviceId'
       ],
     
      
@@ -292,13 +292,14 @@ const cleanDataForAppwrite = async (data, collectionId) => {
   
   // Always ensure deviceId is present
   cleanData.deviceId = baseData.deviceId || await getDeviceId();
+  
+  // Debug logging for attendance
+  if (collectionId === 'attendance') {
+    console.log(`🔍 [CLEAN DATA] Cleaning attendance data for Appwrite:`, baseData);
+    console.log(`🔍 [CLEAN DATA] Allowed fields for attendance:`, allowedFieldsForCollection);
+  }
   for (const field of allowedFieldsForCollection) {
     if (baseData.hasOwnProperty(field)) {
-      // Don't skip empty arrays for attendance data (checkInTimes, checkOutTimes)
-      if (collectionId === 'attendance' && (field === 'checkInTimes' || field === 'checkOutTimes')) {
-        cleanData[field] = Array.isArray(baseData[field]) ? baseData[field] : [];
-        continue;
-      }
         
         // Handle timestamp field - convert null to current timestamp
       if (field === 'timestamp' && (baseData[field] === null || baseData[field] === undefined)) {
@@ -372,7 +373,10 @@ const cleanDataForAppwrite = async (data, collectionId) => {
     }
   }
   
-   
+  // Debug logging for attendance
+  if (collectionId === 'attendance') {
+    console.log(`🔍 [CLEAN DATA] Final cleaned data for Appwrite:`, cleanData);
+  }
   
   return cleanData;
 };
@@ -1031,14 +1035,46 @@ export const dataService = {
   async saveData(data, collectionId) {
     try {
       const deviceId = await getDeviceId();
-      const uniqueId = generateValidAppwriteId(data.id || data.$id);
+      
+      // For attendance, preserve the employeeId_date format, don't generate random ID
+      let uniqueId;
+      if (collectionId === 'attendance' && data.id && data.id.includes('_')) {
+        // Check if the employeeId_date format is valid for Appwrite
+        if (validateAppwriteId(data.id)) {
+          uniqueId = data.id;
+          console.log(`🔍 [ATTENDANCE ID] Preserving valid attendance ID: ${uniqueId}`);
+        } else {
+          console.log(`🔍 [ATTENDANCE ID] Invalid format "${data.id}", generating compatible ID`);
+          uniqueId = generateValidAppwriteId(data.id);
+        }
+      } else {
+        // For other collections, generate Appwrite-compatible ID
+        uniqueId = generateValidAppwriteId(data.id || data.$id);
+      }
+      
       const cleanData = { ...data, id: uniqueId, $id: uniqueId, deviceId: deviceId, synced: false };
      
       // Check for duplicates across ALL devices (not just current device)
       const existing = await dataService.getItems(collectionId);
+      
+      // Debug logging for attendance
+      if (collectionId === 'attendance') {
+        console.log(`🔍 [DUPLICATE CHECK] Looking for duplicates in ${existing.length} existing records`);
+        console.log(`🔍 [DUPLICATE CHECK] New data - employeeId: ${data.employeeId}, date: ${data.date}, uniqueId: ${uniqueId}`);
+        console.log(`🔍 [DUPLICATE CHECK] Existing attendance records:`, existing.map(item => ({
+          id: item.id,
+          employeeId: item.employeeId,
+          date: item.date,
+          status: item.status
+        })));
+      }
+      
       const duplicate = existing.find(item => {
         // Skip the current item if we're updating
         if (item.id === uniqueId || item.$id === uniqueId) {
+          if (collectionId === 'attendance') {
+            console.log(`🔍 [DUPLICATE CHECK] Skipping self (same ID): ${item.id}`);
+          }
           return false;
         }
         
@@ -1052,13 +1088,22 @@ export const dataService = {
         if (collectionId === 'expenses' && data.title && item.title) {
           return item.title === data.title;
         }
+        // Note: attendance duplicates are now prevented by using employeeId_date as ID format
         return false;
       });
       
+      if (collectionId === 'attendance') {
+        console.log(`🔍 [DUPLICATE CHECK] Duplicate found:`, duplicate ? duplicate.id : 'none');
+      }
+      
       if (duplicate) {
-        const duplicateType = collectionId === 'employees' ? 'Badge number' : 'Title';
-        const duplicateValue = collectionId === 'employees' ? data.badgeNumber : data.title;
-        throw new Error(`${duplicateType} "${duplicateValue}" already exists.`);
+        // For attendance, the employeeId_date ID format naturally prevents duplicates
+        // so this should not happen, but if it does, throw an error for non-attendance
+        if (collectionId !== 'attendance') {
+          const duplicateType = collectionId === 'employees' ? 'Badge number' : 'Title';
+          const duplicateValue = collectionId === 'employees' ? data.badgeNumber : data.title;
+          throw new Error(`${duplicateType} "${duplicateValue}" already exists.`);
+        }
       }
       
       const key = `${collectionId}_${uniqueId}`;

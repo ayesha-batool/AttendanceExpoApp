@@ -8,7 +8,7 @@ const CasesLayoutContent = () => {
       <PageHeader 
         title="Cases Management" 
         icon="document-text"
-        gradientColors={['#8b5cf6', '#7c3aed', '#6d28d9']}
+        gradientColors={['#ef4444', '#dc2626']}
       />
       <Stack>
         <Stack.Screen

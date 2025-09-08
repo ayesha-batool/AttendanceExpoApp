@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "description": "Police Department Management System - Secure, Efficient, Professional",
     "orientation": "portrait",
-    "icon": "./assets/images/police-shield-icon.png",
+    "icon": "./assets/images/police-shield-favicon.png",
     "scheme": "policeshield",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -14,7 +14,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/police-shield-splash.png",
+          "image": "./assets/images/police-shield-favicon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#1e40af"
@@ -41,7 +41,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/police-shield-adaptive.png",
+        "foregroundImage": "./assets/images/police-shield-favicon.png",
         "backgroundColor": "#1e40af"
       },
       "edgeToEdgeEnabled": true,

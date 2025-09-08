@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { parseStoredLocation } from '../utils/geocoding';
 
-const LocationMap = ({ employees = [], showMap, embedded = false }) => {
+const LocationMap = ({ employees = [], showMap, embedded = false, onMarkerClick }) => {
   const employeeLocations = useMemo(() => {
     if (!employees?.length) return [];
     

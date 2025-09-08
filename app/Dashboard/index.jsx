@@ -4,11 +4,12 @@ import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import PageHeader from '../../components/PageHeader';
 import { useAuth } from '../../context/AuthContext';
 // import { useCasesContext } from '../../context/CasesContext';
 
+import LocationMap from '../../components/LocationMap';
 import { hybridDataService } from '../../services/hybridDataService';
 
 
@@ -30,6 +31,8 @@ const DashboardScreen = () => {
   });
   const [appwriteHealth, setAppwriteHealth] = useState(null);
   const [healthLoading, setHealthLoading] = useState(false);
+  const [showMap, setShowMap] = useState(false);
+  const [selectedEmployees, setSelectedEmployees] = useState([]);
 
 
   const showCustomToast = (type, title, message) => {
@@ -53,14 +56,58 @@ const DashboardScreen = () => {
       // Add a small delay to allow authentication session to be established
       await new Promise(resolve => setTimeout(resolve, 500));
       
-            const [employeesData, casesData, expensesData] = await Promise.all([
+      console.log('🔍 [DASHBOARD] Starting to fetch data...');
+      
+      const [employeesData, casesData, expensesData] = await Promise.all([
         hybridDataService.getItems('employees'),
         hybridDataService.getItems('cases'),
         hybridDataService.getItems('expenses')
       ]);
-      const validEmployees = employeesData.filter(item => item && typeof item === 'object');
-      const validCases = casesData.filter(item => item && typeof item === 'object');
-      const validExpenses = expensesData.filter(item => item && typeof item === 'object');
+
+      console.log('🔍 [DASHBOARD] Raw data received:');
+      console.log('  - Employees raw:', employeesData);
+      console.log('  - Cases raw:', casesData);
+      console.log('  - Expenses raw:', expensesData);
+      
+      // More robust data validation - check for actual valid data objects
+      const validEmployees = employeesData.filter(item => {
+        const isValid = item && 
+                       typeof item === 'object' && 
+                       (item.name || item.fullName || item.employeeName) && 
+                       !item.deleted;
+        if (!isValid && item) {
+          console.log('🔍 [DASHBOARD] Invalid employee filtered out:', item);
+        }
+        return isValid;
+      });
+      
+      const validCases = casesData.filter(item => {
+        const isValid = item && 
+                       typeof item === 'object' && 
+                       (item.caseTitle || item.title || item.caseName) && 
+                       !item.deleted;
+        if (!isValid && item) {
+          console.log('🔍 [DASHBOARD] Invalid case filtered out:', item);
+        }
+        return isValid;
+      });
+      
+      const validExpenses = expensesData.filter(item => {
+        const isValid = item && 
+                       typeof item === 'object' && 
+                       (item.title || item.description || item.expenseTitle) && 
+                       !item.deleted;
+        if (!isValid && item) {
+          console.log('🔍 [DASHBOARD] Invalid expense filtered out:', item);
+        }
+        return isValid;
+      });
+
+      console.log('🔍 [DASHBOARD] After filtering:');
+      console.log('  - Valid employees:', validEmployees.length, validEmployees);
+      console.log('  - Valid cases:', validCases.length, validCases);
+      console.log('  - Valid expenses:', validExpenses.length, validExpenses);
+      
       setEmployees(validEmployees);
       setCases(validCases);
       setExpenses(validExpenses);
@@ -72,20 +119,20 @@ const DashboardScreen = () => {
         expenses: validExpenses.length
       };
       
-      console.log('🔍 [DASHBOARD] Setting stats:', newStats);
-      console.log('🔍 [DASHBOARD] Employees data:', validEmployees);
-      console.log('🔍 [DASHBOARD] Cases data:', validCases);
-      console.log('🔍 [DASHBOARD] Expenses data:', validExpenses);
-      
+      console.log('✅ [DASHBOARD] Final stats being set:', newStats);
       setStats(newStats);
       
       // Check device IDs
       await checkDeviceIds();
       
-      
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-    
+      console.error('❌ [DASHBOARD] Error fetching dashboard data:', error);
+      // Set empty stats on error
+      setStats({
+        employees: 0,
+        cases: 0,
+        expenses: 0
+      });
     } finally {
       setLoading(false);
     }
@@ -123,71 +170,16 @@ const DashboardScreen = () => {
       const health = await hybridDataService.getAppwriteHealth();
       setAppwriteHealth(health);
       
-      if (health.healthy) {
-        Alert.alert('Health Check', '✅ Appwrite is healthy and available!');
-      } else {
-        Alert.alert('Health Check', `⚠️ Appwrite has issues:\n\nError: ${health.error}\nMessage: ${health.message}`);
-      }
-    } catch (error) {
+       } catch (error) {
       console.error('Error forcing health check:', error);
-      Alert.alert('Error', 'Failed to check Appwrite health');
     } finally {
       setHealthLoading(false);
     }
   };
 
-  const forceHealthCheck = async () => {
-    try {
-      setHealthLoading(true);
-      const health = await hybridDataService.checkAppwriteHealth();
-      setAppwriteHealth(health);
-      
-      if (health.healthy) {
-        Alert.alert('Health Check', '✅ Appwrite is healthy and available!');
-      } else {
-        Alert.alert('Health Check', `⚠️ Appwrite has issues:\n\nError: ${health.error}\nMessage: ${health.message}`);
-      }
-    } catch (error) {
-      console.error('Error forcing health check:', error);
-      Alert.alert('Error', 'Failed to check Appwrite health');
-    } finally {
-      setHealthLoading(false);
-    }
-  };
+ 
 
-  const handleDebugDeviceId = async () => {
-    try {
-      const deviceId = await AsyncStorage.getItem('deviceId');
-      Alert.alert('Device ID', `Current Device ID: ${deviceId || 'Not set'}`);
-    } catch (error) {
-      console.error('Error getting device ID:', error);
-    }
-  };
-
-  const handleSyncData = async () => {
-    try {
-      const result = await hybridDataService.manualSync();
-      if (result.success) {
-        Alert.alert('Sync Success', result.message);
-        loadDashboardData(); // Refresh dashboard data
-      } else {
-        Alert.alert('Sync Failed', result.message);
-      }
-    } catch (error) {
-      console.error('Error syncing data:', error);
-      Alert.alert('Sync Error', 'Failed to sync data');
-    }
-  };
-
-  const getTotalExpenses = () => {
-    return expenses.reduce((total, expense) => total + (parseFloat(expense.amount) || 0), 0);
-  };
-
-  const getActiveCasesCount = () => {
-    return cases.filter(caseItem => caseItem.status === 'active' || caseItem.status === 'investigation').length;
-  };
-
-
+ 
 
  
   const checkDeviceIds = async () => {
@@ -366,7 +358,12 @@ const DashboardScreen = () => {
 
       {/* Statistics Cards */}
       <View style={styles.statsSection}>
-        <Text style={styles.sectionTitle}>Quick Statistics</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Quick Statistics</Text>
+          <TouchableOpacity onPress={fetchData} style={styles.refreshButton} disabled={loading}>
+            <Ionicons name={loading ? "hourglass" : "refresh"} size={20} color="#64748b" />
+          </TouchableOpacity>
+        </View>
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
             <LinearGradient colors={['#3b82f6', '#1d4ed8']} style={styles.statGradient}>
@@ -383,7 +380,7 @@ const DashboardScreen = () => {
           </View>
 
           <View style={styles.statCard}>
-            <LinearGradient colors={['#8b5cf6', '#7c3aed']} style={styles.statGradient}>
+            <LinearGradient colors={['#ef4444', '#dc2626']} style={styles.statGradient}>
               <View style={styles.statIconContainer}>
                 <Ionicons name="document-text" size={28} color="#fff" />
               </View>
@@ -397,7 +394,7 @@ const DashboardScreen = () => {
           </View>
 
           <View style={styles.statCard}>
-            <LinearGradient colors={['#ef4444', '#dc2626']} style={styles.statGradient}>
+            <LinearGradient colors={['#10b981', '#059669']} style={styles.statGradient}>
               <View style={styles.statIconContainer}>
                 <Ionicons name="card" size={28} color="#fff" />
               </View>
@@ -427,7 +424,7 @@ const DashboardScreen = () => {
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/Cases')}>
-            <LinearGradient colors={['#8b5cf6', '#7c3aed']} style={styles.actionGradient}>
+            <LinearGradient colors={['#ef4444', '#dc2626']} style={styles.actionGradient}>
               <View style={styles.actionIconContainer}>
                 <Ionicons name="document-text" size={28} color="#fff" />
               </View>
@@ -437,7 +434,7 @@ const DashboardScreen = () => {
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/ExpensesManagement')}>
-            <LinearGradient colors={['#ef4444', '#dc2626']} style={styles.actionGradient}>
+            <LinearGradient colors={['#10b981', '#059669']} style={styles.actionGradient}>
               <View style={styles.actionIconContainer}>
                 <Ionicons name="card" size={28} color="#fff" />
               </View>
@@ -447,7 +444,7 @@ const DashboardScreen = () => {
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/DataTransfer')}>
-            <LinearGradient colors={['#10b981', '#059669']} style={styles.actionGradient}>
+            <LinearGradient colors={['#f97316', '#ea580c']} style={styles.actionGradient}>
               <View style={styles.actionIconContainer}>
                 <Ionicons name="swap-horizontal" size={28} color="#fff" />
               </View>
@@ -455,8 +452,78 @@ const DashboardScreen = () => {
               <Text style={styles.actionSubtitle}>Export and import data</Text>
             </LinearGradient>
           </TouchableOpacity>
+
+          
         </View>
       </View>
+
+      {/* Employee Map Section */}
+      {showMap && (
+        <View style={styles.mapSection}>
+          <View style={styles.mapHeader}>
+            <Text style={styles.sectionTitle}>Employee Locations</Text>
+            <TouchableOpacity onPress={() => setShowMap(false)} style={styles.closeMapButton}>
+              <Ionicons name="close" size={24} color="#64748b" />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.mapContainer}>
+            <LocationMap
+              employees={employees}
+              showMap={true}
+              embedded={true}
+              onMarkerClick={(employee) => {
+                // Check if employee is already selected
+                const isSelected = selectedEmployees.some(emp => emp.id === employee.id);
+                if (isSelected) {
+                  // Remove from selection
+                  setSelectedEmployees(prev => prev.filter(emp => emp.id !== employee.id));
+                } else {
+                  // Add to selection
+                  setSelectedEmployees(prev => [...prev, employee]);
+                }
+              }}
+            />
+          </View>
+          
+          {/* Employee Info Containers - Compact Grid */}
+          {selectedEmployees.length > 0 && (
+            <View style={styles.employeeContainersSection}>
+              <View style={styles.employeesHeader}>
+                <Text style={styles.employeesTitle}>Selected ({selectedEmployees.length})</Text>
+                <TouchableOpacity onPress={() => setSelectedEmployees([])} style={styles.clearAllButton}>
+                  <Text style={styles.clearAllText}>Clear</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.employeeGrid}>
+                {selectedEmployees.map((employee, index) => (
+                  <View key={employee.id || index} style={styles.compactEmployeeCard}>
+                    <TouchableOpacity 
+                      onPress={() => setSelectedEmployees(prev => prev.filter(emp => emp.id !== employee.id))} 
+                      style={styles.compactCloseButton}
+                    >
+                      <Ionicons name="close" size={12} color="#64748b" />
+                    </TouchableOpacity>
+                    <View style={styles.compactAvatar}>
+                      <Text style={styles.compactAvatarText}>
+                        {(employee.fullName || employee.name || 'N').charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <Text style={styles.compactName} numberOfLines={1}>
+                      {employee.fullName || employee.name}
+                    </Text>
+                    <Text style={styles.compactRank} numberOfLines={1}>
+                      {employee.rank}
+                    </Text>
+                    <Text style={styles.compactBadge} numberOfLines={1}>
+                      #{employee.badgeNumber || 'N/A'}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+        </View>
+      )}
 
       {/* Login Section - Show only if user is not logged in */}
       {!currentUser && (
@@ -661,12 +728,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     marginTop: 8
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   sectionTitle: { 
     fontSize: 24, 
     fontWeight: '700', 
-    color: '#1e293b', 
-    marginBottom: 20,
-    textAlign: 'center'
+    color: '#1e293b',
+    textAlign: 'center',
+    flex: 1,
+  },
+  refreshButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#f1f5f9',
+    marginLeft: 12,
   },
   actionsGrid: { 
     gap: 16 
@@ -1074,6 +1153,117 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#fff',
     opacity: 0.9,
+  },
+  mapSection: {
+    padding: 20,
+    backgroundColor: '#fff',
+    margin: 16,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  mapHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  closeMapButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#f1f5f9',
+  },
+  mapContainer: {
+    height: 300,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  employeeContainersSection: {
+    marginTop: 16,
+  },
+  employeesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  employeesTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1e293b',
+  },
+  clearAllButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: '#ef4444',
+    borderRadius: 4,
+  },
+  clearAllText: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#fff',
+  },
+  employeeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  compactEmployeeCard: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    width: '48%',
+    marginBottom: 8,
+    alignItems: 'center',
+    position: 'relative',
+    minHeight: 80,
+  },
+  compactCloseButton: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    padding: 4,
+    borderRadius: 4,
+    backgroundColor: '#e2e8f0',
+    zIndex: 1,
+  },
+  compactAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#3b82f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  compactAvatarText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  compactName: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  compactRank: {
+    fontSize: 10,
+    color: '#64748b',
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  compactBadge: {
+    fontSize: 9,
+    color: '#94a3b8',
+    textAlign: 'center',
   },
 });
 

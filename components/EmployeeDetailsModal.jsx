@@ -905,8 +905,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   navButton: {
-    width: 44,
-    height: 44,
+    width: 30,
+    height: 30,
     borderRadius: 22,
     backgroundColor: '#f8fafc',
     alignItems: 'center',

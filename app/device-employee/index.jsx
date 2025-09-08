@@ -217,9 +217,9 @@ const DeviceEmployeeRegistration = () => {
           return;
         }
         
-        const hostname = hybridDataService.getHostname();
-        const deviceEmployeeId = `device_${hostname}_${deviceInfo?.deviceId}`;
-        const message = `Employee ${officerData.fullName} has been successfully registered as a device employee for this device (${deviceEmployeeId}). This device is now locked to this employee. Only this employee can mark attendance on this device. The employee data has been synced with the main system for online/offline access.`;
+        // const hostname = hybridDataService.getHostname();
+        const deviceEmployeeId = `${deviceInfo?.deviceId}`;
+        const message = `Employee ${officerData.fullName} has been successfully registered as a device employee for this device (${deviceEmployeeId}). `;
         showCustomToast("success", "Registration Successful", message);
       }
 

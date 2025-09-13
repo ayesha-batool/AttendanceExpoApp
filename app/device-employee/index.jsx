@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -15,11 +14,12 @@ import AddOfficerModal from "../../components/AddOfficerModal";
 import CaseDetailsModal from "../../components/CaseDetailsModal";
 import EmployeeCard from "../../components/EmployeeCard";
 import EmployeeDetailsModal from "../../components/EmployeeDetailsModal";
-
 import OfflineStatus from "../../components/OfflineStatus";
+import PageHeader from "../../components/PageHeader";
 
 import { hybridDataService } from "../../services/hybridDataService";
-import { formatLocationForStorage, getAccuracyDescription, getCurrentLocationWithAddress, parseStoredLocation } from "../../utils/geocoding";
+import deviceIdManager from "../../utils/deviceIdManager";
+import { checkLocationPermissions, formatLocationForStorage, getAccuracyDescription, getCurrentLocationWithAddress, parseStoredLocation } from "../../utils/geocoding";
 
 const DeviceEmployeeRegistration = () => {
   const router = useRouter();
@@ -65,6 +65,14 @@ const DeviceEmployeeRegistration = () => {
   const setCurrentLocationAsWorkLocation = async () => {
     try {
       setIsGettingLocation(true);
+      
+      // Check permissions first
+      const permissionStatus = await checkLocationPermissions();
+      if (!permissionStatus.granted) {
+        showCustomToast('error', 'Permission Required', 'Location permission is required to set your work location. Please enable location access in your device settings.');
+        return;
+      }
+      
       showCustomToast("info", "Getting Location", "Getting high-accuracy location...");
       
       const { location, address } = await getCurrentLocationWithAddress();
@@ -109,10 +117,17 @@ const DeviceEmployeeRegistration = () => {
       await initializePage();
       
     } catch (error) {
-      console.error("❌ Error setting work location:", error);
+      // Don't log permission denied errors to console to avoid spam
+      if (error.code !== 'PERMISSION_DENIED') {
+        console.error("❌ Error setting work location:", error);
+      }
       
-      if (error.message === 'Location permission denied') {
-        showCustomToast('error', 'Permission Denied', 'Location permission is required to set your work location');
+      if (error.message === 'Location permission denied' || error.code === 'PERMISSION_DENIED') {
+        showCustomToast('error', 'Permission Denied', 'Location permission is required to set your work location. Please enable location access in your device settings.');
+      } else if (error.message.includes('Unable to get location') || error.code === 'LOCATION_UNAVAILABLE') {
+        showCustomToast('error', 'Location Unavailable', 'Unable to get your current location. Please check your GPS settings and try again.');
+      } else if (error.message.includes('timeout') || error.code === 'LOCATION_TIMEOUT') {
+        showCustomToast('error', 'Location Timeout', 'Location request timed out. Please try again in a better location.');
       } else {
         showCustomToast("error", "Location Error", "Failed to set work location. Please try again.");
       }
@@ -123,12 +138,14 @@ const DeviceEmployeeRegistration = () => {
 
 
 
+ 
+
   const initializePage = async () => {
     try {
-    
-      // Get device ID from storage
-      const deviceId = await AsyncStorage.getItem('deviceId');
-      console.log("deviceId", deviceId);
+      // Get device ID using unified manager
+      const deviceId = await deviceIdManager.getDeviceId();
+      console.log("DeviceD:", deviceId);
+      
       const device = { deviceId };
       setDeviceInfo(device);
 
@@ -136,14 +153,11 @@ const DeviceEmployeeRegistration = () => {
       const allEmployeesData = await hybridDataService.getItems("employees");
       setAllEmployees(allEmployeesData);
 
-      // Get hostname for filtering
-      const hostname = hybridDataService.getHostname();
-      const expectedDeviceEmployeeId = `device_${hostname}_${device.deviceId}`;
-      
-      console.log("🔍 [DEVICE EMPLOYEE FILTER] Base device ID:", device.deviceId);
-      console.log("🔍 [DEVICE EMPLOYEE FILTER] Hostname:", hostname);
-      console.log("🔍 [DEVICE EMPLOYEE FILTER] Expected device employee ID:", expectedDeviceEmployeeId);
-      
+      // Get expected device employee ID using unified manager
+      const expectedDeviceEmployeeId = await deviceIdManager.getDeviceEmployeeId();
+      console.log("🔍  Expected device employee ID:", expectedDeviceEmployeeId);
+      console.log("🔍  Base device ID:", device.deviceId);
+    
       // First try to find with new hostname format and registrationType
       let employeeForThisDevice = allEmployeesData.find(
         (emp) => emp.deviceId === expectedDeviceEmployeeId && emp.registrationType === "device"
@@ -217,7 +231,6 @@ const DeviceEmployeeRegistration = () => {
           return;
         }
         
-        // const hostname = hybridDataService.getHostname();
         const deviceEmployeeId = `${deviceInfo?.deviceId}`;
         const message = `Employee ${officerData.fullName} has been successfully registered as a device employee for this device (${deviceEmployeeId}). `;
         showCustomToast("success", "Registration Successful", message);
@@ -324,6 +337,18 @@ const DeviceEmployeeRegistration = () => {
     }
   };
 
+  const handleDeleteDeviceId = async () => {
+    try {
+      await deviceIdManager.clearDeviceId();
+      showCustomToast("success", "Device ID Deleted", "Device ID has been removed from local storage");
+      // Refresh the page to generate a new device ID
+      await initializePage();
+    } catch (error) {
+      console.error("❌ Error deleting device ID:", error);
+      showCustomToast("error", "Error", "Failed to delete device ID");
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -334,7 +359,15 @@ const DeviceEmployeeRegistration = () => {
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <View style={styles.container}>
+      {/* Page Header with Back Button */}
+      <PageHeader
+        title="Device Employee"
+        subtitle="Register and manage device-based employees"
+        icon="shield"
+        showBackButton={true}
+      />
+      
       {/* Offline Status */}
       <OfflineStatus />
       
@@ -372,34 +405,31 @@ const DeviceEmployeeRegistration = () => {
         </View>
       )}
 
-      <LinearGradient
-        colors={["#1e40af", "#1e3a8a", "#1e293b"]}
-        style={styles.header}
-      >
-        <View style={styles.headerContent}>
-          <Ionicons name="shield" size={40} color="#fff" />
-          <Text style={styles.headerTitle}>Police Shield</Text>
-          <Text style={styles.headerSubtitle}>
-            Device-Based Employee System
-          </Text>
-        </View>
-      </LinearGradient>
+      <ScrollView style={styles.scrollContainer}>
 
       <View style={styles.content}>
          {/* Device ID Card */}
          <View style={styles.deviceCard}>
           <View style={styles.deviceHeader}>
-            <Ionicons name="phone-portrait" size={24} color="#3b82f6" />
-            <Text style={styles.deviceTitle}>Device Information</Text>
+            <View style={styles.deviceTitleContainer}>
+              <Ionicons name="phone-portrait" size={24} color="#3b82f6" />
+              <Text style={styles.deviceTitle}>Device Information</Text>
+            </View>
+            {/* <TouchableOpacity 
+              style={styles.deleteDeviceButton}
+              onPress={handleDeleteDeviceId}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="trash-outline" size={20} color="#ef4444" />
+            </TouchableOpacity> */}
            </View>
           
           <View style={styles.deviceInfo}>
             <Text style={styles.deviceLabel}>Device ID:</Text>
             <Text style={styles.deviceValue} numberOfLines={1} ellipsizeMode="middle">
-              {deviceInfo?.deviceId}
+              {deviceInfo?.deviceId || 'No Device ID'}
             </Text>
           </View>
-          
           
          
         </View>
@@ -556,6 +586,7 @@ const DeviceEmployeeRegistration = () => {
           </View>
         )}
       </View>
+      </ScrollView>
 
       {/* Add Officer Modal */}
       <AddOfficerModal
@@ -590,8 +621,7 @@ const DeviceEmployeeRegistration = () => {
         }}
       />
 
-
-    </ScrollView>
+    </View>
   );
 };
 
@@ -599,6 +629,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f8fafc",
+  },
+  scrollContainer: {
+    flex: 1,
   },
   loadingContainer: {
     flex: 1,
@@ -616,26 +649,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 16,
     color: "#64748b",
-  },
-  header: {
-    paddingTop: 60,
-    paddingBottom: 30,
-    paddingHorizontal: 20,
-  },
-  headerContent: {
-    alignItems: "center",
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#fff",
-    marginTop: 10,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: "#cbd5e1",
-    marginTop: 5,
-    textAlign: "center",
   },
   content: {
     flex: 1,
@@ -812,12 +825,44 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 15,
   },
+  deviceTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
   deviceTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#1e293b',
     marginLeft: 10,
-    flex: 1,
+  },
+  deleteDeviceButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  deviceActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 10,
+  },
+  refreshDeviceButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#f0f9ff',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#bae6fd',
+  },
+  refreshButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#0369a1',
+    marginLeft: 4,
   },
   syncButton: {
     padding: 12,

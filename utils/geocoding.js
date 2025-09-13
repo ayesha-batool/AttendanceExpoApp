@@ -62,7 +62,9 @@ export const getHighAccuracyLocation = async () => {
     // Request location permissions
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
-      throw new Error('Location permission denied');
+      const error = new Error('Location permission denied');
+      error.code = 'PERMISSION_DENIED';
+      throw error;
     }
 
     // Enable high accuracy location services
@@ -112,6 +114,10 @@ export const getHighAccuracyLocation = async () => {
       } catch (error) {
         console.warn(`⚠️ Location reading ${i + 1} failed:`, error.message);
         if (i === maxReadings - 1) {
+          // Add error code for timeout errors
+          if (error.message.includes('timeout')) {
+            error.code = 'LOCATION_TIMEOUT';
+          }
           throw error;
         }
       }
@@ -138,7 +144,9 @@ export const getHighAccuracyLocation = async () => {
         
       } catch (fallbackError) {
         console.error('❌ Fallback location also failed:', fallbackError);
-        throw new Error('Unable to get location. Please check your device GPS and try again.');
+        const error = new Error('Unable to get location. Please check your device GPS and try again.');
+        error.code = 'LOCATION_UNAVAILABLE';
+        throw error;
       }
     }
     
@@ -170,7 +178,10 @@ export const getHighAccuracyLocation = async () => {
     return bestLocation;
     
   } catch (error) {
-    console.error("❌ Error getting high-accuracy location:", error);
+    // Don't log permission denied errors to console to avoid spam
+    if (error.code !== 'PERMISSION_DENIED') {
+      console.error("❌ Error getting high-accuracy location:", error);
+    }
     throw error;
   }
 };
@@ -195,7 +206,10 @@ export const getCurrentLocationWithAddress = async () => {
     };
     
   } catch (error) {
-    console.error("❌ Error getting current location with address:", error);
+    // Don't log permission denied errors to console to avoid spam
+    if (error.code !== 'PERMISSION_DENIED') {
+      console.error("❌ Error getting current location with address:", error);
+    }
     throw error;
   }
 };
@@ -287,4 +301,44 @@ export const getPlatformLocationAdvice = () => {
   }
   
   return "Mobile devices provide better GPS accuracy. Ensure GPS is enabled and you're outdoors for best results.";
+};
+
+/**
+ * Check if location permissions are granted
+ * @returns {Promise<{granted: boolean, status: string}>} - Permission status
+ */
+export const checkLocationPermissions = async () => {
+  try {
+    const { status } = await Location.getForegroundPermissionsAsync();
+    return {
+      granted: status === 'granted',
+      status: status
+    };
+  } catch (error) {
+    console.error("❌ Error checking location permissions:", error);
+    return {
+      granted: false,
+      status: 'unknown'
+    };
+  }
+};
+
+/**
+ * Request location permissions with better error handling
+ * @returns {Promise<{granted: boolean, status: string}>} - Permission status
+ */
+export const requestLocationPermissions = async () => {
+  try {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    return {
+      granted: status === 'granted',
+      status: status
+    };
+  } catch (error) {
+    console.error("❌ Error requesting location permissions:", error);
+    return {
+      granted: false,
+      status: 'error'
+    };
+  }
 };

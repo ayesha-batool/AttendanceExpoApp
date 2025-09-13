@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   FlatList,
   Modal,
@@ -28,11 +28,23 @@ const SelectDropdown = ({
   onOptionRemoved = null,
   showAddNewOption = true,
   showRemoveOption = true,
+  autoSelectFirst = true,
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [removeSearchQuery, setRemoveSearchQuery] = useState('');
   const [customToast, setCustomToast] = useState(null);
+
+  // Auto-select first option if no value is selected
+  useEffect(() => {
+    if (autoSelectFirst && !selectedValue && options.length > 0) {
+      const firstOption = options[0];
+      const firstValue = typeof firstOption === 'string' ? firstOption : firstOption.value;
+      if (firstValue && firstValue !== 'add_new_option' && firstValue !== 'remove_option') {
+        onValueChange(firstValue);
+      }
+    }
+  }, [options, selectedValue, onValueChange, autoSelectFirst]);
 
   const showCustomToast = (type, title, message) => {
     setCustomToast({ type, title, message });
@@ -153,7 +165,6 @@ const SelectDropdown = ({
           onValueChange={handleValueChange}
           style={styles.picker}
         >
-          <Picker.Item label="Select" value="" />
           {displayOptions.map((item, index) => {
             // Create unique key by combining value and index to avoid duplicates
             const key = typeof item === 'string' 
@@ -168,7 +179,7 @@ const SelectDropdown = ({
                 label={item}
                 value={item}
                 color={
-                  isAddNewOption ? '#3b82f6' : isRemoveOption ? '#ef4444' : '#000'
+                  isAddNewOption ? '#3b82f6' : isRemoveOption ? '#ef4444' : '#374151'
                 }
               />
             ) : (
@@ -177,7 +188,7 @@ const SelectDropdown = ({
                 label={item.label}
                 value={item.value}
                 color={
-                  isAddNewOption ? '#3b82f6' : isRemoveOption ? '#ef4444' : '#000'
+                  isAddNewOption ? '#3b82f6' : isRemoveOption ? '#ef4444' : '#374151'
                 }
               />
             );
@@ -284,10 +295,15 @@ const styles = StyleSheet.create({
   },
   pickerContainer: {
     borderWidth: 1.5,
-    borderColor: '#ccc',
+    borderColor: '#d1d5db',
     borderRadius: 10,
-    backgroundColor: '#fff',
+    backgroundColor: '#ffffff',
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   pickerContainerError: {
     borderColor: '#ff4d4f',
@@ -295,7 +311,8 @@ const styles = StyleSheet.create({
   picker: {
     height: 50,
     width: '100%',
-    color: '#000',
+    color: '#374151',
+    backgroundColor: '#ffffff',
   },
   errorText: {
     marginTop: 4,

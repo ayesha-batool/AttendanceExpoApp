@@ -3,6 +3,7 @@ import { Account, Client, Databases, ID, Query } from 'appwrite';
 import * as Network from 'expo-network';
 import { useEffect, useState } from 'react';
 import { appConfig } from '../config/appConfig';
+import deviceIdManager from '../utils/deviceIdManager';
 
 // Set to false to reduce console spam
 const DEBUG_MODE = false;
@@ -219,29 +220,9 @@ const isOnline = async () => {
   }
 };
 
-// Device ID management - integrated into unified service
+// Device ID management - using unified manager
 const getDeviceId = async () => {
-  try {
-    let deviceId = await AsyncStorage.getItem('deviceId');
-    
-    if (!deviceId) {
-      // Generate a unique device ID
-      const timestamp = Date.now().toString();
-      const randomStr = Math.random().toString(36).substring(2, 15);
-      deviceId = `DEVICE_${timestamp}_${randomStr}`;
-      
-      // Save the device ID
-      await AsyncStorage.setItem('deviceId', deviceId);
-      console.log('✅ Generated new device ID:', deviceId);
-    }
-    
-    return deviceId;
-  } catch (error) {
-    console.error('Error getting device ID:', error);
-    // Generate a fallback device ID
-    const fallbackId = `DEVICE_${Date.now().toString().slice(-6)}`;
-    return fallbackId;
-  }
+  return await deviceIdManager.getDeviceId();
 };
 
 // Cache management for Appwrite data
@@ -277,7 +258,7 @@ const cleanDataForAppwrite = async (data, collectionId) => {
     ],
                                        attendance: [
         'employeeId', 'employeeName', 'date', 'status',
-        'totalWorkingHours', 'timestamp', 'deviceId'
+         'totalWorkingHours', 'timestamp', 'deviceId'
       ],
     
      
@@ -1098,11 +1079,12 @@ export const dataService = {
       
       if (duplicate) {
         // For attendance, the employeeId_date ID format naturally prevents duplicates
-        // so this should not happen, but if it does, throw an error for non-attendance
+        // For other collections, log the duplicate but don't throw error - let UI handle it
         if (collectionId !== 'attendance') {
-          const duplicateType = collectionId === 'employees' ? 'Badge number' : 'Title';
-          const duplicateValue = collectionId === 'employees' ? data.badgeNumber : data.title;
-          throw new Error(`${duplicateType} "${duplicateValue}" already exists.`);
+        const duplicateType = collectionId === 'employees' ? 'Badge number' : 'Title';
+        const duplicateValue = collectionId === 'employees' ? data.badgeNumber : data.title;
+          console.log(`⚠️ [DUPLICATE FOUND] ${duplicateType} "${duplicateValue}" already exists, but proceeding with save`);
+          // Don't throw error - let the save continue and UI will handle duplicate notification
         }
       }
       
@@ -1224,30 +1206,8 @@ export const dataService = {
     try {
         const cleanData = { ...data, id: documentId, $id: documentId };
       
-      // Check for duplicates across ALL devices (excluding current item)
-      const existing = await dataService.getItems(collectionId);
-      const duplicate = existing.find(item => {
-        // Skip the current item being updated
-        if (item.id === documentId || item.$id === documentId) return false;
-        
-        // Check for duplicates based on business rules
-        if (collectionId === 'employees' && data.badgeNumber && item.badgeNumber) {
-          return item.badgeNumber === data.badgeNumber;
-        }
-        if (collectionId === 'cases' && data.title && item.title) {
-          return item.title === data.title;
-        }
-        if (collectionId === 'expenses' && data.title && item.title) {
-          return item.title === data.title;
-        }
-        return false;
-      });
-      
-      if (duplicate) {
-        const duplicateType = collectionId === 'employees' ? 'Badge number' : 'Title';
-        const duplicateValue = collectionId === 'employees' ? data.badgeNumber : data.title;
-        throw new Error(`${duplicateType} "${duplicateValue}" already exists.`);
-      }
+      // Duplicate checking is now handled at the hybridDataService level
+      console.log(`🔍 [UPDATE DATA] Duplicate check already performed at hybrid service level`);
       
       await storage.save(key, cleanData);
       

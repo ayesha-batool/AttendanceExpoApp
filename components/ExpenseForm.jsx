@@ -22,6 +22,7 @@ const ExpenseForm = ({
   expense = null, 
   categoryOptions = [], 
   departmentOptions = [],
+  existingExpenses = [],
   isEdit = false 
 }) => {
   const [form, setForm] = useState({
@@ -73,6 +74,7 @@ const ExpenseForm = ({
 
   const updateForm = (key, value) => {
     setForm(prev => ({ ...prev, [key]: value }));
+    
     // Clear error when user starts typing
     if (errors[key]) {
       setErrors(prev => ({ ...prev, [key]: null }));
@@ -111,33 +113,60 @@ const ExpenseForm = ({
 
   const validateForm = () => {
     const newErrors = {};
-
+const duplicate = existingExpenses.filter(expense => expense.title === form.title);
+    // Title validation
     if (!form.title?.trim()) {
       newErrors.title = 'Title is required';
+    } else if (form.title.trim().length < 2) {
+      newErrors.title = 'Title must be at least 2 characters';
     }
 
-    if (!form.amount || parseFloat(form.amount) <= 0) {
-      newErrors.amount = 'Amount must be greater than 0';
+    // Amount validation
+    if (!form.amount || form.amount.toString().trim() === '') {
+      newErrors.amount = 'Amount is required';
+    } else {
+      const amount = parseFloat(form.amount);
+      if (isNaN(amount)) {
+        newErrors.amount = 'Amount must be a valid number';
+      } else if (amount <= 0) {
+        newErrors.amount = 'Amount must be greater than 0';
+      } else if (amount > 999999999) {
+        newErrors.amount = 'Amount is too large';
+      }
+    }
+if (duplicate.length > 0) {
+  newErrors.title = 'Title already exists';
+}
+    // Category validation (optional but if provided should be valid)
+    if (form.category && !categoryOptions.some(opt => opt.value === form.category)) {
+      newErrors.category = 'Please select a valid category';
     }
 
-  
+    // Department validation (optional but if provided should be valid)
+    if (form.department && !departmentOptions.some(opt => opt.value === form.department)) {
+      newErrors.department = 'Please select a valid department';
+    }
 
- 
+    // Date validation
+    if (!form.date || isNaN(new Date(form.date).getTime())) {
+      newErrors.date = 'Please select a valid date';
+    }
 
     setErrors(newErrors);
     
     // Show validation toast if there are errors
     if (Object.keys(newErrors).length > 0) {
-      const errorMessages = Object.values(newErrors).join(', ');
+      const errorMessages = Object.values(newErrors)[0];
       setCustomToast({
         type: 'error',
         title: 'Validation Error',
         message: errorMessages
       });
-      setTimeout(() => setCustomToast(null), 4000);
+      setTimeout(() => setCustomToast(null), 5000);
+      return false;
     }
     
-    return Object.keys(newErrors).length === 0;
+    return true;
   };
 
   const handleSave = async () => {
@@ -147,23 +176,71 @@ const ExpenseForm = ({
 
     setLoading(true);
     try {
+      // Prepare expense data with proper formatting
       const expenseData = {
         ...form,
+        title: form.title.trim(),
         amount: parseFloat(form.amount),
         date: form.date.toISOString(),
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
+        // Ensure we have default values for optional fields
+        category: form.category || '',
+        department: form.department || '',
+        description: form.description || '',
+        notes: form.notes || '',
+        status: form.status || 'unpaid'
       };
 
+      console.log('🔍 [EXPENSE FORM] Saving expense data:', expenseData);
+
       await onSave(expenseData);
-      resetForm();
-      onClose();
+      
+      // Show success message
+      setCustomToast({
+        type: 'success',
+        title: 'Success',
+        message: isEdit ? 'Expense updated successfully!' : 'Expense added successfully!'
+      });
+      
+      // Close modal after brief delay to show success message
+      setTimeout(() => {
+        resetForm();
+        onClose();
+      }, 1000);
+      
     } catch (error) {
+      console.error('❌ [EXPENSE FORM] Save error:', error);
+      
+      // Handle different types of errors
+      let errorMessage = 'Failed to save expense';
+      let errorTitle = 'Save Failed';
+      
+      if (error.message) {
+        if (error.message.includes('Missing required attribute')) {
+          const match = error.message.match(/Missing required attribute "(\w+)"/);
+          const field = match ? match[1] : 'field';
+          errorMessage = `Missing required field: ${field}`;
+          errorTitle = 'Required Field Missing';
+        } else if (error.message.includes('already exists')) {
+          errorMessage = error.message;
+          errorTitle = 'Duplicate Entry';
+        } else if (error.message.includes('Invalid document structure')) {
+          errorMessage = 'Invalid data format. Please check your entries.';
+          errorTitle = 'Data Format Error';
+        } else if (error.message.includes('Network')) {
+          errorMessage = 'Network error. Please check your connection.';
+          errorTitle = 'Connection Error';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       setCustomToast({
         type: 'error',
-        title: 'Save Failed',
-        message: error.message || 'Failed to save expense'
+        title: errorTitle,
+        message: errorMessage
       });
-      setTimeout(() => setCustomToast(null), 4000);
+      setTimeout(() => setCustomToast(null), 5000);
     } finally {
       setLoading(false);
     }
@@ -171,11 +248,7 @@ const ExpenseForm = ({
 
   const handleCancel = () => {
     if (isEdit) {
-      setCustomToast({
-        type: 'warning',
-        title: 'Cancel Edit',
-        message: 'Are you sure you want to cancel? All changes will be lost.'
-      });
+     
       setTimeout(() => setCustomToast(null), 3000);
       
       // Reset form and close after showing warning
@@ -215,7 +288,7 @@ const ExpenseForm = ({
           </View>
         )}
         
-        <LinearGradient colors={['#007AFF', '#0056CC']} style={styles.header}>
+        <LinearGradient colors={['#059669', '#047857']} style={styles.header}>
           <View style={styles.headerContent}>
             <TouchableOpacity onPress={handleCancel} style={styles.backButton}>
               <Ionicons name="close" size={24} color="#fff" />
@@ -338,7 +411,7 @@ const ExpenseForm = ({
             onPress={handleSave}
             disabled={loading}
           >
-            <LinearGradient colors={['#007AFF', '#0056CC']} style={styles.saveGradient}>
+            <LinearGradient colors={['#059669', '#047857']} style={styles.saveGradient}>
               <Ionicons name="checkmark" size={20} color="#fff" />
               <Text style={styles.saveButtonText}>
                 {loading ? 'Saving...' : (isEdit ? 'Update' : 'Save')}
@@ -375,6 +448,7 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingBottom: 20,
     paddingHorizontal: 20,
+    backgroundColor: '#059669',
   },
   headerContent: {
     flexDirection: 'row',
@@ -390,6 +464,8 @@ const styles = StyleSheet.create({
     color: '#fff',
     flex: 1,
     textAlign: 'center',
+    
+    
   },
   headerSpacer: {
     width: 40,

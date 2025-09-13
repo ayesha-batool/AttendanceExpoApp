@@ -12,6 +12,7 @@ import ExpenseForm from '../../components/ExpenseForm';
 import LoadingOverlay from '../../components/LoadingOverlay';
 import LoadingState from '../../components/LoadingState';
 import SearchBar from '../../components/SearchBar';
+import dataCache from '../../services/dataCache';
 import { hybridDataService } from '../../services/hybridDataService';
 
 const ExpensesManagementScreen = () => {
@@ -82,8 +83,8 @@ const ExpensesManagementScreen = () => {
   const loadDropdownOptions = async () => {
     try {
       const [categories, departments] = await Promise.all([
-        hybridDataService.getOptions('expense_categories'),
-        hybridDataService.getOptions('departments')
+        dataCache.getOptions('expense_categories'),
+        dataCache.getOptions('departments')
       ]);
       
       const categoryOptions = categories.map(category => ({
@@ -106,15 +107,12 @@ const ExpensesManagementScreen = () => {
     try {
       setLoading(true);
       
-      const expensesData = await hybridDataService.getItems('expenses');
+      const expensesData = await dataCache.getData('expenses');
       
-      const validExpenses = expensesData.filter(item => item && typeof item === 'object');
+    
       
-      // Remove duplicates based on ID (in-memory deduplication)
-      const uniqueExpenses = removeDuplicateExpenses(validExpenses);
+      setExpenses(expensesData);
       
-      setExpenses(uniqueExpenses);
-      setFilteredExpenses(uniqueExpenses);
     
     } catch (error) {
       console.error('Failed to load expenses data:', error);
@@ -126,25 +124,7 @@ const ExpensesManagementScreen = () => {
     }
   };
 
-  // Remove duplicate expenses based on ID
-  const removeDuplicateExpenses = (expenses) => {
-    const seen = new Set();
-    const unique = [];
-    
-    for (const expense of expenses) {
-      const id = getExpenseId(expense);
-      if (id && !seen.has(id)) {
-        seen.add(id);
-        unique.push(expense);
-      } else if (!id) {
-        // If no ID, still include the expense but with a warning
-        console.warn('Expense without ID found:', expense);
-        unique.push(expense);
-      }
-    }
-    
-    return unique;
-  };
+
 
   // Search and filter expenses
   const handleSearch = (query) => {
@@ -218,7 +198,7 @@ const ExpensesManagementScreen = () => {
       
     } catch (error) {
       console.error('Error deleting expense:', error);
-      showCustomToast('error', 'Error', error.message || 'Failed to delete expense');
+      // showCustomToast('error', 'Error', error.message || 'Failed to delete expense');
     } finally {
       updateModal('delete', false);
       updateSelected('deleteExpense', null);
@@ -237,7 +217,6 @@ const ExpensesManagementScreen = () => {
       await loadDropdownOptions();
       return;
     }
-
     try {
       setIsSaving(true);
       
@@ -262,8 +241,19 @@ const ExpensesManagementScreen = () => {
         
         showCustomToast('success', 'Success', 'Expense updated successfully');
       } else {
-        const newExpense = await hybridDataService.saveData(expenseData, 'expenses');
+        // Check for duplicates before saving and show warning if found
+        const existingExpense = expenses.find(expense => 
+          expense.title && expenseData.title && 
+          expense.title.toLowerCase() === expenseData.title.toLowerCase()
+        );
         
+        if (existingExpense) {
+          showCustomToast('warning', 'Duplicate Title', `Title "${expenseData.title}" already exists. `);
+        }
+        else{
+          console.log('🔍 [EXPENSE MANAGEMENT] Saving expense:', expenseData,existingExpense);
+
+          const newExpense = await hybridDataService.saveData(expenseData, 'expenses');
         const expenseWithId = { 
           ...newExpense, 
           id: newExpense.$id || newExpense.id,
@@ -274,36 +264,60 @@ const ExpensesManagementScreen = () => {
         setFilteredExpenses(prev => [...prev, expenseWithId]);
         
         showCustomToast('success', 'Success', 'Expense added successfully');
+          updateModal('add', false);
+          updateSelected('isEdit', false);
+          updateSelected('editExpense', null);
+          
+        }
+        
+        
       }
       
       // Close modal and reset state
-      updateModal('add', false);
-      updateSelected('isEdit', false);
-      updateSelected('editExpense', null);
-      
     } catch (error) {
-      console.error('Error saving expense:', error);
-      showCustomToast('error', 'Error', error.message || 'Failed to save expense');
+      console.error('❌ [EXPENSE MANAGEMENT] Error saving expense:', error);
+      
+      // Handle different types of errors with appropriate user feedback
+      let errorMessage = 'Failed to save expense';
+      let errorType = 'error';
+      let errorTitle = 'Error';
+      
+      if (error.message) {
+        if (error.message.includes('already exists')) {
+          console.log('Duplicate detected, showing toast but allowing operation to continue');
+          errorMessage = error.message;
+          errorType = 'warning';
+          errorTitle = 'Duplicate Title';
+          // Don't return here - let the operation continue
+        } else if (error.message.includes('Missing required attribute')) {
+          const match = error.message.match(/Missing required attribute "(\w+)"/);
+          const field = match ? match[1] : 'field';
+          errorMessage = `Missing required field: ${field}. Please fill in all required fields.`;
+          errorTitle = 'Required Field Missing';
+        } else if (error.message.includes('Invalid document structure')) {
+          errorMessage = 'Invalid data format. Please check your entries and try again.';
+          errorTitle = 'Data Format Error';
+        } else if (error.message.includes('Network') || error.message.includes('fetch')) {
+          errorMessage = 'Network error. Please check your connection and try again.';
+          errorTitle = 'Connection Error';
+        } else if (error.message.includes('Amount must be')) {
+          errorMessage = error.message;
+          errorTitle = 'Invalid Amount';
+        } else if (error.message.includes('Title')) {
+          errorMessage = error.message;
+          errorTitle = 'Invalid Title';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      showCustomToast(errorType, errorTitle, errorMessage);
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Clear search
-  const clearSearch = () => {
-    setSearchQuery('');
-    setFilteredExpenses(expenses);
-  };
 
-  // Stats calculations - compressed
-  const totalExpenses = expenses.reduce((sum, expense) => sum + (parseFloat(expense.amount) || 0), 0);
-  const topCategory = Object.entries(
-    expenses.reduce((acc, expense) => {
-      const cat = expense.category || 'other';
-      acc[cat] = (acc[cat] || 0) + (parseFloat(expense.amount) || 0);
-      return acc;
-    }, {})
-  ).sort(([,a], [,b]) => b - a)[0];
 
   // Calculate totals
   const calculateTotals = () => {
@@ -314,7 +328,7 @@ const ExpensesManagementScreen = () => {
     return { total, count, filteredTotal, filteredCount };
   };
 
-  const { total, count, filteredTotal, filteredCount } = calculateTotals();
+  const { total, count } = calculateTotals();
 
   // Effects
   useEffect(() => {
@@ -426,6 +440,7 @@ const ExpensesManagementScreen = () => {
         isEdit={selected.isEdit}
         categoryOptions={categoryOptions}
         departmentOptions={departmentOptions}
+        existingExpenses={expenses}
       />
 
       <ExpenseDetailsModal
@@ -553,7 +568,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 8,
     marginHorizontal: 20,
-
   },
   tab: {
     flexDirection: 'row',

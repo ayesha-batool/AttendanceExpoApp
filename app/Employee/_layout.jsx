@@ -9,6 +9,7 @@ const EmployeeLayoutContent = () => {
         title="Employee Management" 
         icon="people"
         gradientColors={['#3b82f6', '#1d4ed8', '#1e40af']}
+        showBackButton={true}
       />
       <Stack>
         <Stack.Screen

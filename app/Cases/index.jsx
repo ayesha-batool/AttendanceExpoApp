@@ -14,6 +14,7 @@ import OfflineStatus from '../../components/OfflineStatus';
 import SearchBar from '../../components/SearchBar';
 import SelectDropdown from '../../components/SelectDropdown';
 import { useAuth } from '../../context/AuthContext';
+import dataCache from '../../services/dataCache';
 import { hybridDataService } from '../../services/hybridDataService';
 import { validateForm, VALIDATION_SCHEMAS } from '../../utils/validation';
 
@@ -75,9 +76,9 @@ const CasesScreen = () => {
   const loadDropdownOptions = async () => {
     try {
       const [statusOptions, priorityOptions, categoryOptions] = await Promise.all([
-        hybridDataService.getOptions('case_status'),
-        hybridDataService.getOptions('case_priority'),
-        hybridDataService.getOptions('case_categories')
+        dataCache.getOptions('case_statuses'),
+        dataCache.getOptions('case_priorities'),
+        dataCache.getOptions('case_categories')
       ]);
 
   
@@ -174,8 +175,8 @@ const CasesScreen = () => {
       setLoading(true);
       
       const [casesData, employeesData] = await Promise.all([
-        hybridDataService.getItems('cases'),
-        hybridDataService.getItems('employees')
+        dataCache.getData('cases'),
+        dataCache.getData('employees')
       ]);
       
     
@@ -294,6 +295,16 @@ const CasesScreen = () => {
         showCustomToast('success', 'Success', 'Case updated successfully');
         setTimeout(() => setCustomToast(null), 3000);
       } else {
+        // Check for duplicates before saving and show warning if found
+        const existingCase = cases.find(caseItem => 
+          caseItem.title && caseData.title && 
+          caseItem.title.toLowerCase() === caseData.title.toLowerCase()
+        );
+        
+        if (existingCase) {
+          showCustomToast('warning', 'Duplicate Title', `Title "${caseData.title}" already exists. Saving anyway with unique ID.`);
+        }
+        
         const newCase = await hybridDataService.saveData(caseData, 'cases');
         
         const caseWithId = { ...newCase, id: newCase.$id || newCase.id, $id: newCase.$id || newCase.id };
@@ -314,8 +325,16 @@ const CasesScreen = () => {
         router.replace('/auth');
         return;
       }
+      
+      // Handle duplicate errors specifically
+      if (error.message && error.message.includes('already exists')) {
+        console.log('Duplicate detected, showing toast but allowing operation to continue');
+        showCustomToast('warning', 'Duplicate Title', error.message);
+        // Don't return here - let the operation continue
+      } else {
       console.error('Failed to save case:', error);
       showCustomToast('error', 'Error', error.message || 'Failed to save case');
+      }
     } finally {
       setIsSaving(false);
     }
@@ -429,7 +448,7 @@ const CasesScreen = () => {
                     <Text style={styles.caseTitle} numberOfLines={2}>{String(item.title || 'Untitled Case')}</Text>
                     <View style={styles.caseMetaRow}>
                       <View style={styles.caseMeta}>
-                        <Ionicons name="folder-outline" size={12} color="#6366f1" />
+                        <Ionicons name="folder-outline" size={10} color="#6366f1" />
                         <Text style={styles.caseCategoryText}>{String(item.category || 'General')}</Text>
                       </View>
                       <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
@@ -439,10 +458,10 @@ const CasesScreen = () => {
                   </View>
                   <View style={styles.cardActions}>
                     <TouchableOpacity style={styles.actionButton} onPress={(e) => { e.stopPropagation(); handleEdit(item); }}>
-                      <Ionicons name="create-outline" size={18} color="#6366f1" />
+                      <Ionicons name="create-outline" size={16} color="#6366f1" />
                     </TouchableOpacity>
                     <TouchableOpacity style={[styles.actionButton, styles.deleteButton]} onPress={(e) => { e.stopPropagation(); handleDelete(item); }}>
-                      <Ionicons name="trash-outline" size={18} color="#ef4444" />
+                      <Ionicons name="trash-outline" size={16} color="#ef4444" />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -451,7 +470,7 @@ const CasesScreen = () => {
                 <View style={styles.cardContent}>
                   <View style={styles.infoRow}>
                     <View style={styles.infoIconContainer}>
-                      <Ionicons name="person-outline" size={16} color="#6366f1" />
+                      <Ionicons name="person-outline" size={14} color="#6366f1" />
                     </View>
                     <View style={styles.infoContent}>
                       <Text style={styles.infoLabel}>Assigned Officer</Text>
@@ -461,19 +480,19 @@ const CasesScreen = () => {
                   
                   <View style={styles.infoRow}>
                     <View style={styles.infoIconContainer}>
-                      <Ionicons name="calendar-outline" size={16} color="#6366f1" />
+                      <Ionicons name="calendar-outline" size={14} color="#6366f1" />
                     </View>
                     <View style={styles.infoContent}>
                       <Text style={styles.infoLabel}>Start Date</Text>
                       <Text style={styles.infoValue}>{String(item.startDate ? new Date(item.startDate).toLocaleDateString() : 'Not set')}</Text>
-                    </View>
                   </View>
-
+                </View>
+                
                   {item.location && (
                     <View style={styles.infoRow}>
                       <View style={styles.infoIconContainer}>
-                        <Ionicons name="location-outline" size={16} color="#6366f1" />
-                      </View>
+                        <Ionicons name="location-outline" size={14} color="#6366f1" />
+                  </View>
                       <View style={styles.infoContent}>
                         <Text style={styles.infoLabel}>Location</Text>
                         <Text style={styles.infoValue}>{String(item.location)}</Text>
@@ -486,13 +505,13 @@ const CasesScreen = () => {
                 <View style={styles.cardFooter}>
                   <View style={styles.priorityContainer}>
                     <Text style={styles.priorityLabel}>Priority</Text>
-                    <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(item.priority) }]}>
+                  <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(item.priority) }]}>
                       <Text style={styles.priorityText}>{String(item.priority || 'Medium').toUpperCase()}</Text>
-                    </View>
+                  </View>
                   </View>
                   <TouchableOpacity style={styles.viewButton} onPress={() => handleView(item)}>
                     <Text style={styles.viewButtonText}>View Details</Text>
-                    <Ionicons name="chevron-forward" size={16} color="#6366f1" />
+                    <Ionicons name="chevron-forward" size={14} color="#6366f1" />
                   </TouchableOpacity>
                 </View>
                 
@@ -793,19 +812,19 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 20, fontWeight: '600', color: '#374151', marginTop: 16, marginBottom: 8 },
   emptyMessage: { fontSize: 14, color: '#6b7280', textAlign: 'center' },
   caseCard: { 
-    marginBottom: 16, 
-    borderRadius: 16, 
+    marginBottom: 12, 
+    borderRadius: 12, 
     backgroundColor: '#ffffff',
     shadowColor: '#6366f1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
     borderWidth: 1,
     borderColor: '#e5e7eb',
   },
   cardGradient: { 
-    borderRadius: 16, 
+    borderRadius: 12, 
     padding: 0,
     overflow: 'hidden',
   },
@@ -817,19 +836,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row', 
     justifyContent: 'space-between', 
     alignItems: 'flex-start', 
-    padding: 16,
-    paddingBottom: 12,
+    padding: 12,
+    paddingBottom: 8,
   },
   cardTitleContainer: { 
-    flex: 1, 
-    marginRight: 16 
+    flex: 1,
+    marginRight: 12 
   },
   caseTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: '#1e293b',
-    marginBottom: 8,
-    lineHeight: 24,
+    marginBottom: 6,
+    lineHeight: 20,
   },
   caseMetaRow: {
     flexDirection: 'row',
@@ -840,25 +859,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#f0f9ff',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#bae6fd',
   },
   caseCategoryText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: '#0369a1',
-    marginLeft: 4,
+    marginLeft: 3,
   },
   cardActions: { 
     flexDirection: 'row', 
     gap: 8 
   },
   actionButton: { 
-    padding: 10, 
-    borderRadius: 10, 
+    padding: 8, 
+    borderRadius: 8, 
     backgroundColor: '#f8fafc',
     borderWidth: 1,
     borderColor: '#e2e8f0',
@@ -868,46 +887,46 @@ const styles = StyleSheet.create({
     borderColor: '#fecaca',
   },
   cardContent: { 
-    paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingHorizontal: 12,
+    paddingBottom: 8,
   },
   infoRow: { 
     flexDirection: 'row', 
     alignItems: 'flex-start', 
-    marginBottom: 12,
+    marginBottom: 8,
   },
   infoIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 6,
     backgroundColor: '#f0f9ff',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 10,
   },
   infoContent: {
     flex: 1,
   },
   infoLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
     color: '#6b7280',
-    marginBottom: 2,
+    marginBottom: 1,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
   infoValue: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: '#374151',
-    lineHeight: 20,
+    lineHeight: 18,
   },
   cardFooter: { 
     flexDirection: 'row', 
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     backgroundColor: '#f9fafb',
     borderTopWidth: 1,
     borderTopColor: '#f3f4f6',
@@ -917,48 +936,48 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   priorityLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
     color: '#6b7280',
-    marginRight: 8,
+    marginRight: 6,
   },
   statusBadge: { 
-    paddingHorizontal: 8, 
-    paddingVertical: 4, 
-    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 5,
   },
   statusText: { 
-    fontSize: 10, 
+    fontSize: 9, 
     fontWeight: '700', 
     color: '#fff', 
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
   priorityBadge: { 
-    paddingHorizontal: 8, 
-    paddingVertical: 4, 
-    borderRadius: 6,
+    paddingHorizontal: 6, 
+    paddingVertical: 3, 
+    borderRadius: 5,
   },
   priorityText: { 
-    fontSize: 10, 
+    fontSize: 9, 
     fontWeight: '700', 
     color: '#fff',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
   viewButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     backgroundColor: '#f0f9ff',
-    borderRadius: 8,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: '#bae6fd',
   },
   viewButtonText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: '#0369a1',
-    marginRight: 4,
+    marginRight: 3,
   },
   modalOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#f8f9fa', zIndex: 1000 },
   modalContent: { flex: 1, backgroundColor: '#f8f9fa' },

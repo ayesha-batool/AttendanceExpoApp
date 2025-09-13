@@ -9,6 +9,7 @@ const CasesLayoutContent = () => {
         title="Cases Management" 
         icon="document-text"
         gradientColors={['#ef4444', '#dc2626']}
+        showBackButton={true}
       />
       <Stack>
         <Stack.Screen

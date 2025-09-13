@@ -3,13 +3,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
-import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import PageHeader from '../../components/PageHeader';
 import { useAuth } from '../../context/AuthContext';
 // import { useCasesContext } from '../../context/CasesContext';
 
 import LocationMap from '../../components/LocationMap';
+import dataCache from '../../services/dataCache';
 import { hybridDataService } from '../../services/hybridDataService';
 
 
@@ -17,11 +18,27 @@ const DashboardScreen = () => {
   const router = useRouter();
   const { currentUser, logout } = useAuth();
   const [employees, setEmployees] = useState([]);
+  const spinValue = useRef(new Animated.Value(0)).current;
   const [cases, setCases] = useState([]);
   const [expenses, setExpenses] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [deviceInfo, setDeviceInfo] = useState({ local: null, appwrite: null });
+
+  // Animation effect for loading spinner
+  useEffect(() => {
+    if (loading) {
+      const spinAnimation = Animated.loop(
+        Animated.timing(spinValue, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        })
+      );
+      spinAnimation.start();
+      return () => spinAnimation.stop();
+    }
+  }, [loading, spinValue]);
   const [customToast, setCustomToast] = useState(null);
   const [showUserModal, setShowUserModal] = useState(false);
   const [stats, setStats] = useState({
@@ -56,12 +73,12 @@ const DashboardScreen = () => {
       // Add a small delay to allow authentication session to be established
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      console.log('🔍 [DASHBOARD] Starting to fetch data...');
+      console.log('🔍 [DASHBOARD] Starting to fetch cached data...');
       
-      const [employeesData, casesData, expensesData] = await Promise.all([
-        hybridDataService.getItems('employees'),
-        hybridDataService.getItems('cases'),
-        hybridDataService.getItems('expenses')
+            const [employeesData, casesData, expensesData] = await Promise.all([
+        dataCache.getData('employees'),
+        dataCache.getData('cases'),
+        dataCache.getData('expenses')
       ]);
 
       console.log('🔍 [DASHBOARD] Raw data received:');
@@ -142,9 +159,9 @@ const DashboardScreen = () => {
     try {
       setLoading(true);
       const [employeesData, casesData, expensesData] = await Promise.all([
-        hybridDataService.getItems('employees'),
-        hybridDataService.getItems('cases'),
-        hybridDataService.getItems('expenses')
+        dataCache.getData('employees'),
+        dataCache.getData('cases'),
+        dataCache.getData('expenses')
       ]);
 
       // Set the actual data arrays
@@ -190,7 +207,7 @@ const DashboardScreen = () => {
       // Get device ID from Appwrite if online
       let appwriteDeviceId = null;
       try {
-        const appwriteData = await hybridDataService.getItems('employees');
+        const appwriteData = await dataCache.getData('employees');
         if (appwriteData.length > 0) {
           // Get the first employee's deviceId from Appwrite
           const firstEmployee = appwriteData[0];
@@ -310,9 +327,16 @@ const DashboardScreen = () => {
 
 
   if (loading) {
+    const spin = spinValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '360deg'],
+    });
+
     return (
       <View style={styles.loadingContainer}>
-        <Ionicons name="refresh" size={48} color="#1e40af" />
+        <Animated.View style={{ transform: [{ rotate: spin }] }}>
+          <Ionicons name="refresh" size={48} color="#1e40af" />
+        </Animated.View>
         <Text style={styles.loadingText}>Loading Dashboard...</Text>
       </View>
     );
@@ -359,7 +383,7 @@ const DashboardScreen = () => {
       {/* Statistics Cards */}
       <View style={styles.statsSection}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Quick Statistics</Text>
+        <Text style={styles.sectionTitle}>Quick Statistics</Text>
           <TouchableOpacity onPress={fetchData} style={styles.refreshButton} disabled={loading}>
             <Ionicons name={loading ? "hourglass" : "refresh"} size={20} color="#64748b" />
           </TouchableOpacity>
@@ -737,7 +761,7 @@ const styles = StyleSheet.create({
   sectionTitle: { 
     fontSize: 24, 
     fontWeight: '700', 
-    color: '#1e293b',
+    color: '#1e293b', 
     textAlign: 'center',
     flex: 1,
   },

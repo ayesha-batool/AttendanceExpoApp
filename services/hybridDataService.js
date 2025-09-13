@@ -1,10 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import deviceIdManager from '../utils/deviceIdManager';
+import dataCache from './dataCache';
 import { customOptionsService } from './unifiedDataService';
 
 // Simple local storage wrapper
 const localStorage = {
   async save(key, data) {
     try {
+      console.log("data:", data);
       console.log(`🔍 [LOCAL STORAGE] Saving data with key: ${key}`, data);
       await AsyncStorage.setItem(key, JSON.stringify(data));
       console.log(`✅ [LOCAL STORAGE] Successfully saved data with key: ${key}`);
@@ -191,6 +194,7 @@ export const hybridDataService = {
     return validItems;
   },
 
+
   // Save data - try Appwrite first, fallback to local
   async saveData(data, collectionId) {
     console.log(`🔍 [SAVE DATA] Starting saveData for collection: ${collectionId}`, data);
@@ -231,6 +235,7 @@ export const hybridDataService = {
           
           // Mark as synced
           cleanData.synced = true;
+          console.log(`🔍 [SAVE DATA] Marking as synced:`, cleanData);
           await localStorage.save(key, cleanData);
           
           console.log(`✅ [SAVE DATA] Successfully saved to Appwrite`);
@@ -242,6 +247,10 @@ export const hybridDataService = {
         console.log(`📱 [SAVE DATA] Appwrite not healthy, keeping data local only`);
       }
 
+      // Invalidate cache for this collection
+      dataCache.invalidateCache(collectionId);
+      console.log(`🗑️ [SAVE DATA] Cache invalidated for collection: ${collectionId}`);
+      
       console.log(`✅ [SAVE DATA] Final result:`, cleanData);
       return cleanData;
     } catch (error) {
@@ -268,6 +277,9 @@ export const hybridDataService = {
       console.log(`🔍 [UPDATE DATA] Clean data ID: ${cleanData.id}`);
       console.log(`🔍 [UPDATE DATA] Clean data deviceId: ${cleanData.deviceId}`);
       console.log(`🔍 [UPDATE DATA] Clean data registrationType: ${cleanData.registrationType}`);
+
+      // For updates, we don't need to check duplicates - just proceed
+      console.log(`🔍 [UPDATE DATA] Proceeding with update operation`);
 
       // Update locally first
       console.log(`🔍 [UPDATE DATA] Updating local storage with key: ${key}`);
@@ -301,6 +313,10 @@ export const hybridDataService = {
         console.log(`📱 [UPDATE DATA] Appwrite not healthy, keeping update local only`);
       }
 
+      // Invalidate cache for this collection
+      dataCache.invalidateCache(collectionId);
+      console.log(`🗑️ [UPDATE DATA] Cache invalidated for collection: ${collectionId}`);
+      
       console.log(`✅ [UPDATE DATA] Final result:`, cleanData);
       return cleanData;
     } catch (error) {
@@ -343,6 +359,10 @@ export const hybridDataService = {
       await localStorage.delete(key);
       console.log(`✅ [DELETE DATA] Successfully deleted from local storage`);
 
+      // Invalidate cache for this collection
+      dataCache.invalidateCache(collectionId);
+      console.log(`🗑️ [DELETE DATA] Cache invalidated for collection: ${collectionId}`);
+      
       const result = { success: true, id: documentId };
       console.log(`✅ [DELETE DATA] Final result:`, result);
       return result;
@@ -516,59 +536,21 @@ export const hybridDataService = {
 
   // Utility methods
   async getDeviceId() {
-    console.log(`🔍 [DEVICE ID] Getting device ID`);
-    let deviceId = await AsyncStorage.getItem('deviceId');
-    if (!deviceId) {
-      deviceId = Date.now().toString(36) + Math.random().toString(36).substr(2);
-      await AsyncStorage.setItem('deviceId', deviceId);
-      console.log(`✅ [DEVICE ID] Generated new device ID: ${deviceId}`);
-    } else {
-      console.log(`✅ [DEVICE ID] Using existing device ID: ${deviceId}`);
-    }
-    return deviceId;
+    return await deviceIdManager.getDeviceId();
   },
 
   // Generate device ID with hostname prefix for different employee types
   async getAdminDeviceId() {
-    const baseDeviceId = await this.getDeviceId(); // Gets DEVICE_VM1YWC
-    const hostname = this.getHostname();
-    const adminDeviceId = `${hostname}_${baseDeviceId}`;
-    console.log(`🔍 [ADMIN DEVICE ID] Generated admin device ID: ${adminDeviceId}`);
-    return adminDeviceId;
+    return await deviceIdManager.getAdminDeviceId();
   },
 
   async getDeviceEmployeeDeviceId() {
-    const baseDeviceId = await this.getDeviceId(); // Gets DEVICE_VM1YWC
-    const hostname = this.getHostname();
-    const deviceEmployeeDeviceId = `device_${hostname}_${baseDeviceId}`;
-    console.log(`🔍 [DEVICE EMPLOYEE DEVICE ID] Generated device employee device ID: ${deviceEmployeeDeviceId}`);
-    return deviceEmployeeDeviceId;
+    return await deviceIdManager.getDeviceEmployeeId();
   },
 
   // Get hostname (localhost on web, IP on mobile)
   getHostname() {
-    try {
-      // For web browsers
-      if (typeof window !== 'undefined' && window.location) {
-        const hostname = window.location.hostname;
-        console.log(`🔍 [HOSTNAME] Web hostname: ${hostname}`);
-        return hostname;
-      }
-      
-      // For React Native/Expo
-      if (typeof global !== 'undefined' && global.__DEV__) {
-        // In development, try to get local IP
-        console.log(`🔍 [HOSTNAME] React Native development mode`);
-        return 'localhost'; // Fallback for development
-      }
-      
-      // Fallback
-      console.log(`🔍 [HOSTNAME] Using fallback hostname`);
-      return 'localhost';
-    } catch (error) {
-      console.log(`🔍 [HOSTNAME] Error getting hostname, using fallback:`, error.message);
-      return 'localhost';
-    }
+    return deviceIdManager.getHostname();
   },
 
   // Default options for each field

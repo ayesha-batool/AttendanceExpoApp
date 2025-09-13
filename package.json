@@ -11,6 +11,7 @@
     "lint": "expo lint"
   },
   "dependencies": {
+    "@expo/schema-utils": "^0.1.7",
     "@expo/vector-icons": "^14.1.0",
     "@react-native-async-storage/async-storage": "2.1.2",
     "@react-native-community/datetimepicker": "8.4.1",
@@ -42,10 +43,10 @@
     "fuse.js": "^7.1.0",
     "libphonenumber-js": "^1.12.10",
     "nanoid": "^3.3.11",
-    "react": "19.0.0",
+    "react": "18.2.0",
     "react-async-hook": "^4.0.0",
-    "react-dom": "19.0.0",
-    "react-native": "0.79.5",
+    "react-dom": "18.2.0",
+    "react-native": "0.76.3",
     "react-native-country-picker-modal": "^2.0.0",
     "react-native-gesture-handler": "~2.24.0",
     "react-native-phone-number-input": "^2.1.0",
@@ -64,10 +65,10 @@
     "@babel/plugin-transform-runtime": "^7.28.3",
     "@expo/cli": "^0.24.20",
     "@react-native-community/cli": "^19.1.1",
-    "@types/react": "~19.0.10",
+    "@types/react": "~18.2.79",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~9.2.0",
-    "typescript": "~5.8.3"
+    "typescript": "~5.3.3"
   },
   "private": true
 }

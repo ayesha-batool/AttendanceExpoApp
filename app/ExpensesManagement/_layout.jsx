@@ -9,6 +9,7 @@ const ExpensesLayoutContent = () => {
         title="Expenses Management" 
         icon="card"
         gradientColors={['#10b981', '#059669']}
+        showBackButton={true}
       />
       <Stack>
         <Stack.Screen

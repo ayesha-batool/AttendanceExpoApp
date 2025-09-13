@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import Toast, { BaseToast, ErrorToast } from "react-native-toast-message";
 import { AppProvider } from "../context/AppContext";
 import { AuthProvider, useAuth } from "../context/AuthContext";
+import dataCache from "../services/dataCache";
 
 // Fix font loading timeout issue - removed window code for mobile
 
@@ -108,18 +109,26 @@ const AuthenticatedLayout = () => {
   
   useEffect(() => {
     try {
-      if (!loading) {
-        // Log current auth state for debugging
-        console.log('🔍 App Layout - Auth State:', {
-          isAuthenticated,
-          currentUser: currentUser ? {
-            id: currentUser.$id,
-            email: currentUser.email,
-            isOffline: currentUser.isOffline,
-            name: currentUser.name
-          } : null,
+    if (!loading) {
+      // Log current auth state for debugging
+      console.log('🔍 App Layout - Auth State:', {
+        isAuthenticated,
+        currentUser: currentUser ? {
+          id: currentUser.$id,
+          email: currentUser.email,
+          isOffline: currentUser.isOffline,
+          name: currentUser.name
+        } : null,
           mode: isOfflineMode ? (typeof isOfflineMode === 'function' ? isOfflineMode() : 'unknown') : 'unknown'
         });
+        
+        // Initialize data cache from storage
+        if (isAuthenticated) {
+          console.log('📦 [CACHE] Initializing data cache...');
+          dataCache.initializeFromStorage().catch(error => {
+            console.warn('Failed to initialize data cache:', error);
+          });
+        }
       }
     } catch (error) {
       console.error('Error in AuthenticatedLayout useEffect:', error);

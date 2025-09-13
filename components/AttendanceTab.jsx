@@ -73,7 +73,7 @@ const AttendanceTab = ({ employees = [] }) => {
     const selectedDateKey = formatDate(selectedDate);
     
     const currentAttendance = attendanceData[selectedDateKey] || {};
-    const activeEmployees = employees.filter(emp => emp.status === 'active');
+    const activeEmployees = employees.filter(emp => emp.status === 'Active' || emp.status === 'active');
     let needsInit = false;
     
     activeEmployees.forEach(employee => {
@@ -513,7 +513,7 @@ const AttendanceTab = ({ employees = [] }) => {
     // Filter employees by both active status and joining date
     const activeEmployees = employees.filter(emp => {
       // Check if employee is active
-      if (emp.status !== 'active') return false;
+      if (emp.status !== 'Active' ) return false;
       
       // Check if employee has joined before or on the selected date
       if (!emp.joiningDate) return true; // If no joining date, show them
@@ -787,7 +787,8 @@ const AttendanceTab = ({ employees = [] }) => {
         {(() => {
           const filteredEmployees = employees.filter(employee => {
             // Check if employee is active
-            if (employee.status !== 'active') return false;
+            console.log("employee.status:", employee.status);
+            if (employee.status !== 'Active' ) return false;
             
             // Only show employees who have joined before or on the selected date
             if (!employee.joiningDate) return true; // If no joining date, show them

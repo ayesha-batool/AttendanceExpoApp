@@ -56,7 +56,7 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null, d
   const [form, setForm] = useState({
     badgeNumber: "", fullName: "", fatherName: "", cnic: "", dateOfBirth: new Date("2000-01-01"), gender: "",
     contactNumber: "", email: "", address: "", joiningDate: new Date("2020-01-01"), rank: "", department: "", 
-    postingStation: "", shift: "", status: "active", isArmed: false, 
+    postingStation: "", shift: "", status: "Active", isArmed: false, 
     serviceYears: "", lastPromotionDate: new Date(),
     disciplinaryActions: "", trainingCertifications: "", salary: "", overtimeRate: "", 
     monthlyOvertimeHours: "", totalAdvances: "", lastAdvanceDate: new Date(), 
@@ -83,6 +83,60 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null, d
     employment_status: []
   });
   const [customToast, setCustomToast] = useState(null);
+
+  // Tab navigation
+  const tabs = [
+    { key: "basic", icon: "person", label: "Basic Info" },
+    { key: "contact", icon: "call", label: "Contact" },
+    { key: "professional", icon: "shield", label: "Professional" },
+    { key: "payroll", icon: "cash", label: "Payroll" }
+  ];
+
+  const currentTabIndex = tabs.findIndex(tab => tab.key === activeTab);
+  const canGoPrevious = currentTabIndex > 0;
+  const canGoNext = currentTabIndex < tabs.length - 1;
+
+  const goToPreviousTab = () => {
+    if (canGoPrevious) {
+      setActiveTab(tabs[currentTabIndex - 1].key);
+    }
+  };
+
+  const goToNextTab = () => {
+    if (canGoNext) {
+      setActiveTab(tabs[currentTabIndex + 1].key);
+    }
+  };
+
+  // Simple swipe gesture handling
+  const [touchStart, setTouchStart] = useState(null);
+  const [touchEnd, setTouchEnd] = useState(null);
+
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e) => {
+    setTouchEnd(null);
+    setTouchStart(e.nativeEvent.pageX);
+  };
+
+  const onTouchMove = (e) => {
+    setTouchEnd(e.nativeEvent.pageX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe && canGoNext) {
+      goToNextTab();
+    }
+    if (isRightSwipe && canGoPrevious) {
+      goToPreviousTab();
+    }
+  };
 
   useEffect(() => {
     if (editingOfficer) {
@@ -143,7 +197,7 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null, d
     setForm({
       badgeNumber: "", fullName: "", fatherName: "", cnic: "", dateOfBirth: new Date("2000-01-01"), gender: "",
       contactNumber: "", email: "", address: "", joiningDate: new Date("2020-01-01"), rank: "", department: "", 
-      postingStation: "", shift: "", status: "active", isArmed: false, 
+      postingStation: "", shift: "", status: "Active", isArmed: false, 
       serviceYears: "", lastPromotionDate: new Date(),
       disciplinaryActions: "", trainingCertifications: "", salary: "", overtimeRate: "", 
       monthlyOvertimeHours: "", totalAdvances: "", lastAdvanceDate: new Date(), 
@@ -174,7 +228,7 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null, d
         rank: editingOfficer.rank || "", department: editingOfficer.department || "",
         postingStation: editingOfficer.postingStation || "",
         shift: editingOfficer.shift || editingOfficer.dutyShift || "",
-        status: editingOfficer.status || editingOfficer.status || "active",
+        status: editingOfficer.status || "Active",
         isArmed: editingOfficer.isArmed || false,
         serviceYears: editingOfficer.serviceYears || "",
         lastPromotionDate: editingOfficer.lastPromotionDate ? new Date(editingOfficer.lastPromotionDate) : new Date(),
@@ -867,13 +921,21 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null, d
           </LinearGradient>
 
           <View style={styles.tabContainer}>
+            {/* Left Arrow */}
+            <TouchableOpacity 
+              style={[styles.navArrow, !canGoPrevious && styles.navArrowDisabled]} 
+              onPress={goToPreviousTab}
+              disabled={!canGoPrevious}
+            >
+              <Ionicons 
+                name="chevron-back" 
+                size={20} 
+                color={canGoPrevious ? "#007AFF" : "#C7C7CC"} 
+              />
+            </TouchableOpacity>
+
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScrollContainer}>
-              {[
-                { key: "basic", icon: "person", label: "Basic Info" },
-                { key: "contact", icon: "call", label: "Contact" },
-                { key: "professional", icon: "shield", label: "Professional" },
-                { key: "payroll", icon: "cash", label: "Payroll" }
-              ].map(tab => (
+              {tabs.map(tab => (
                 <TouchableOpacity key={tab.key} style={[styles.tab, activeTab === tab.key && styles.activeTab]} 
                   onPress={() => setActiveTab(tab.key)}>
                   <Ionicons name={tab.icon} size={16} color={activeTab === tab.key ? "#007AFF" : "#8E8E93"} />
@@ -881,10 +943,44 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null, d
               </TouchableOpacity>
               ))}
             </ScrollView>
+
+            {/* Right Arrow */}
+            <TouchableOpacity 
+              style={[styles.navArrow, !canGoNext && styles.navArrowDisabled]} 
+              onPress={goToNextTab}
+              disabled={!canGoNext}
+            >
+              <Ionicons 
+                name="chevron-forward" 
+                size={20} 
+                color={canGoNext ? "#007AFF" : "#C7C7CC"} 
+              />
+            </TouchableOpacity>
+
+            {/* Tab Position Indicator */}
+            <View style={styles.tabIndicator}>
+              <Text style={styles.tabIndicatorText}>
+                {currentTabIndex + 1} of {tabs.length}
+              </Text>
+            </View>
           </View>
 
-          <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" 
-            keyboardDismissMode="none" contentContainerStyle={styles.scrollViewContent}>
+          {/* Swipe Hint */}
+          <View style={styles.swipeHint}>
+            <Ionicons name="swap-horizontal" size={16} color="#8E8E93" />
+            <Text style={styles.swipeHintText}>Swipe or use arrows to navigate</Text>
+          </View>
+
+          <ScrollView 
+            style={styles.scrollView} 
+            showsVerticalScrollIndicator={false} 
+            keyboardShouldPersistTaps="handled" 
+            keyboardDismissMode="none" 
+            contentContainerStyle={styles.scrollViewContent}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+          >
             {activeTab === "basic" && renderBasicInfoTab()}
             {activeTab === "contact" && renderContactTab()}
             {activeTab === "professional" && renderProfessionalTab()}
@@ -988,11 +1084,52 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: "#E5E5EA",
+    alignItems: "center",
   },
   tabScrollContainer: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 8,
+    flex: 1,
+  },
+  navArrow: {
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: "#F2F2F7",
+    marginHorizontal: 4,
+    borderWidth: 1,
+    borderColor: "#E5E5EA",
+  },
+  navArrowDisabled: {
+    backgroundColor: "#F9F9F9",
+    borderColor: "#F0F0F0",
+  },
+  tabIndicator: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: "#F2F2F7",
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  tabIndicatorText: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#8E8E93",
+  },
+  swipeHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 8,
+    backgroundColor: "#F9F9F9",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E5EA",
+  },
+  swipeHintText: {
+    fontSize: 12,
+    color: "#8E8E93",
+    marginLeft: 4,
+    fontStyle: "italic",
   },
   tab: {
     flexDirection: "row",

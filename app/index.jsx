@@ -4,11 +4,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 
@@ -39,8 +39,8 @@ const Index = () => {
     try {
       
       const hasLoggedIn = await AsyncStorage.getItem('hasLoggedInOnce');
-  
-      if (hasLoggedIn && isAuthenticated && currentUser) {
+  console.log('hasLoggedIn', hasLoggedIn);
+      if (hasLoggedIn) {
         // User has logged in once and is authenticated, go directly to Dashboard
         router.push('/Dashboard');
       } else {

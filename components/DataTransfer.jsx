@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import { Alert, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { hybridDataService } from '../services/hybridDataService';
+import PageHeader from './PageHeader';
 
 export const DataTransfer = () => {
   const [exportData, setExportData] = useState('');
@@ -57,14 +58,19 @@ export const DataTransfer = () => {
   ];
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <LinearGradient colors={['#1e40af', '#1e3a8a']} style={styles.headerGradient}>
-          <Ionicons name="swap-horizontal" size={32} color="#fff" />
-          <Text style={styles.title}>Data Transfer</Text>
-          <Text style={styles.subtitle}>Export and import data between devices</Text>
-        </LinearGradient>
-      </View>
+    <View style={styles.container}>
+      {/* Header */}
+      <LinearGradient colors={['#1e40af', '#1e3a8a', '#1e293b']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
+        <PageHeader
+          title="Data Transfer"
+          subtitle="Export and import data between devices"
+          icon="swap-horizontal"
+          gradientColors={['#1e40af', '#1e3a8a']}
+          showBackButton={true}
+        />
+      </LinearGradient>
+
+      <ScrollView style={styles.scrollContainer}>
 
       {/* Export Section */}
       <View style={styles.section}>
@@ -185,7 +191,8 @@ export const DataTransfer = () => {
           </View>
         </View>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 
@@ -195,32 +202,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   header: {
-    paddingTop: 50,
-    paddingBottom: 30,
-    alignItems: 'center',
+    paddingTop: 0,
+    paddingBottom: 0,
   },
-  headerGradient: {
-    padding: 24,
-    borderRadius: 20,
-    alignItems: 'center',
-    width: '90%',
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginTop: 10,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#e5e7eb',
-    marginTop: 5,
+  scrollContainer: {
+    flex: 1,
   },
   section: {
     backgroundColor: '#fff',

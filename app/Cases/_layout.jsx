@@ -1,7 +1,7 @@
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { View } from 'react-native';
 import PageHeader from '../../components/PageHeader';
-
+const router = useRouter();
 const CasesLayoutContent = () => {
   return (
     <View style={{ flex: 1 }}>
@@ -10,6 +10,7 @@ const CasesLayoutContent = () => {
         icon="document-text"
         gradientColors={['#ef4444', '#dc2626']}
         showBackButton={true}
+        onIconPress={() => router.back()}
       />
       <Stack>
         <Stack.Screen

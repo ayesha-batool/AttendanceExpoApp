@@ -50,6 +50,7 @@ const InputField = ({
         value={value}
         onChangeText={handleAmountChange}
         placeholder={placeholder}
+        placeholderTextColor="#999"
         keyboardType={keyboardType}
         multiline={multiline}
         numberOfLines={numberOfLines}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View, ActivityIndicator } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 const LoadingState = ({ text = "Loading..." }) => {
   return (
@@ -11,11 +11,12 @@ const LoadingState = ({ text = "Loading..." }) => {
 };
 
 const styles = StyleSheet.create({
-  loadingContainer: {
+  container: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 40,
+    backgroundColor: '#f8fafc',
   },
   loadingText: {
     fontSize: 16,

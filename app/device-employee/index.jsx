@@ -365,6 +365,7 @@ const DeviceEmployeeRegistration = () => {
         title="Device Employee"
         subtitle="Register and manage device-based employees"
         icon="shield"
+        onIconPress={() => router.back()}
         showBackButton={true}
       />
       

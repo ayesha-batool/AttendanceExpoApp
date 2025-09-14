@@ -1,7 +1,7 @@
 // Components
 import DatePickerField from "./DatePickerField";
-
 import InputField from "./InputField";
+import PhoneInputField from "./PhoneInputField";
 import SelectDropdown from "./SelectDropdown";
 // External Libraries
 import { Ionicons } from "@expo/vector-icons";
@@ -448,11 +448,11 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null, d
         validation.isValid = false;
       }
 
-      // Validate phone number format (Pakistani format: +923260764834)
+      // Validate phone number format (Pakistani format: 3001234567)
       if (form.contactNumber) {
-        const phoneRegex = /^\+923\d{9}$/;
+        const phoneRegex = /^3\d{9}$/;
         if (!phoneRegex.test(form.contactNumber)) {
-          validation.errors.contactNumber = "Phone number must be in format +923XXXXXXXXX";
+          validation.errors.contactNumber = "Phone number must be 10 digits starting with 3";
           validation.isValid = false;
         }
       }
@@ -491,7 +491,7 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null, d
         lastPromotionDate: form.lastPromotionDate.toISOString(),
         lastAdvanceDate: form.lastAdvanceDate.toISOString(),
         employeeId: form.badgeNumber,
-        phone: form.contactNumber,
+        phone: form.contactNumber ? `+92${form.contactNumber}` : '',
         postingStation: form.postingStation,
         dateOfJoining: form.joiningDate.toISOString(),
         dutyShift: form.shift,
@@ -724,13 +724,11 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null, d
 
   const renderContactTab = () => (
     <View style={styles.tabContent}>
-      <InputField 
-        label="Contact Number (+92)" 
+      <PhoneInputField 
+        label="Contact Number" 
         value={form.contactNumber} 
         onChangeText={(text) => updateForm("contactNumber", text)} 
-        placeholder="Enter phone number (e.g., 3001234567)" 
-        keyboardType="phone-pad"
-        required 
+        placeholder="0000000000" 
         error={errors.contactNumber} 
       />
       <InputField label="Email" value={form.email} onChangeText={(text) => updateForm("email", text)} 
@@ -921,20 +919,15 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null, d
           </LinearGradient>
 
           <View style={styles.tabContainer}>
-            {/* Left Arrow */}
-            <TouchableOpacity 
-              style={[styles.navArrow, !canGoPrevious && styles.navArrowDisabled]} 
-              onPress={goToPreviousTab}
-              disabled={!canGoPrevious}
-            >
-              <Ionicons 
-                name="chevron-back" 
-                size={20} 
-                color={canGoPrevious ? "#007AFF" : "#C7C7CC"} 
-              />
-            </TouchableOpacity>
+           
 
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScrollContainer}>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={true} 
+              contentContainerStyle={styles.tabScrollContainer}
+              bounces={false}
+              alwaysBounceHorizontal={false}
+            >
               {tabs.map(tab => (
                 <TouchableOpacity key={tab.key} style={[styles.tab, activeTab === tab.key && styles.activeTab]} 
                   onPress={() => setActiveTab(tab.key)}>
@@ -944,32 +937,11 @@ const AddOfficerModal = ({ visible, onClose, onSuccess, editingOfficer = null, d
               ))}
             </ScrollView>
 
-            {/* Right Arrow */}
-            <TouchableOpacity 
-              style={[styles.navArrow, !canGoNext && styles.navArrowDisabled]} 
-              onPress={goToNextTab}
-              disabled={!canGoNext}
-            >
-              <Ionicons 
-                name="chevron-forward" 
-                size={20} 
-                color={canGoNext ? "#007AFF" : "#C7C7CC"} 
-              />
-            </TouchableOpacity>
+          
 
-            {/* Tab Position Indicator */}
-            <View style={styles.tabIndicator}>
-              <Text style={styles.tabIndicatorText}>
-                {currentTabIndex + 1} of {tabs.length}
-              </Text>
-            </View>
           </View>
 
-          {/* Swipe Hint */}
-          <View style={styles.swipeHint}>
-            <Ionicons name="swap-horizontal" size={16} color="#8E8E93" />
-            <Text style={styles.swipeHintText}>Swipe or use arrows to navigate</Text>
-          </View>
+          
 
           <ScrollView 
             style={styles.scrollView} 
@@ -1090,7 +1062,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 8,
-    flex: 1,
   },
   navArrow: {
     padding: 8,
@@ -1139,7 +1110,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 8,
     marginHorizontal: 4,
-    minWidth: 100,
+    minWidth: 120,
   },
   activeTab: {
     backgroundColor: "#F2F8FF",

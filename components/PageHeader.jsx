@@ -23,9 +23,7 @@ const PageHeader = ({
 }) => {
   const router = useRouter();
 
-  const handleIconPress = () => {
-    // Removed navigation toast as requested
-    
+  const handleBackPress = () => {
     if (onIconPress) {
       try {
         onIconPress();
@@ -62,20 +60,33 @@ const PageHeader = ({
       end={{ x: 1, y: 1 }}
       style={styles.header}
     >
-      <View style={styles.headerContent}>
+      <View style={styles.headerContent} onPress={handleBackPress}>
         <View style={styles.titleContainer}>
-          <View style={styles.leftSection}>
-          
+          <View style={styles.leftSection} onPress={handleBackPress}>
+            {/* Back Button */}
+            {showBackButton && (
+              <TouchableOpacity 
+                style={styles.backButton} 
+                onPress={handleBackPress}
+                activeOpacity={0.7}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="arrow-back" size={24} color="#fff" />
+              </TouchableOpacity>
+            )}
+            
             {icon && (
               <View style={styles.headerIconContainer}>
                 <Ionicons name={icon} size={24} color="#fff" />
               </View>
             )}
-          <View style={styles.titleAndActionContainer}>
-            <Text style={styles.headerTitle}>{String(title || '')}</Text>
-            {subtitle && <Text style={styles.headerSubtitle}>{String(subtitle)}</Text>}
+            
+            <View style={styles.titleAndActionContainer}>
+              <Text style={styles.headerTitle}>{String(title || '')}</Text>
+              {subtitle && <Text style={styles.headerSubtitle}>{String(subtitle)}</Text>}
+            </View>
           </View>
-          </View>
+          
           <View style={styles.rightSection}>
             {actionButton && (
               <TouchableOpacity 
@@ -111,9 +122,9 @@ const PageHeader = ({
 
 const styles = StyleSheet.create({
   header: {
-    paddingTop:40,
-    paddingBottom:20,
-    paddingHorizontal:20,
+    paddingTop: 40,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
   },
   headerContent: {
     flexDirection: 'column',
@@ -134,13 +145,15 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   backButton: {
-    
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 12,
-    // marginRight: 12,
+    marginRight: 12,
     minWidth: 44,
     minHeight: 44,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   headerIconContainer: {
     width: 48,
@@ -208,4 +221,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default PageHeader; 
+export default PageHeader;

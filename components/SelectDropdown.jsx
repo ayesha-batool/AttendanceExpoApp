@@ -179,7 +179,7 @@ const SelectDropdown = ({
                 label={item}
                 value={item}
                 color={
-                  isAddNewOption ? '#3b82f6' : isRemoveOption ? '#ef4444' : '#374151'
+                  isAddNewOption ? '#3b82f6' : isRemoveOption ? '#ef4444' : '#000000'
                 }
               />
             ) : (
@@ -188,7 +188,7 @@ const SelectDropdown = ({
                 label={item.label}
                 value={item.value}
                 color={
-                  isAddNewOption ? '#3b82f6' : isRemoveOption ? '#ef4444' : '#374151'
+                  isAddNewOption ? '#3b82f6' : isRemoveOption ? '#ef4444' : '#000000'
                 }
               />
             );
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
   picker: {
     height: 50,
     width: '100%',
-    color: '#374151',
+    color: '#000000',
     backgroundColor: '#ffffff',
   },
   errorText: {

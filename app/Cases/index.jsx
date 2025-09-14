@@ -76,42 +76,18 @@ const CasesScreen = () => {
   const loadDropdownOptions = async () => {
     try {
       const [statusOptions, priorityOptions, categoryOptions] = await Promise.all([
-        dataCache.getOptions('case_statuses'),
-        dataCache.getOptions('case_priorities'),
-        dataCache.getOptions('case_categories')
+        hybridDataService.getOptions('case_status'),
+        hybridDataService.getOptions('case_priority'),
+        hybridDataService.getOptions('case_categories')
       ]);
 
-  
-      // Check if arrays are valid
-      const validStatusData = Array.isArray(statusOptions) ? statusOptions : [];
-      const validPriorityData = Array.isArray(priorityOptions) ? priorityOptions : [];
-      const validCategoryData = Array.isArray(categoryOptions) ? categoryOptions : [];
-
-     
-      setStatusOptions(validStatusData.map(status => ({ label: status, value: status.toLowerCase().replace(/\s+/g, '_') })));
-      setPriorityOptions(validPriorityData.map(priority => ({ label: priority, value: priority.toLowerCase() })));
-      setCategoryOptions(validCategoryData.map(category => ({ label: category, value: category })));
+      // Format options to match the expected structure
+      setStatusOptions(statusOptions.map(status => ({ label: status, value: status.toLowerCase().replace(/\s+/g, '_') })));
+      setPriorityOptions(priorityOptions.map(priority => ({ label: priority, value: priority.toLowerCase() })));
+      setCategoryOptions(categoryOptions.map(category => ({ label: category, value: category })));
     } catch (error) {
       console.error('Error loading dropdown options:', error);
       // Set default options if loading fails
-      setStatusOptions([
-        { label: 'Active', value: 'active' },
-        { label: 'Under Investigation', value: 'under_investigation' },
-        { label: 'Pending Review', value: 'pending_review' },
-        { label: 'Closed', value: 'closed' }
-      ]);
-      setPriorityOptions([
-        { label: 'Low', value: 'low' },
-        { label: 'Medium', value: 'medium' },
-        { label: 'High', value: 'high' },
-        { label: 'Critical', value: 'critical' }
-      ]);
-      setCategoryOptions([
-        { label: 'Theft', value: 'theft' },
-        { label: 'Assault', value: 'assault' },
-        { label: 'Fraud', value: 'fraud' },
-        { label: 'Other', value: 'other' }
-      ]);
     }
   };
 
@@ -446,13 +422,16 @@ const CasesScreen = () => {
                 <View style={styles.cardHeader}>
                   <View style={styles.cardTitleContainer}>
                     <Text style={styles.caseTitle} numberOfLines={2}>{String(item.title || 'Untitled Case')}</Text>
-                    <View style={styles.caseMetaRow}>
-                      <View style={styles.caseMeta}>
-                        <Ionicons name="folder-outline" size={10} color="#6366f1" />
-                        <Text style={styles.caseCategoryText}>{String(item.category || 'General')}</Text>
+                    <View style={styles.caseMetaRowLeft}>
+                      <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(item.priority) }]}>
+                        <Text style={styles.priorityText}>{String(item.priority || 'Medium').toUpperCase()}</Text>
                       </View>
                       <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
                         <Text style={styles.statusText}>{String(item.status || 'Unknown').toUpperCase()}</Text>
+                      </View>
+                      <View style={styles.caseMeta}>
+                        <Ionicons name="folder-outline" size={10} color="#6366f1" />
+                        <Text style={styles.caseCategoryText}>{String(item.category || 'General')}</Text>
                       </View>
                     </View>
                   </View>
@@ -466,53 +445,17 @@ const CasesScreen = () => {
                   </View>
                 </View>
 
-                {/* Content Section */}
+                {/* Simplified Content Section */}
                 <View style={styles.cardContent}>
                   <View style={styles.infoRow}>
                     <View style={styles.infoIconContainer}>
                       <Ionicons name="person-outline" size={14} color="#6366f1" />
                     </View>
                     <View style={styles.infoContent}>
-                      <Text style={styles.infoLabel}>Assigned Officer</Text>
+                      <Text style={styles.infoLabel}>Officer</Text>
                       <Text style={styles.infoValue}>{String(item.assignedOfficer || 'Unassigned')}</Text>
                     </View>
                   </View>
-                  
-                  <View style={styles.infoRow}>
-                    <View style={styles.infoIconContainer}>
-                      <Ionicons name="calendar-outline" size={14} color="#6366f1" />
-                    </View>
-                    <View style={styles.infoContent}>
-                      <Text style={styles.infoLabel}>Start Date</Text>
-                      <Text style={styles.infoValue}>{String(item.startDate ? new Date(item.startDate).toLocaleDateString() : 'Not set')}</Text>
-                  </View>
-                </View>
-                
-                  {item.location && (
-                    <View style={styles.infoRow}>
-                      <View style={styles.infoIconContainer}>
-                        <Ionicons name="location-outline" size={14} color="#6366f1" />
-                  </View>
-                      <View style={styles.infoContent}>
-                        <Text style={styles.infoLabel}>Location</Text>
-                        <Text style={styles.infoValue}>{String(item.location)}</Text>
-                      </View>
-                    </View>
-                  )}
-                </View>
-
-                {/* Footer Section */}
-                <View style={styles.cardFooter}>
-                  <View style={styles.priorityContainer}>
-                    <Text style={styles.priorityLabel}>Priority</Text>
-                  <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(item.priority) }]}>
-                      <Text style={styles.priorityText}>{String(item.priority || 'Medium').toUpperCase()}</Text>
-                  </View>
-                  </View>
-                  <TouchableOpacity style={styles.viewButton} onPress={() => handleView(item)}>
-                    <Text style={styles.viewButtonText}>View Details</Text>
-                    <Ionicons name="chevron-forward" size={14} color="#6366f1" />
-                  </TouchableOpacity>
                 </View>
                 
               </LinearGradient>
@@ -854,6 +797,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  caseMetaRowLeft: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    gap: 8,
   },
   caseMeta: {
     flexDirection: 'row',
